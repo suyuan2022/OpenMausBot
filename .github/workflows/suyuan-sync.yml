@@ -1,8 +1,9 @@
-# Daily: merge upstream main into suyuan through a PR. A clean merge waits for that PR's CI and merges itself, which
-# triggers suyuan-release; a conflicting one stays open for a person to resolve locally.
-# SYNC_TOKEN is a fine-grained token for this repository only (Contents, Pull requests, Workflows, Actions: read and
-# write; Actions is for rerunning a flaky CI job).
-# The default GITHUB_TOKEN cannot push upstream's workflow edits, and PRs it opens never start CI.
+# Daily: merge upstream main into suyuan through a PR. A clean merge gets GitHub auto-merge, so it lands once the
+# required check "CI" (branch protection on suyuan) passes, and that merge triggers suyuan-release. suyuan-sync-retry.yml
+# reruns a failed CI once; a conflicting merge stays open for a person to resolve locally.
+# SYNC_TOKEN is a fine-grained token for this repository only (Contents, Pull requests, Workflows: read and write).
+# The default GITHUB_TOKEN cannot push upstream's workflow edits, PRs it opens never start CI, and merges it makes never
+# start suyuan-release.
 name: suyuan · sync upstream
 
 on:
@@ -20,7 +21,7 @@ concurrency:
 jobs:
   sync:
     runs-on: ubuntu-latest
-    timeout-minutes: 240
+    timeout-minutes: 15
     env:
       GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
       # The merge step adds a remote named upstream, which gh would otherwise pick as the repository for every call.
@@ -66,40 +67,22 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$STATUS" = clean ]; then
-            body="原作者 main 到 $SHORT 的更新，自动合并没有冲突。CI 通过后这个流程会自己合并，合并后自动打安装包。"
+            body="原作者 main 分支截至 commit $SHORT 的更新，自动合并没有冲突。CI 通过后 GitHub 会自动合并，合并后自动打安装包。CI 失败会自动重跑一次，再失败就留在这里等人看。"
           else
-            body="原作者 main 到 $SHORT 的更新和 suyuan 有冲突，要在本地解：在 suyuan 上 git merge upstream/main，解完推到 suyuan，再关掉这个 PR。"
+            body="原作者 main 分支截至 commit $SHORT 的更新和 suyuan 有冲突，要在本地解：在 suyuan 上 git merge upstream/main，解完推到 suyuan，再关掉这个 PR。"
           fi
-          gh pr view "$BRANCH" --json number >/dev/null 2>&1 \
-            || gh pr create --base suyuan --head "$BRANCH" --title "同步原作者更新 $SHORT" --body "$body"
-      - name: Wait for CI, then merge
+          pr=$(gh pr list --head "$BRANCH" --state open --json number -q '.[0].number')
+          if [ -z "$pr" ]; then
+            gh pr create --base suyuan --head "$BRANCH" --title "同步原作者更新 $SHORT" --body "$body"
+            pr=$(gh pr list --head "$BRANCH" --state open --json number -q '.[0].number')
+          fi
+          # An older sync PR that never landed is covered by this one, which carries all of upstream up to $SHORT.
+          for old in $(gh pr list --state open --json number,headRefName \
+              -q ".[] | select(.headRefName | startswith(\"sync/upstream-\")) | select(.headRefName != \"$BRANCH\") | .number"); do
+            gh pr close "$old" --delete-branch --comment "由 #$pr 取代：它包含原作者 main 分支截至 commit $SHORT 的全部更新。"
+          done
+      - name: Merge once CI passes
         if: steps.merge.outputs.status == 'clean'
         env:
           BRANCH: ${{ steps.merge.outputs.branch }}
-        run: |
-          set -euo pipefail
-          sha=$(gh pr view "$BRANCH" --json headRefOid -q .headRefOid)
-          # Waits for every workflow run this commit started. A run completes only once all its jobs have, the summary
-          # job "CI" included, while a poll of the PR's checks can land between one job ending and the next registering.
-          settle() {
-            local ids="" failed=0
-            for _ in $(seq 1 20); do
-              ids=$(gh run list --commit "$sha" --event pull_request --json databaseId -q '.[].databaseId')
-              [ -n "$ids" ] && break
-              sleep 30
-            done
-            [ -n "$ids" ] || { echo "::error::no workflow run started for $sha"; return 2; }
-            for id in $ids; do gh run watch "$id" --exit-status --interval 60 >/dev/null || failed=1; done
-            return $failed
-          }
-          if ! settle; then
-            # Upstream's suite has timing-sensitive tests and crashing workers; one rerun of the failed jobs tells a
-            # flake from a real break, which then stays open for a person.
-            for id in $(gh run list --commit "$sha" --event pull_request --status failure --json databaseId -q '.[].databaseId'); do
-              gh run rerun "$id" --failed
-            done
-            sleep 30
-            settle
-          fi
-          gh pr checks "$BRANCH"
-          gh pr merge "$BRANCH" --merge --delete-branch
+        run: gh pr merge "$BRANCH" --auto --merge --match-head-commit "$(git rev-parse HEAD)"

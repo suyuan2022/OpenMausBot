@@ -1,0 +1,30 @@
+# When CI fails on a daily sync PR (suyuan-sync.yml), rerun its failed jobs once. Upstream's suite has timing-sensitive
+# tests and crashing workers, so one failure may be a flake; a second is a real break and the PR stays open for a person.
+# The rerun reports to the same "CI" check, so a green rerun lets the PR's auto-merge go ahead.
+name: suyuan · retry sync CI
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+
+permissions:
+  actions: write
+
+jobs:
+  retry:
+    if: >-
+      github.event.workflow_run.conclusion == 'failure'
+      && github.event.workflow_run.run_attempt == 1
+      && github.event.workflow_run.event == 'pull_request'
+      && startsWith(github.event.workflow_run.head_branch, 'sync/upstream-')
+      && github.event.workflow_run.head_repository.full_name == github.repository
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Rerun the failed jobs
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RUN: ${{ github.event.workflow_run.id }}
+        run: gh run rerun "$RUN" --failed
