@@ -1,6 +1,7 @@
 # Daily: merge upstream main into suyuan through a PR. A clean merge waits for that PR's CI and merges itself, which
 # triggers suyuan-release; a conflicting one stays open for a person to resolve locally.
-# SYNC_TOKEN is a fine-grained token for this repository only (Contents, Pull requests, Workflows: read and write).
+# SYNC_TOKEN is a fine-grained token for this repository only (Contents, Pull requests, Workflows, Actions: read and
+# write; Actions is for rerunning a flaky CI job).
 # The default GITHUB_TOKEN cannot push upstream's workflow edits, and PRs it opens never start CI.
 name: suyuan · sync upstream
 
@@ -76,5 +77,12 @@ jobs:
         run: |
           set -euo pipefail
           sleep 60
-          gh pr checks "$BRANCH" --watch --interval 60
+          if ! gh pr checks "$BRANCH" --watch --interval 60; then
+            # Upstream's suite has timing-sensitive tests and crashing workers; one rerun of the failed jobs tells a
+            # flake from a real break, which then stays open for a person.
+            run=$(gh run list --branch "$BRANCH" --workflow CI --limit 1 --json databaseId -q '.[0].databaseId')
+            gh run rerun "$run" --failed
+            sleep 60
+            gh pr checks "$BRANCH" --watch --interval 60
+          fi
           gh pr merge "$BRANCH" --merge --delete-branch
