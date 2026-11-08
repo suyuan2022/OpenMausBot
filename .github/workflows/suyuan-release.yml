@@ -1,0 +1,55 @@
+# Every push to suyuan becomes a GitHub release "suyuan-v<upstream version>-suyuan.<run>" carrying the npm tarball
+# that scripts/suyuan/deploy-vm.sh installs. Same assembly as npm-package.yml, minus the npm publish.
+name: suyuan · release
+
+on:
+  push:
+    branches: [suyuan]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: suyuan-release
+  cancel-in-progress: false
+
+jobs:
+  pack:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: pnpm/action-setup@ff378ebe6b225b0680b81c1ad4498ae0d1d3a5e3 # v6.0.10
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+      - run: pnpm install --frozen-lockfile
+        env:
+          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      - name: Stamp the fork version
+        run: |
+          node -e '
+            const fs = require("fs");
+            const p = JSON.parse(fs.readFileSync("package.json", "utf8"));
+            p.version = `${p.version.replace(/-.*$/, "")}-suyuan.${process.env.GITHUB_RUN_NUMBER}`;
+            fs.writeFileSync("package.json", JSON.stringify(p, null, 2) + "\n");
+          '
+      - run: pnpm build:server && pnpm exec vite build && node scripts/build-npm-package.mjs
+      - name: Pack and prove it starts
+        run: |
+          set -euo pipefail
+          cd release/npm && npm pack --silent && cd ../..
+          tgz=$(ls release/npm/openmausbot-*.tgz)
+          mkdir -p /tmp/omb-smoke && tar -xzf "$tgz" -C /tmp/omb-smoke
+          node /tmp/omb-smoke/package/cli.js --version
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          version=$(node -p 'require("./package.json").version')
+          gh release create "suyuan-v$version" release/npm/openmausbot-*.tgz \
+            --target "$GITHUB_SHA" --latest \
+            --title "suyuan $version" \
+            --notes "$(git log -1 --pretty='%h %s')"

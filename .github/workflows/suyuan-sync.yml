@@ -1,0 +1,80 @@
+# Daily: merge upstream main into suyuan through a PR. A clean merge waits for that PR's CI and merges itself, which
+# triggers suyuan-release; a conflicting one stays open for a person to resolve locally.
+# SYNC_TOKEN is a fine-grained token for this repository only (Contents, Pull requests, Workflows: read and write).
+# The default GITHUB_TOKEN cannot push upstream's workflow edits, and PRs it opens never start CI.
+name: suyuan · sync upstream
+
+on:
+  schedule:
+    - cron: "7 1 * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: suyuan-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 240
+    env:
+      GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+    steps:
+      - name: Require SYNC_TOKEN
+        run: test -n "$GH_TOKEN" || { echo "::error::Repository secret SYNC_TOKEN is missing (see the comment at the top of this file)"; exit 1; }
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          ref: suyuan
+          fetch-depth: 0
+          token: ${{ secrets.SYNC_TOKEN }}
+      - name: Merge upstream main
+        id: merge
+        run: |
+          set -euo pipefail
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git remote add upstream https://github.com/milind-soni/OpenMausBot.git
+          git fetch --no-tags upstream main
+          if git merge-base --is-ancestor upstream/main HEAD; then
+            echo "status=current" >> "$GITHUB_OUTPUT"; exit 0
+          fi
+          short=$(git rev-parse --short upstream/main)
+          branch="sync/upstream-$short"
+          echo "branch=$branch" >> "$GITHUB_OUTPUT"
+          echo "short=$short" >> "$GITHUB_OUTPUT"
+          if git merge --no-edit -m "Merge upstream main ($short)" upstream/main; then
+            echo "status=clean" >> "$GITHUB_OUTPUT"
+            git checkout -B "$branch"
+          else
+            git merge --abort
+            echo "status=conflict" >> "$GITHUB_OUTPUT"
+            git checkout -B "$branch" upstream/main
+          fi
+          git push -f origin "$branch"
+      - name: Open the PR
+        if: steps.merge.outputs.status != 'current'
+        env:
+          BRANCH: ${{ steps.merge.outputs.branch }}
+          SHORT: ${{ steps.merge.outputs.short }}
+          STATUS: ${{ steps.merge.outputs.status }}
+        run: |
+          set -euo pipefail
+          if [ "$STATUS" = clean ]; then
+            body="原作者 main 到 $SHORT 的更新，自动合并没有冲突。CI 通过后这个流程会自己合并，合并后自动打安装包。"
+          else
+            body="原作者 main 到 $SHORT 的更新和 suyuan 有冲突，要在本地解：在 suyuan 上 git merge upstream/main，解完推到 suyuan，再关掉这个 PR。"
+          fi
+          gh pr view "$BRANCH" --json number >/dev/null 2>&1 \
+            || gh pr create --base suyuan --head "$BRANCH" --title "同步原作者更新 $SHORT" --body "$body"
+      - name: Wait for CI, then merge
+        if: steps.merge.outputs.status == 'clean'
+        env:
+          BRANCH: ${{ steps.merge.outputs.branch }}
+        run: |
+          set -euo pipefail
+          sleep 60
+          gh pr checks "$BRANCH" --watch --interval 60
+          gh pr merge "$BRANCH" --merge --delete-branch
