@@ -25,6 +25,6 @@ describe("the fork's hooks into upstream files", () => {
   it("the app runs the push hook, shows its switch, and leaves notifications to push where it is on", () => {
     expect(functionBody(source("src/App.tsx"), "Shell")).toContain("useWebPush(state, dispatch)");
     expect(functionBody(source("src/components/NotificationSettingsRows.tsx"), "NotificationRows")).toContain("<WebPushRow />");
-    expect(functionBody(source("src/lib/notify.ts"), "showNotification")).toContain("if (pushHandlesNotifications()) return;");
+    expect(functionBody(source("src/lib/notify.ts"), "showNotification")).toContain("if (pushHandlesNotifications() && !frame.forPerson) return;");
   });
 });

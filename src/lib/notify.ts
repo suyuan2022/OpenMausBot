@@ -39,7 +39,7 @@ export function showNotification(
   visibleThreadId?: string | null,
 ) {
   if (typeof Notification === "undefined") return;
-  if (pushHandlesNotifications()) return; // suyuan fork: this device's push shows it (src/suyuan/web-push.ts)
+  if (pushHandlesNotifications() && !frame.forPerson) return; // suyuan fork: this device's push shows it (src/suyuan/web-push.ts)
   if (frame.kind === "done" && !finishedNotificationsEnabled()) return;
   const spend = frame.kind === "spend";
   if (!spend && document.hasFocus() && visibleThreadId === frame.threadId) return;

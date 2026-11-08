@@ -1,7 +1,7 @@
 // suyuan fork: the "push to this device" switch under the device notification rows (src/suyuan/web-push.ts).
 import { useEffect, useState } from "react";
 import { SettingRow, Switch } from "@/components/SettingsPrimitives";
-import { needsHomeScreen, sendTestPush, turnOffPush, turnOnPush, webPushSupported, workingSubscription } from "./web-push";
+import { needsHomeScreen, turnOffPush, turnOnPush, webPushSupported, workingSubscription } from "./web-push";
 
 const TITLE = "推送到这台设备";
 
@@ -32,10 +32,9 @@ export function WebPushRow() {
         await turnOffPush();
         setOn(false);
       } else {
-        const subscription = await turnOnPush();
+        const { ok, status } = await turnOnPush();
         setOn(true);
-        const { ok, status } = await sendTestPush(subscription.endpoint);
-        if (!ok) setProblem(`已开启，但测试推送没送到（推送服务回：${status}）。服务端日志里搜 [web-push] 看详情。`);
+        if (!ok) setProblem(`已开启，但测试推送没送到（推送服务回：${status}）。送达之前，页面开着时仍由页面弹通知。服务端日志里搜 [web-push] 看详情。`);
       }
     } catch (error) {
       setProblem(error instanceof Error ? error.message : String(error));

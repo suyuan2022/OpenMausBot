@@ -25,8 +25,9 @@ export function pushWorker(): Promise<ServiceWorkerRegistration> {
 }
 
 let handledByPush = false;
-/** True once this device holds a working push subscription: src/lib/notify.ts then leaves notifications to the worker,
- * so one notification never shows (and sounds) twice. */
+/** True while this device holds a subscription the server says its pushes reach: src/lib/notify.ts then leaves
+ * notifications to the worker, so one notification never shows (and sounds) twice. Until the server says so, the page
+ * keeps showing its own, so a device whose pushes fail still hears from its bots while open. */
 export function pushHandlesNotifications(): boolean {
   return handledByPush;
 }
@@ -44,28 +45,36 @@ function sameKey(held: ArrayBuffer | null, wanted: Uint8Array): boolean {
 
 const serverKey = async () => keyBytes((await api<{ publicKey: string }>("/api/suyuan/push")).publicKey);
 
-function sendSubscription(subscription: PushSubscription): Promise<unknown> {
+/** Hands the server this subscription with today's preferences; true when it says pushes to it get through. */
+async function sendSubscription(subscription: PushSubscription): Promise<boolean> {
   const prefs = { done: finishedNotificationsEnabled(), sound: notificationSoundsEnabled() };
-  return api("/api/suyuan/push/subscribe", { method: "POST", body: JSON.stringify({ ...subscription.toJSON(), prefs }) });
+  const answer = await api<{ delivering?: boolean }>("/api/suyuan/push/subscribe", { method: "POST", body: JSON.stringify({ ...subscription.toJSON(), prefs }) });
+  return answer.delivering !== false;
 }
 
-/** This device's subscription if it still works: made for the server's current key, with permission still granted.
+/** This device's subscription while it can still work: permission still granted, made for the server's current key.
  * One made for another key (the data directory was replaced) is dropped, so the switch shows off instead of lying.
- * The server hears it again, with today's preferences, in case it lost it. */
+ * The server hears it again, in case it lost it. Talking to the server is best effort: while it can't be reached the
+ * subscription still counts, so the page goes on reporting what it shows, and it keeps its own notifications. */
 export async function workingSubscription(): Promise<PushSubscription | null> {
   const subscription = await (await pushWorker()).pushManager.getSubscription();
-  let working = subscription !== null && Notification.permission === "granted";
-  if (subscription && working && !sameKey(subscription.options.applicationServerKey, await serverKey())) {
-    await subscription.unsubscribe().catch(() => {});
-    working = false;
+  if (!subscription || Notification.permission !== "granted") {
+    handledByPush = false;
+    return null;
   }
-  if (subscription && working) await sendSubscription(subscription);
-  handledByPush = working;
-  return working ? subscription : null;
+  const key = await serverKey().catch(() => null);
+  if (key && !sameKey(subscription.options.applicationServerKey, key)) {
+    handledByPush = false;
+    await subscription.unsubscribe().catch(() => {});
+    return null;
+  }
+  handledByPush = await sendSubscription(subscription).catch(() => false);
+  return subscription;
 }
 
-/** Asks for permission first, while the tap that called this still counts as one: iOS only asks from a tap. */
-export async function turnOnPush(): Promise<PushSubscription> {
+/** Asks for permission first, while the tap that called this still counts as one: iOS only asks from a tap. Ends with
+ * one test push, whose answer says whether the page can leave its notifications to push. */
+export async function turnOnPush(): Promise<{ ok: boolean; status: string }> {
   const permission = await Notification.requestPermission();
   if (permission !== "granted") throw new Error(permission === "denied" ? "这个网站的通知被关掉了，到系统设置里打开。" : "没有允许通知。");
   const worker = await pushWorker();
@@ -77,9 +86,10 @@ export async function turnOnPush(): Promise<PushSubscription> {
   }
   subscription ??= await worker.pushManager.subscribe({ userVisibleOnly: true, applicationServerKey: key });
   await sendSubscription(subscription);
-  handledByPush = true;
+  const test = await api<{ ok: boolean; status: string }>("/api/suyuan/push/test", { method: "POST", body: JSON.stringify({ endpoint: subscription.endpoint }) });
+  handledByPush = test.ok;
   window.dispatchEvent(new Event(PUSH_CHANGED));
-  return subscription;
+  return test;
 }
 
 export async function turnOffPush(): Promise<void> {
@@ -95,11 +105,7 @@ export async function turnOffPush(): Promise<void> {
 /** Tells the server this device's notification preferences changed. */
 export async function resendSubscription(): Promise<void> {
   const subscription = await (await pushWorker()).pushManager.getSubscription();
-  if (subscription && handledByPush) await sendSubscription(subscription);
-}
-
-export function sendTestPush(endpoint: string): Promise<{ ok: boolean; status: string }> {
-  return api("/api/suyuan/push/test", { method: "POST", body: JSON.stringify({ endpoint }) });
+  if (subscription && Notification.permission === "granted") handledByPush = await sendSubscription(subscription);
 }
 
 /** `leaving`: the page is going out of sight, so the request has to outlive it. */

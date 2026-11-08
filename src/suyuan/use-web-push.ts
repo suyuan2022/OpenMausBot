@@ -45,13 +45,19 @@ export function useWebPush(state: AppState, dispatch: (action: Action) => void):
       endpointRef.current = subscription?.endpoint ?? null;
       setEndpoint(endpointRef.current);
     }, () => {});
+    // Asked again whenever the app comes back: the server may have been unreachable, or its pushes started failing.
+    const onVisible = () => { if (document.visibilityState === "visible") refresh(); };
     navigator.serviceWorker.addEventListener("message", onMessage);
     navigator.serviceWorker.startMessages();
     window.addEventListener(PUSH_CHANGED, refresh);
+    window.addEventListener("online", refresh);
+    document.addEventListener("visibilitychange", onVisible);
     void pushWorker().then(refresh, () => {});
     return () => {
       navigator.serviceWorker.removeEventListener("message", onMessage);
       window.removeEventListener(PUSH_CHANGED, refresh);
+      window.removeEventListener("online", refresh);
+      document.removeEventListener("visibilitychange", onVisible);
     };
   }, []);
 

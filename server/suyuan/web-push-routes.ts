@@ -1,6 +1,6 @@
 // suyuan fork: the routes behind the "push to this device" switch in notification settings (server/suyuan/web-push.ts).
 //   GET  /api/suyuan/push              { publicKey }
-//   POST /api/suyuan/push/subscribe    a PushSubscription's toJSON() plus prefs { done, sound }
+//   POST /api/suyuan/push/subscribe    a PushSubscription's toJSON() plus prefs { done, sound } → { ok, delivering }
 //   POST /api/suyuan/push/unsubscribe  { endpoint }
 //   POST /api/suyuan/push/viewing      { endpoint, threadId | null }: the conversation this device shows right now
 //   POST /api/suyuan/push/test         { endpoint }: one push to that device, so turning it on is proven at once
@@ -51,8 +51,7 @@ export function createWebPushRoutes(deps: { push: () => WebPush; isOwner(auth: R
       case "subscribe": {
         const subscription = subscriptionOf(given);
         if (!subscription) return json(res, 400, { error: "Not a push subscription: a push service's https endpoint with p256dh and auth keys" });
-        push.subscribe(subscription);
-        return json(res, 200, { ok: true });
+        return json(res, 200, { ok: true, ...push.subscribe(subscription) });
       }
       case "unsubscribe":
         if (!httpsUrl(given.endpoint)) return json(res, 400, { error: "endpoint must be an https URL" });

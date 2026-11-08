@@ -199,6 +199,32 @@ describe("createWebPush", () => {
     expect(payload.body.length).toBeGreaterThan(500);
   });
 
+  it("ends even when the fields around the body are too big, and never cuts an emoji in half", () => {
+    const bloated = pushPayload({ ...notification("t1"), botId: "b".repeat(4000), title: "\u0001".repeat(300) });
+    expect(Buffer.byteLength(JSON.stringify(bloated))).toBeLessThanOrEqual(PAYLOAD_BYTES);
+    expect(bloated).toMatchObject({ title: "OpenMausBot", body: "" });
+    for (let length = 1000; length < 1010; length++) {
+      const { body } = pushPayload({ ...notification("t1"), body: "😀".repeat(length) });
+      expect(body.endsWith("…")).toBe(true);
+      expect(body).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+    }
+  });
+
+  it("tells a page heard again whether its pushes get through, which only new keys reset", async () => {
+    let answer = 500;
+    const { push } = host(() => answer);
+    const phone = device();
+    expect(push.subscribe(phone)).toEqual({ delivering: true });
+    await push.deliver(notification("t1"));
+    expect(push.subscribe(phone)).toEqual({ delivering: false });
+    answer = 201;
+    expect((await push.test(phone.endpoint)).ok).toBe(true);
+    expect(push.subscribe(phone)).toEqual({ delivering: true });
+    answer = 500;
+    await push.deliver(notification("t1"));
+    expect(push.subscribe({ ...phone, keys: device().keys })).toEqual({ delivering: true });
+  });
+
   it("keeps a key file it can't read rather than replacing the keys every device subscribed with", async () => {
     const { dir, log } = host();
     writeFileSync(join(dir, PUSH_FILE), "{ not json");

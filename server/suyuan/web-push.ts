@@ -18,6 +18,9 @@ export interface PushSubscriptionRecord {
   endpoint: string;
   keys: { p256dh: string; auth: string };
   prefs?: PushPrefs;
+  /** Whether the last push to it got through; absent before the first. A page keeps showing its own notifications while
+   * this is false (src/suyuan/web-push.ts), so a device whose pushes fail still hears from its bots while open. */
+  delivered?: boolean;
 }
 
 export interface Vapid {
@@ -52,6 +55,8 @@ const SUBJECT = "https://github.com/suyuan2022/OpenMausBot";
 const RECORD_SIZE = 4096;
 
 const utf8 = (value: string) => Buffer.from(value, "utf8");
+/** The first `count` characters, never half of an emoji's surrogate pair. */
+const firstChars = (text: string, count: number) => Array.from(text).slice(0, count).join("");
 
 /** One RFC 8291 aes128gcm body. `fixed` pins the sender key and salt, which only the RFC's worked example needs. */
 export function encryptPushPayload(
@@ -98,7 +103,7 @@ function newVapid(): Vapid {
  * control character in command output 6 once escaped. */
 export function pushPayload(notification: Notification, prefs?: PushPrefs): PushPayload {
   const payload: PushPayload = {
-    title: notification.title.slice(0, 200),
+    title: firstChars(notification.title, 200),
     body: notification.body,
     tag: notification.kind === "spend" ? "openmausbot:spend" : `openmausbot:${notification.botId}`,
     botId: notification.botId,
@@ -106,11 +111,15 @@ export function pushPayload(notification: Notification, prefs?: PushPrefs): Push
     ...(notification.avatarUrl && notification.avatarUrl.length <= 300 ? { icon: notification.avatarUrl } : {}),
     ...(prefs?.sound === false ? { silent: true } : {}),
   };
-  while (payload.body && Buffer.byteLength(JSON.stringify(payload)) > PAYLOAD_BYTES) {
-    payload.body = `${payload.body.slice(0, Math.floor(payload.body.length * 0.8))}…`;
-    if (payload.body === "…") payload.body = "";
+  const fits = () => Buffer.byteLength(JSON.stringify(payload)) <= PAYLOAD_BYTES;
+  let kept = Array.from(payload.body);
+  while (!fits() && kept.length > 0) {
+    // At least one character fewer every round, so the loop ends even when the other fields alone are too big.
+    kept = kept.slice(0, Math.min(Math.floor(kept.length * 0.8), kept.length - 1));
+    payload.body = kept.length ? `${kept.join("")}…` : "";
   }
-  return payload;
+  // Only the body is meant to run long; a notification whose other fields overflow still shows, just bare.
+  return fits() ? payload : { title: "OpenMausBot", body: "", tag: "openmausbot", ...(payload.silent ? { silent: true } : {}) };
 }
 
 export const TEST_PAYLOAD: PushPayload = {
@@ -128,7 +137,8 @@ export interface PushOutcome {
 
 export interface WebPush {
   publicKey(): string;
-  subscribe(subscription: PushSubscriptionRecord): void;
+  /** `delivering`: false while the last push to this device failed. */
+  subscribe(subscription: PushSubscriptionRecord): { delivering: boolean };
   unsubscribe(endpoint: string): void;
   /** `threadId` null: this device shows no conversation, or is out of sight. */
   viewing(endpoint: string, threadId: string | null): void;
@@ -212,11 +222,13 @@ export function createWebPush(options: {
   async function pushAll(sends: Array<{ subscription: PushSubscriptionRecord; payload: PushPayload }>): Promise<PushOutcome[]> {
     const outcomes = await Promise.all(sends.map(({ subscription, payload }) => pushTo(subscription, payload)));
     const gone = new Set(sends.filter((_, i) => outcomes[i]!.gone).map(({ subscription }) => subscription.endpoint));
-    if (gone.size) {
-      const current = load();
-      save({ ...current, subscriptions: current.subscriptions.filter((one) => !gone.has(one.endpoint)) });
-      for (const endpoint of gone) viewing.delete(endpoint);
-    }
+    const delivered = new Map(sends.map(({ subscription }, i) => [subscription.endpoint, outcomes[i]!.ok]));
+    const current = load();
+    const subscriptions = current.subscriptions
+      .filter((one) => !gone.has(one.endpoint))
+      .map((one) => delivered.has(one.endpoint) && one.delivered !== delivered.get(one.endpoint) ? { ...one, delivered: delivered.get(one.endpoint) } : one);
+    if (gone.size || subscriptions.some((one, i) => one !== current.subscriptions[i])) save({ ...current, subscriptions });
+    for (const endpoint of gone) viewing.delete(endpoint);
     return outcomes;
   }
 
@@ -224,9 +236,14 @@ export function createWebPush(options: {
     publicKey: () => load().vapid.publicKey,
     subscribe({ endpoint, keys, prefs }) {
       const current = load();
-      const kept = current.subscriptions.filter((one) => one.endpoint !== endpoint);
-      const record: PushSubscriptionRecord = { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth }, ...(prefs ? { prefs } : {}) };
-      save({ ...current, subscriptions: [...kept, record] });
+      const before = current.subscriptions.find((one) => one.endpoint === endpoint);
+      // The same subscription heard again (every page load does) keeps what its last push did; new keys start over.
+      const delivered = before && before.keys.p256dh === keys.p256dh && before.keys.auth === keys.auth ? before.delivered : undefined;
+      const record: PushSubscriptionRecord = {
+        endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth }, ...(prefs ? { prefs } : {}), ...(delivered === undefined ? {} : { delivered }),
+      };
+      save({ ...current, subscriptions: [...current.subscriptions.filter((one) => one !== before), record] });
+      return { delivering: delivered !== false };
     },
     unsubscribe(endpoint) {
       const current = load();

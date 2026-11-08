@@ -13,7 +13,7 @@ const ENDPOINT = "https://web.push.apple.com/QGx3abc";
 function fakePush(): WebPush {
   return {
     publicKey: vi.fn(() => "BPUB"),
-    subscribe: vi.fn(),
+    subscribe: vi.fn(() => ({ delivering: true })),
     unsubscribe: vi.fn(),
     viewing: vi.fn(),
     deliver: vi.fn(async () => {}),
@@ -42,7 +42,7 @@ describe("/api/suyuan/push", () => {
 
   it("stores a real subscription and refuses anything else", async () => {
     const good = await call("/api/suyuan/push/subscribe", "POST", { endpoint: ENDPOINT, expirationTime: null, keys: KEYS });
-    expect(good.answers).toEqual([[200, { ok: true }]]);
+    expect(good.answers).toEqual([[200, { ok: true, delivering: true }]]);
     expect(good.push.subscribe).toHaveBeenCalledWith({ endpoint: ENDPOINT, keys: KEYS });
     const withPrefs = await call("/api/suyuan/push/subscribe", "POST", { endpoint: "https://fcm.googleapis.com/fcm/send/abc", keys: KEYS, prefs: { done: false, sound: true } });
     expect(withPrefs.push.subscribe).toHaveBeenCalledWith({ endpoint: "https://fcm.googleapis.com/fcm/send/abc", keys: KEYS, prefs: { done: false, sound: true } });
