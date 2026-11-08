@@ -21,7 +21,8 @@
    `env -u CLAUDECODE claude -p "<审查任务>" --model opus --effort xhigh --allowedTools "Read,Grep,Glob,Bash(git:*),Bash(gh pr view:*),Bash(gh pr diff:*)"`
    它提的意见由你判断改不改。改动大的，再让它审一次改过的部分，到此为止。
 5. **CI 绿了就合并。** 合并会触发自动流程 `.github/workflows/suyuan-release.yml`，打出名为 `suyuan-v<版本>` 的 release，附 npm 安装包。
-6. **部署。** 在 MacBook 的这个仓库里跑 `scripts/suyuan/deploy-vm.sh`：用 gh 下载最新 release，拷到虚拟机，由 `deploy-vm-remote.sh` 装上并重启服务（虚拟机访问 GitHub 时通时断，所以由 MacBook 中转）。脚本不会打断干活的 bot：开始时有 bot 在忙就拒绝，装完时有 bot 在忙就等，最多等 10 分钟。已经是这个版本时什么也不做。出问题就用 `--rollback` 换回上一版。
+6. **部署。** 在 MacBook 的这个仓库里跑 `scripts/suyuan/deploy-vm.sh`：用 gh 下载最新 release，拷到虚拟机，由 `deploy-vm-remote.sh` 装上并重启服务（虚拟机访问 GitHub 时通时断，所以由 MacBook 中转）。脚本不会打断干活的 bot：有 bot 在忙就先等，最多等 10 分钟，等不到就什么都不装、直接退出。已经在跑这个版本时什么也不做。出问题就用 `--rollback` 换回上一版。
+   脚本最长要跑十几分钟，用 Bash 的后台运行或把超时调到 15 分钟。断线不影响部署本身，日志在虚拟机的 `~/.openmausbot-releases/deploy.log`。
 7. **交给夙愿手测。** 只留只有手机上才能判断的几项，比如真机推送、主屏幕网页 App 的手感。写清测什么、在哪测、看到什么算对。
    完成：`FORK.md` 的改动清单加了这一行。
 
