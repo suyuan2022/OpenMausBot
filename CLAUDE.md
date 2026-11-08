@@ -30,3 +30,4 @@
 
 - `ssh lizhi-vm` 登录。服务由 LaunchAgent `com.openmausbot.serve` 管，数据在 `~/.openmausbot`。那是夙愿的真实数据，只读着看。
 - 升级只走 `deploy-vm.sh`。`npm install -g openmausbot` 会把 fork 换回官方版。
+- 公网入口 `bot.tokenic.cn` 是北京服务器（`ssh root@82.157.117.245`）上的 nginx，配置在 `/etc/nginx/sites-available/bot.tokenic.cn`，经虚拟机打过来的 ssh 反向隧道转到虚拟机的 8799。这台服务器出口只有约 3 Mbps，是手机打开慢的瓶颈，所以 nginx 对脚本和接口数据开了 gzip。这台服务器上还跑着别的站点，改配置前先备份，`nginx -t` 通过再 `systemctl reload nginx`。
