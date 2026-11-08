@@ -2,13 +2,14 @@
 // (a running page gets a message from the worker, a fresh one ?pushBot=&pushThread=), and while push is on here the
 // server hears which conversation this device shows, so a reply in it doesn't buzz the phone already open on it.
 import { useEffect, useRef, useState } from "react";
+import { useFinishedNotifications, useNotificationSounds } from "@/lib/notification-preferences";
 import { useShowThreads } from "@/lib/thread-preferences";
 import { openThread, type Action, type AppState, type ThreadTarget } from "@/state/store";
 import { visibleNotificationThread } from "@/state/thread-navigation";
-import { api } from "@/state/api";
-import { currentSubscription, PUSH_CHANGED, pushWorker, reportViewing, webPushSupported } from "./web-push";
+import { PUSH_CHANGED, pushWorker, reportViewing, resendSubscription, webPushSupported, workingSubscription } from "./web-push";
 
-const HEARTBEAT_MS = 30_000;
+/** Well inside the server's VIEWING_MS, so a phone locked without a word stops holding pushes back within seconds. */
+const HEARTBEAT_MS = 10_000;
 
 function targetInUrl(): ThreadTarget | null {
   const params = new URLSearchParams(location.search);
@@ -40,11 +41,9 @@ export function useWebPush(state: AppState, dispatch: (action: Action) => void):
         setTarget({ botId: data.botId, threadId: data.threadId });
       }
     };
-    // Re-sends a held subscription, so a server that lost it (a restored data directory) has it again.
-    const refresh = () => void currentSubscription().then((subscription) => {
+    const refresh = () => void workingSubscription().then((subscription) => {
       endpointRef.current = subscription?.endpoint ?? null;
       setEndpoint(endpointRef.current);
-      if (subscription) void api("/api/suyuan/push/subscribe", { method: "POST", body: JSON.stringify(subscription.toJSON()) }).catch(() => {});
     }, () => {});
     navigator.serviceWorker.addEventListener("message", onMessage);
     navigator.serviceWorker.startMessages();
@@ -72,6 +71,12 @@ export function useWebPush(state: AppState, dispatch: (action: Action) => void):
       document.removeEventListener("visibilitychange", update);
     };
   }, []);
+
+  // The server drops "done" and silences pushes the way this device's settings already do for its page notifications.
+  const finished = useFinishedNotifications(), sounds = useNotificationSounds();
+  useEffect(() => {
+    if (endpointRef.current) void resendSubscription().catch(() => {});
+  }, [finished, sounds]);
 
   useEffect(() => {
     if (!target || !state.hydrated) return;

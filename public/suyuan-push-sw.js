@@ -15,6 +15,7 @@ self.addEventListener("push", (event) => {
     body: payload.body || "",
     tag: payload.tag,
     renotify: Boolean(payload.tag),
+    silent: Boolean(payload.silent),
     icon: payload.icon || "/app-icon-192.png",
     data: { botId: payload.botId, threadId: payload.threadId },
   }));

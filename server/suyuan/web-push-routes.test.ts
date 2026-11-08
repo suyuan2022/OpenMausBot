@@ -17,7 +17,7 @@ function fakePush(): WebPush {
     unsubscribe: vi.fn(),
     viewing: vi.fn(),
     deliver: vi.fn(async () => {}),
-    test: vi.fn(async () => true),
+    test: vi.fn(async () => ({ ok: true, gone: false, status: "201" })),
   };
 }
 
@@ -44,7 +44,11 @@ describe("/api/suyuan/push", () => {
     const good = await call("/api/suyuan/push/subscribe", "POST", { endpoint: ENDPOINT, expirationTime: null, keys: KEYS });
     expect(good.answers).toEqual([[200, { ok: true }]]);
     expect(good.push.subscribe).toHaveBeenCalledWith({ endpoint: ENDPOINT, keys: KEYS });
+    const withPrefs = await call("/api/suyuan/push/subscribe", "POST", { endpoint: "https://fcm.googleapis.com/fcm/send/abc", keys: KEYS, prefs: { done: false, sound: true } });
+    expect(withPrefs.push.subscribe).toHaveBeenCalledWith({ endpoint: "https://fcm.googleapis.com/fcm/send/abc", keys: KEYS, prefs: { done: false, sound: true } });
     for (const bad of [
+      { endpoint: "https://example.com/push/x", keys: KEYS },
+      { endpoint: "https://push.apple.com.evil.test/x", keys: KEYS },
       { endpoint: "http://web.push.apple.com/x", keys: KEYS },
       { endpoint: ENDPOINT, keys: { ...KEYS, auth: "short" } },
       { endpoint: ENDPOINT },
@@ -64,7 +68,7 @@ describe("/api/suyuan/push", () => {
 
   it("unsubscribes, sends the test push, and names a wrong method or path", async () => {
     expect((await call("/api/suyuan/push/unsubscribe", "POST", { endpoint: ENDPOINT })).push.unsubscribe).toHaveBeenCalledWith(ENDPOINT);
-    expect((await call("/api/suyuan/push/test", "POST", { endpoint: ENDPOINT })).answers).toEqual([[200, { ok: true }]]);
+    expect((await call("/api/suyuan/push/test", "POST", { endpoint: ENDPOINT })).answers).toEqual([[200, { ok: true, gone: false, status: "201" }]]);
     expect((await call("/api/suyuan/push/test", "POST", { endpoint: "nope" })).answers[0]![0]).toBe(400);
     expect((await call("/api/suyuan/push/subscribe", "GET")).answers[0]![0]).toBe(405);
     expect((await call("/api/suyuan/push", "POST")).answers[0]![0]).toBe(405);

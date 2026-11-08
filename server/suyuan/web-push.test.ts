@@ -1,11 +1,11 @@
 import { createDecipheriv, createECDH, createPublicKey, hkdfSync, verify } from "node:crypto";
-import { mkdtempSync, readFileSync, rmSync, statSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { Notification } from "../../shared/notification.ts";
-import { createWebPush, encryptPushPayload, PUSH_FILE, pushPayload, TEST_PAYLOAD, VIEWING_MS, vapidAuthorization } from "./web-push.ts";
+import { createWebPush, encryptPushPayload, PAYLOAD_BYTES, PUSH_FILE, pushPayload, TEST_PAYLOAD, VIEWING_MS, vapidAuthorization } from "./web-push.ts";
 
 const b64 = (value: string) => Buffer.from(value, "base64url");
 
@@ -137,7 +137,7 @@ describe("createWebPush", () => {
     await push.deliver(notification("t1"));
     expect(log).toHaveBeenCalledWith(expect.stringContaining("web.push.apple.com answered 403"));
     expect(JSON.parse(readFileSync(join(dir, PUSH_FILE), "utf8")).subscriptions.map((one: { endpoint: string }) => one.endpoint)).toEqual([laptop.endpoint]);
-    expect(await push.test(phone.endpoint)).toBe(false);
+    expect(await push.test(phone.endpoint)).toEqual({ ok: false, gone: false, status: "not subscribed" });
     expect(calls).toHaveLength(2);
   });
 
@@ -148,11 +148,11 @@ describe("createWebPush", () => {
     push.subscribe(laptop);
     push.subscribe({ ...phone, keys: laptop.keys });
     expect(JSON.parse(readFileSync(join(dir, PUSH_FILE), "utf8")).subscriptions).toHaveLength(2);
-    expect(await push.test(laptop.endpoint)).toBe(true);
+    expect(await push.test(laptop.endpoint)).toEqual({ ok: true, gone: false, status: "201" });
     expect(calls.map((call) => call.url)).toEqual([laptop.endpoint]);
     expect(JSON.parse(decrypt(Buffer.from(calls[0]!.init.body as Uint8Array), laptop.receiver, laptop.auth))).toEqual(TEST_PAYLOAD);
     push.unsubscribe(laptop.endpoint);
-    expect(await push.test(laptop.endpoint)).toBe(false);
+    expect(await push.test(laptop.endpoint)).toMatchObject({ ok: false, status: "not subscribed" });
   });
 
   it("drops a subscription whose key is not a point on the curve, and still reaches the other devices", async () => {
@@ -165,6 +165,48 @@ describe("createWebPush", () => {
     expect(calls.map((call) => call.url)).toEqual([phone.endpoint]);
     expect(log).toHaveBeenCalledWith(expect.stringContaining("dropped a subscription whose key is unusable"));
     expect(JSON.parse(readFileSync(join(dir, PUSH_FILE), "utf8")).subscriptions.map((one: { endpoint: string }) => one.endpoint)).toEqual([phone.endpoint]);
+  });
+
+  it("follows each device's own settings: no \"done\" when it is off there, no sound when sounds are", async () => {
+    const { push, calls } = host();
+    const quiet = device(), plain = device();
+    push.subscribe({ ...quiet, prefs: { done: false, sound: false } });
+    push.subscribe(plain);
+    await push.deliver(notification("t1"));
+    expect(calls.map((call) => call.url)).toEqual([plain.endpoint]);
+    await push.deliver(notification("t1", "question"));
+    const sent = new Map(calls.slice(1).map((call) => [call.url, Buffer.from(call.init.body as Uint8Array)]));
+    expect(JSON.parse(decrypt(sent.get(quiet.endpoint)!, quiet.receiver, quiet.auth))).toMatchObject({ silent: true });
+    expect(JSON.parse(decrypt(sent.get(plain.endpoint)!, plain.receiver, plain.auth))).not.toHaveProperty("silent");
+  });
+
+  it("pushes a spend warning even to the device showing its chat, and nothing meant for one teammate", async () => {
+    const { push, calls } = host();
+    const phone = device();
+    push.subscribe(phone);
+    push.viewing(phone.endpoint, "t1");
+    await push.deliver(notification("t1", "spend"));
+    expect(calls).toHaveLength(1);
+    await push.deliver({ ...notification("t2"), forPerson: "teammate@example.com" });
+    expect(calls).toHaveLength(1);
+  });
+
+  it("cuts the body by encoded bytes so the push fits the services' 4 KB", () => {
+    const long = { ...notification("t1"), body: `${"汉".repeat(2000)}\u001b[31m`.repeat(2) };
+    const payload = pushPayload(long);
+    expect(Buffer.byteLength(JSON.stringify(payload))).toBeLessThanOrEqual(PAYLOAD_BYTES);
+    expect(payload.body.endsWith("…")).toBe(true);
+    expect(payload.body.length).toBeGreaterThan(500);
+  });
+
+  it("keeps a key file it can't read rather than replacing the keys every device subscribed with", async () => {
+    const { dir, log } = host();
+    writeFileSync(join(dir, PUSH_FILE), "{ not json");
+    const push = createWebPush({ dataDir: dir, log });
+    expect(() => push.publicKey()).toThrow();
+    await push.deliver(notification("t1"));
+    expect(readFileSync(join(dir, PUSH_FILE), "utf8")).toBe("{ not json");
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("could not push"));
   });
 
   it("never rejects, even when the push service can't be reached", async () => {

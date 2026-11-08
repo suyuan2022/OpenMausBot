@@ -6,9 +6,18 @@ import { readFileSync, renameSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Notification } from "../../shared/notification.ts";
 
+/** The device's own notification settings (src/lib/notification-preferences.ts), which the page's notifications obey. */
+export interface PushPrefs {
+  /** "Notify me when a bot finishes": off drops the "done" kind. */
+  done: boolean;
+  /** Notification sounds: off shows the push without a sound. */
+  sound: boolean;
+}
+
 export interface PushSubscriptionRecord {
   endpoint: string;
   keys: { p256dh: string; auth: string };
+  prefs?: PushPrefs;
 }
 
 export interface Vapid {
@@ -25,17 +34,20 @@ interface PushFile {
 export interface PushPayload {
   title: string;
   body: string;
-  /** Same tag as the page's own notifications (src/lib/notify.ts), so the two replace each other instead of stacking. */
+  /** Same tag as the page's own notifications (src/lib/notify.ts). */
   tag: string;
   botId?: string;
   threadId?: string;
   icon?: string;
+  silent?: boolean;
 }
 
-/** How long a device's "I show this conversation" lasts unless its page says it again; a page that went away without a
- * word stops holding pushes back after this. */
-export const VIEWING_MS = 75_000;
+/** How long a device's "I show this conversation" lasts unless its page says it again (it does every 10 s); a page that
+ * went away without a word stops holding pushes back after this. */
+export const VIEWING_MS = 25_000;
 export const PUSH_FILE = "suyuan-web-push.json";
+/** Push services take 4096 bytes of encrypted body, 103 of which the encryption itself uses; this leaves headroom. */
+export const PAYLOAD_BYTES = 3000;
 const SUBJECT = "https://github.com/suyuan2022/OpenMausBot";
 const RECORD_SIZE = 4096;
 
@@ -82,15 +94,23 @@ function newVapid(): Vapid {
   return { publicKey: point.toString("base64url"), privateKey: privateKey.export({ format: "jwk" }) };
 }
 
-export function pushPayload(notification: Notification): PushPayload {
-  return {
-    title: notification.title,
-    body: notification.body.slice(0, 1000),
+/** The JSON a device decrypts, cut to PAYLOAD_BYTES by its encoded size, not its length: a CJK character is 3 bytes and a
+ * control character in command output 6 once escaped. */
+export function pushPayload(notification: Notification, prefs?: PushPrefs): PushPayload {
+  const payload: PushPayload = {
+    title: notification.title.slice(0, 200),
+    body: notification.body,
     tag: notification.kind === "spend" ? "openmausbot:spend" : `openmausbot:${notification.botId}`,
     botId: notification.botId,
     threadId: notification.threadId,
-    ...(notification.avatarUrl ? { icon: notification.avatarUrl } : {}),
+    ...(notification.avatarUrl && notification.avatarUrl.length <= 300 ? { icon: notification.avatarUrl } : {}),
+    ...(prefs?.sound === false ? { silent: true } : {}),
   };
+  while (payload.body && Buffer.byteLength(JSON.stringify(payload)) > PAYLOAD_BYTES) {
+    payload.body = `${payload.body.slice(0, Math.floor(payload.body.length * 0.8))}…`;
+    if (payload.body === "…") payload.body = "";
+  }
+  return payload;
 }
 
 export const TEST_PAYLOAD: PushPayload = {
@@ -99,16 +119,24 @@ export const TEST_PAYLOAD: PushPayload = {
   tag: "openmausbot:push-test",
 };
 
+/** What one push service said: `gone` for a device it no longer knows, `status` its HTTP answer or the network error. */
+export interface PushOutcome {
+  ok: boolean;
+  gone: boolean;
+  status: string;
+}
+
 export interface WebPush {
   publicKey(): string;
   subscribe(subscription: PushSubscriptionRecord): void;
   unsubscribe(endpoint: string): void;
   /** `threadId` null: this device shows no conversation, or is out of sight. */
   viewing(endpoint: string, threadId: string | null): void;
-  /** Every notify frame: each device that turned push on, except one showing that very conversation. Never rejects. */
+  /** Every notify frame: each device that turned push on and wants this kind, except one showing that very
+   * conversation. Never rejects. */
   deliver(notification: Notification): Promise<void>;
-  /** false when that device is not subscribed or its push service said it is gone. */
-  test(endpoint: string): Promise<boolean>;
+  /** One push to that device, to prove turning it on worked; `status` "not subscribed" when the server has no such one. */
+  test(endpoint: string): Promise<PushOutcome>;
 }
 
 export function createWebPush(options: {
@@ -129,18 +157,23 @@ export function createWebPush(options: {
     writeFileSync(`${file}.tmp`, `${JSON.stringify(next, null, 2)}\n`, { mode: 0o600 });
     renameSync(`${file}.tmp`, file);
   };
+  /** A new key pair only when there is no file yet: any other failure leaves the file alone, since replacing the keys
+   * would silently cut off every subscribed device. */
   const load = (): PushFile => {
     if (state) return state;
+    let text: string;
     try {
-      state = JSON.parse(readFileSync(file, "utf8")) as PushFile;
-    } catch {
+      text = readFileSync(file, "utf8");
+    } catch (error) {
+      if ((error as NodeJS.ErrnoException).code !== "ENOENT") throw error;
       save({ vapid: newVapid(), subscriptions: [] });
+      return state!;
     }
-    return state!;
+    state = JSON.parse(text) as PushFile;
+    return state;
   };
 
-  /** false: the push service says this subscription is gone for good. */
-  async function pushTo(subscription: PushSubscriptionRecord, payload: PushPayload): Promise<boolean> {
+  async function pushTo(subscription: PushSubscriptionRecord, payload: PushPayload): Promise<PushOutcome> {
     const host = new URL(subscription.endpoint).host;
     let body: Buffer;
     try {
@@ -151,7 +184,7 @@ export function createWebPush(options: {
     } catch (error) {
       // A key no browser would hand out: this device can never be reached, so it is dropped like a gone one.
       log(`${host}: dropped a subscription whose key is unusable (${error instanceof Error ? error.message : String(error)})`);
-      return false;
+      return { ok: false, gone: true, status: "unusable key" };
     }
     try {
       const response = await post(subscription.endpoint, {
@@ -166,33 +199,34 @@ export function createWebPush(options: {
         body: new Uint8Array(body),
         signal: AbortSignal.timeout(15_000),
       });
-      if (response.status === 404 || response.status === 410) return false;
-      if (!response.ok) log(`${host} answered ${response.status}: ${(await response.text()).slice(0, 200)}`);
+      const gone = response.status === 404 || response.status === 410;
+      if (!response.ok && !gone) log(`${host} answered ${response.status}: ${(await response.text()).slice(0, 200)}`);
+      return { ok: response.ok, gone, status: String(response.status) };
     } catch (error) {
-      log(`${host}: ${error instanceof Error ? error.message : String(error)}`);
+      const message = error instanceof Error ? error.message : String(error);
+      log(`${host}: ${message}`);
+      return { ok: false, gone: false, status: message };
     }
-    return true;
   }
 
-  async function pushAll(subscriptions: PushSubscriptionRecord[], payload: PushPayload): Promise<number> {
-    const gone = new Set<string>();
-    await Promise.all(subscriptions.map(async (subscription) => {
-      if (!(await pushTo(subscription, payload))) gone.add(subscription.endpoint);
-    }));
+  async function pushAll(sends: Array<{ subscription: PushSubscriptionRecord; payload: PushPayload }>): Promise<PushOutcome[]> {
+    const outcomes = await Promise.all(sends.map(({ subscription, payload }) => pushTo(subscription, payload)));
+    const gone = new Set(sends.filter((_, i) => outcomes[i]!.gone).map(({ subscription }) => subscription.endpoint));
     if (gone.size) {
       const current = load();
       save({ ...current, subscriptions: current.subscriptions.filter((one) => !gone.has(one.endpoint)) });
       for (const endpoint of gone) viewing.delete(endpoint);
     }
-    return subscriptions.length - gone.size;
+    return outcomes;
   }
 
   return {
     publicKey: () => load().vapid.publicKey,
-    subscribe({ endpoint, keys }) {
+    subscribe({ endpoint, keys, prefs }) {
       const current = load();
       const kept = current.subscriptions.filter((one) => one.endpoint !== endpoint);
-      save({ ...current, subscriptions: [...kept, { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth } }] });
+      const record: PushSubscriptionRecord = { endpoint, keys: { p256dh: keys.p256dh, auth: keys.auth }, ...(prefs ? { prefs } : {}) };
+      save({ ...current, subscriptions: [...kept, record] });
     },
     unsubscribe(endpoint) {
       const current = load();
@@ -205,26 +239,35 @@ export function createWebPush(options: {
     },
     async deliver(notification) {
       try {
+        // Meant for one teammate on a Team Cloud: its routing (teamOwners.reaches) is not repeated here, so none of it.
+        if (notification.forPerson) return;
         const at = now();
-        const targets = load().subscriptions.filter((subscription) => {
-          const shown = viewing.get(subscription.endpoint);
-          return !(shown && shown.until > at && shown.threadId === notification.threadId);
-        });
-        if (targets.length) await pushAll(targets, pushPayload(notification));
+        const sends = load().subscriptions
+          .filter((subscription) => {
+            if (notification.kind === "done" && subscription.prefs?.done === false) return false;
+            // A spend warning shows on the page even in its own chat (src/lib/notify.ts), so it is never held back.
+            if (notification.kind === "spend") return true;
+            const shown = viewing.get(subscription.endpoint);
+            return !(shown && shown.until > at && shown.threadId === notification.threadId);
+          })
+          .map((subscription) => ({ subscription, payload: pushPayload(notification, subscription.prefs) }));
+        if (sends.length) await pushAll(sends);
       } catch (error) {
         log(`could not push "${notification.title}": ${error instanceof Error ? error.message : String(error)}`);
       }
     },
     async test(endpoint) {
       const subscription = load().subscriptions.find((one) => one.endpoint === endpoint);
-      return subscription ? (await pushAll([subscription], TEST_PAYLOAD)) === 1 : false;
+      if (!subscription) return { ok: false, gone: false, status: "not subscribed" };
+      const payload = subscription.prefs?.sound === false ? { ...TEST_PAYLOAD, silent: true } : TEST_PAYLOAD;
+      return (await pushAll([{ subscription, payload }]))[0]!;
     },
   };
 }
 
 const hosts = new Map<string, WebPush>();
 
-/** The one instance per data directory that server/index.ts hands every notify frame to. */
+/** The one instance per data directory that every notify frame reaches (server/suyuan/register.ts). */
 export function webPushFor(dataDir: string): WebPush {
   let host = hosts.get(dataDir);
   if (!host) hosts.set(dataDir, (host = createWebPush({ dataDir })));

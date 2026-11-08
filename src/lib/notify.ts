@@ -1,6 +1,7 @@
 import type { Notification } from "../../shared/notification";
 import { plainPreviewText } from "../../shared/plain-preview";
 import { finishedNotificationsEnabled, notificationSoundsEnabled } from "./notification-preferences";
+import { pushHandlesNotifications } from "@/suyuan/web-push"; // suyuan fork
 
 export type NotifyFrame = Notification;
 
@@ -38,6 +39,7 @@ export function showNotification(
   visibleThreadId?: string | null,
 ) {
   if (typeof Notification === "undefined") return;
+  if (pushHandlesNotifications()) return; // suyuan fork: this device's push shows it (src/suyuan/web-push.ts)
   if (frame.kind === "done" && !finishedNotificationsEnabled()) return;
   const spend = frame.kind === "spend";
   if (!spend && document.hasFocus() && visibleThreadId === frame.threadId) return;
