@@ -23,6 +23,8 @@ jobs:
     timeout-minutes: 240
     env:
       GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
+      # The merge step adds a remote named upstream, which gh would otherwise pick as the repository for every call.
+      GH_REPO: ${{ github.repository }}
     steps:
       - name: Require SYNC_TOKEN
         run: test -n "$GH_TOKEN" || { echo "::error::Repository secret SYNC_TOKEN is missing (see the comment at the top of this file)"; exit 1; }
@@ -76,13 +78,28 @@ jobs:
           BRANCH: ${{ steps.merge.outputs.branch }}
         run: |
           set -euo pipefail
-          sleep 60
-          if ! gh pr checks "$BRANCH" --watch --interval 60; then
+          sha=$(gh pr view "$BRANCH" --json headRefOid -q .headRefOid)
+          # Waits for every workflow run this commit started. A run completes only once all its jobs have, the summary
+          # job "CI" included, while a poll of the PR's checks can land between one job ending and the next registering.
+          settle() {
+            local ids="" failed=0
+            for _ in $(seq 1 20); do
+              ids=$(gh run list --commit "$sha" --event pull_request --json databaseId -q '.[].databaseId')
+              [ -n "$ids" ] && break
+              sleep 30
+            done
+            [ -n "$ids" ] || { echo "::error::no workflow run started for $sha"; return 2; }
+            for id in $ids; do gh run watch "$id" --exit-status --interval 60 >/dev/null || failed=1; done
+            return $failed
+          }
+          if ! settle; then
             # Upstream's suite has timing-sensitive tests and crashing workers; one rerun of the failed jobs tells a
             # flake from a real break, which then stays open for a person.
-            run=$(gh run list --branch "$BRANCH" --workflow CI --limit 1 --json databaseId -q '.[0].databaseId')
-            gh run rerun "$run" --failed
-            sleep 60
-            gh pr checks "$BRANCH" --watch --interval 60
+            for id in $(gh run list --commit "$sha" --event pull_request --status failure --json databaseId -q '.[].databaseId'); do
+              gh run rerun "$id" --failed
+            done
+            sleep 30
+            settle
           fi
+          gh pr checks "$BRANCH"
           gh pr merge "$BRANCH" --merge --delete-branch
