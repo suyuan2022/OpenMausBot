@@ -102,8 +102,9 @@ jobs:
           if [ "$STATUS" = conflict ]; then
             echo "::error::原作者的更新和 suyuan 有冲突，要在本地解，做法写在同步 PR 里。"; exit 1
           fi
-          stale=$(gh pr list --state open --json number,headRefName,isCrossRepository,createdAt \
-            -q '[.[] | select(.isCrossRepository | not) | select(.headRefName | startswith("sync/upstream-")) | select(now - (.createdAt | fromdateiso8601) > 172800) | .number] | join(" ")')
-          if [ -n "$stale" ]; then
-            echo "::error::同步 PR #$stale 开了两天还没合并：CI 一直没通过，或者必需检查 CI 没有出现。"; exit 1
+          # Measured on upstream's commits, not the PR: upstream moves daily, so each day brings a fresh sync PR. The oldest
+          # first-parent commit not yet in suyuan was committed about when it landed on upstream main.
+          since=$(git log --first-parent --format=%ct origin/suyuan..upstream/main | tail -1)
+          if [ -n "$since" ] && [ $(( $(date +%s) - since )) -gt 172800 ]; then
+            echo "::error::原作者 main 上有提交超过两天没进 suyuan：同步 PR 的 CI 一直没通过，或者必需检查 CI 没有出现。"; exit 1
           fi
