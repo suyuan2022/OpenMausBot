@@ -1,7 +1,10 @@
 # Daily: merge upstream main into suyuan through a PR. A clean merge gets GitHub auto-merge, so it lands once the
 # required check "CI" (branch protection on suyuan) passes, and that merge triggers suyuan-release. suyuan-sync-retry.yml
-# reruns a failed CI once; a conflicting merge stays open for a person to resolve locally.
-# SYNC_TOKEN is a fine-grained token for this repository only (Contents, Pull requests, Workflows: read and write).
+# reruns a failed CI once and @-mentions the owner on the PR if it fails again; a conflicting merge stays open for a
+# person to resolve locally.
+# SYNC_TOKEN is a fine-grained token for this repository only (Contents, Pull requests, Workflows: read and write), kept
+# as a secret of the environment "sync", which only the suyuan branch may use: a sync PR's CI runs upstream's workflow
+# files, and a repository secret would be readable by any of them.
 # The default GITHUB_TOKEN cannot push upstream's workflow edits, PRs it opens never start CI, and merges it makes never
 # start suyuan-release.
 name: suyuan · sync upstream
@@ -22,13 +25,14 @@ jobs:
   sync:
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    environment: sync
     env:
       GH_TOKEN: ${{ secrets.SYNC_TOKEN }}
       # The merge step adds a remote named upstream, which gh would otherwise pick as the repository for every call.
       GH_REPO: ${{ github.repository }}
     steps:
       - name: Require SYNC_TOKEN
-        run: test -n "$GH_TOKEN" || { echo "::error::Repository secret SYNC_TOKEN is missing (see the comment at the top of this file)"; exit 1; }
+        run: test -n "$GH_TOKEN" || { echo "::error::Secret SYNC_TOKEN of the environment sync is missing (see the comment at the top of this file)"; exit 1; }
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           ref: suyuan
@@ -58,7 +62,7 @@ jobs:
             git checkout -B "$branch" upstream/main
           fi
           git push -f origin "$branch"
-      - name: Open the PR
+      - name: Open or update the PR
         if: steps.merge.outputs.status != 'current'
         env:
           BRANCH: ${{ steps.merge.outputs.branch }}
@@ -67,22 +71,39 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$STATUS" = clean ]; then
-            body="原作者 main 分支截至 commit $SHORT 的更新，自动合并没有冲突。CI 通过后 GitHub 会自动合并，合并后自动打安装包。CI 失败会自动重跑一次，再失败就留在这里等人看。"
+            body="原作者 main 分支截至 commit $SHORT 的更新，自动合并没有冲突。CI 通过后 GitHub 会自动合并，合并后自动打安装包。CI 失败会自动重跑一次，再失败会在这里 @ 你。这个分支每天会被同步流程覆盖：要修什么，在 suyuan 上另开 fix PR，第二天的同步会带上。"
           else
             body="原作者 main 分支截至 commit $SHORT 的更新和 suyuan 有冲突，要在本地解：在 suyuan 上 git merge upstream/main，解完推到 suyuan，再关掉这个 PR。"
           fi
-          pr=$(gh pr list --head "$BRANCH" --state open --json number -q '.[0].number')
+          sync_prs() { gh pr list --state open --json number,headRefName,isCrossRepository -q ".[] | select(.isCrossRepository | not) | select(.headRefName | startswith(\"sync/upstream-\")) | $1"; }
+          pr=$(sync_prs "select(.headRefName == \"$BRANCH\") | .number")
           if [ -z "$pr" ]; then
             gh pr create --base suyuan --head "$BRANCH" --title "同步原作者更新 $SHORT" --body "$body"
-            pr=$(gh pr list --head "$BRANCH" --state open --json number -q '.[0].number')
+            pr=$(sync_prs "select(.headRefName == \"$BRANCH\") | .number")
+          else
+            gh pr edit "$pr" --body "$body"
+          fi
+          # Off first: the branch was just pushed again, and a conflicting merge must not land at all.
+          gh pr merge "$pr" --disable-auto >/dev/null 2>&1 || true
+          if [ "$STATUS" = clean ]; then
+            gh pr merge "$pr" --auto --merge --match-head-commit "$(git rev-parse HEAD)"
           fi
           # An older sync PR that never landed is covered by this one, which carries all of upstream up to $SHORT.
-          for old in $(gh pr list --state open --json number,headRefName \
-              -q ".[] | select(.headRefName | startswith(\"sync/upstream-\")) | select(.headRefName != \"$BRANCH\") | .number"); do
-            gh pr close "$old" --delete-branch --comment "由 #$pr 取代：它包含原作者 main 分支截至 commit $SHORT 的全部更新。"
+          for old in $(sync_prs "select(.headRefName != \"$BRANCH\") | .number"); do
+            gh pr close "$old" --delete-branch --comment "由 #$pr 取代：它包含原作者 main 分支截至 commit $SHORT 的全部更新。" \
+              || echo "::warning::could not close the older sync PR #$old"
           done
-      - name: Merge once CI passes
-        if: steps.merge.outputs.status == 'clean'
+      - name: Fail when a person is needed
         env:
-          BRANCH: ${{ steps.merge.outputs.branch }}
-        run: gh pr merge "$BRANCH" --auto --merge --match-head-commit "$(git rev-parse HEAD)"
+          STATUS: ${{ steps.merge.outputs.status }}
+        # A red scheduled run mails the owner; a PR their own token opened notifies no one.
+        run: |
+          set -euo pipefail
+          if [ "$STATUS" = conflict ]; then
+            echo "::error::原作者的更新和 suyuan 有冲突，要在本地解，做法写在同步 PR 里。"; exit 1
+          fi
+          stale=$(gh pr list --state open --json number,headRefName,isCrossRepository,createdAt \
+            -q '[.[] | select(.isCrossRepository | not) | select(.headRefName | startswith("sync/upstream-")) | select(now - (.createdAt | fromdateiso8601) > 172800) | .number] | join(" ")')
+          if [ -n "$stale" ]; then
+            echo "::error::同步 PR #$stale 开了两天还没合并：CI 一直没通过，或者必需检查 CI 没有出现。"; exit 1
+          fi
