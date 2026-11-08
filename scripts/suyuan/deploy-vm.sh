@@ -1,40 +1,52 @@
 #!/bin/zsh
 # Installs a suyuan-v* release of suyuan2022/OpenMausBot on lizhi-vm and restarts the server.
+# Runs on the MacBook: the VM cannot reach GitHub, so the tarball is fetched here with gh and copied over.
 #   deploy-vm.sh                 newest release
 #   deploy-vm.sh suyuan-v<x>     that release
 #   deploy-vm.sh --rollback      whatever was installed before the last deploy
-# Add --force to restart even while a bot wrote in the last two minutes (a restart cuts its turn short).
+# Add --force to restart even while a bot is working or has queued messages (a restart cuts that short).
 set -euo pipefail
 
-export PATH="$HOME/.hermes/node/bin:$HOME/.npm-global/bin:$PATH"
 REPO=suyuan2022/OpenMausBot
-LABEL=com.openmausbot.serve
-STORE=$HOME/.openmausbot-releases
-DB=$HOME/.openmausbot/messages.db
-mkdir -p "$STORE"
+VM=lizhi-vm
 
-force=0 target=""
-for arg in "$@"; do
+force=0 rollback=0 tag=""
+for arg; do
   case $arg in
     --force) force=1 ;;
-    --rollback) target=$(cat "$STORE/previous") ;;
-    *) target=$arg ;;
+    --rollback) rollback=1 ;;
+    *) tag=$arg ;;
   esac
 done
 
-if [[ -z $target || $target == suyuan-v* ]]; then
-  api=https://api.github.com/repos/$REPO/releases/${target:+tags/}${target:-latest}
-  url=$(curl -fsSL "$api" | python3 -c 'import sys, json; print(next(a["browser_download_url"] for a in json.load(sys.stdin)["assets"] if a["name"].endswith(".tgz")))')
-  target=$STORE/${url:t}
-  if [[ ! -f $target ]]; then
-    curl -fsSL -o "$target.part" "$url"
-    mv "$target.part" "$target"
-  fi
+target=""
+if (( ! rollback )); then
+  cache=$(mktemp -d)
+  gh release download ${tag:+"$tag"} -R "$REPO" -p '*.tgz' -D "$cache"
+  tgz=$(print -r -- "$cache"/*.tgz)
+  ssh "$VM" 'mkdir -p ~/.openmausbot-releases'
+  scp -q "$tgz" "$VM:.openmausbot-releases/"
+  target=.openmausbot-releases/${tgz:t}
+  trash "$cache"
 fi
 
-recent=$(sqlite3 "$DB" "select count(*) from messages where at > (strftime('%s','now') - 120) * 1000" 2>/dev/null || echo 0)
-if (( recent > 0 && force == 0 )); then
-  echo "bots wrote $recent message(s) in the last two minutes; rerun later or add --force" >&2
+ssh "$VM" zsh -s -- "$force" "$rollback" "$target" <<'REMOTE'
+set -euo pipefail
+force=$1 rollback=$2 target=$3
+export PATH="$HOME/.hermes/node/bin:$HOME/.npm-global/bin:$PATH"
+LABEL=com.openmausbot.serve
+STORE=$HOME/.openmausbot-releases
+
+if (( rollback )); then target=$(cat "$STORE/previous"); else target=$HOME/$target; fi
+
+busy=$(curl -fs http://127.0.0.1:8799/api/bots | node -e '
+  const d = JSON.parse(require("fs").readFileSync(0, "utf8"));
+  const names = d.bots.filter(b => b.busy || (b.tasks ?? []).some(t => t.busy)).map(b => b.name);
+  const queued = Object.values(d.botQueuedMessages ?? {}).flat().length;
+  console.log([...names, ...(queued ? [`${queued} queued message(s)`] : [])].join(", "));
+' 2>/dev/null || true)
+if [[ -n $busy && $force == 0 ]]; then
+  echo "busy: $busy. A restart would cut that work short; rerun later or add --force" >&2
   exit 2
 fi
 
@@ -49,6 +61,7 @@ for _ in {1..60}; do
   curl -fs -o /dev/null http://127.0.0.1:8799/ && break
   sleep 2
 done
-curl -fs -o /dev/null http://127.0.0.1:8799/ || { echo "server is not answering on 8799; try: $0 --rollback --force" >&2; exit 1; }
+curl -fs -o /dev/null http://127.0.0.1:8799/ || { echo "server is not answering on 8799; try: deploy-vm.sh --rollback --force" >&2; exit 1; }
 echo "openmausbot $before -> $(openmausbot --version)"
 ls -t "$STORE"/*.tgz 2>/dev/null | tail -n +6 | while read -r old; do trash "$old" 2>/dev/null || true; done
+REMOTE

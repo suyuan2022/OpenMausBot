@@ -21,7 +21,7 @@
    `env -u CLAUDECODE claude -p "<审查任务>" --model opus --effort xhigh --allowedTools "Read,Grep,Glob,Bash(git:*),Bash(gh pr view:*),Bash(gh pr diff:*)"`
    它提的意见由你判断改不改。改动大的，再让它审一次改过的部分，到此为止。
 5. **CI 绿了就合并。** 合并会触发自动流程 `.github/workflows/suyuan-release.yml`，打出名为 `suyuan-v<版本>` 的 release，附 npm 安装包。
-6. **部署。** 在虚拟机上跑 `scripts/suyuan/deploy-vm.sh`：拉最新 release，装上，重启服务。出问题就用 `--rollback` 换回上一版。
+6. **部署。** 在 MacBook 的这个仓库里跑 `scripts/suyuan/deploy-vm.sh`：用 gh 下载最新 release，拷到虚拟机装上，重启服务（虚拟机连不上 GitHub，所以由 MacBook 中转）。有 bot 正在干活时脚本会拒绝，等它们闲下来再跑。出问题就用 `--rollback` 换回上一版。
 7. **交给夙愿手测。** 只留只有手机上才能判断的几项，比如真机推送、主屏幕网页 App 的手感。写清测什么、在哪测、看到什么算对。
    完成：`FORK.md` 的改动清单加了这一行。
 

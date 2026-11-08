@@ -2,7 +2,8 @@
 import { existsSync } from "node:fs";
 import { join, sep } from "node:path";
 
-export const LATEST_RELEASE_URL = "https://api.github.com/repos/milind-soni/OpenMausBot/releases/latest";
+// suyuan fork: ask the fork's releases (tagged "suyuan-v<version>"), which deploy-vm.sh installs.
+export const LATEST_RELEASE_URL = "https://api.github.com/repos/suyuan2022/OpenMausBot/releases/latest";
 const CACHE_MS = 60 * 60_000;
 
 /** "managed" is a hosted or Cloud server that is updated for its owner. */
@@ -12,7 +13,7 @@ export type InstallKind = "desktop" | "managed" | "docker" | "podman" | "npm" | 
 export const UPDATE_COMMANDS: Partial<Record<InstallKind, { command: string; restart: boolean }>> = {
   docker: { command: "docker compose pull omb && docker compose up -d", restart: false },
   podman: { command: "git pull && cd deploy/podman && PODMAN_COMPOSE_PROVIDER=podman-compose podman compose --env-file .env -f compose.yaml up -d --build", restart: false },
-  npm: { command: "npm install -g openmausbot@latest", restart: true },
+  npm: { command: "cd ~/Documents/OpenMausBot && scripts/suyuan/deploy-vm.sh", restart: false },
   git: { command: "git pull && pnpm install", restart: true },
 };
 
@@ -99,7 +100,7 @@ export function createUpdateChecker(options: {
         if (!response.ok) throw new Error(`GitHub answered ${response.status}`);
         const release = await response.json() as { tag_name?: unknown; html_url?: unknown };
         if (typeof release.tag_name !== "string") throw new Error("GitHub sent no release tag");
-        const latest = release.tag_name.replace(/^v/, "");
+        const latest = release.tag_name.replace(/^(suyuan-)?v/, "");
         const result: UpdateCheck = {
           ...base(),
           latest,
