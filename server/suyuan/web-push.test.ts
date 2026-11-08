@@ -93,7 +93,8 @@ describe("createWebPush", () => {
     const again = createWebPush({ dataDir: first.dir });
     expect(again.publicKey()).toBe(first.push.publicKey());
     expect(b64(first.push.publicKey())).toHaveLength(65);
-    expect(statSync(join(first.dir, PUSH_FILE)).mode & 0o777).toBe(0o600);
+    // Windows has no POSIX modes to check.
+    if (process.platform !== "win32") expect(statSync(join(first.dir, PUSH_FILE)).mode & 0o777).toBe(0o600);
   });
 
   it("delivers an encrypted notification each device can read, with the page notification's tag", async () => {
