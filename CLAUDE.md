@@ -5,14 +5,14 @@
 ## 分支
 
 - `suyuan`：部署分支，也是默认分支。每个改动从它拉 `fix/<名字>` 或 `feat/<名字>`，开 PR 合回 `suyuan`。
-- `upstream/main`：原作者的代码（remote `upstream` 指向 milind-soni/OpenMausBot）。GitHub 自动流程 `.github/workflows/suyuan-sync.yml` 每天把它合进 `suyuan`。
+- `upstream/main`：原作者的代码（remote `upstream` 指向 milind-soni/OpenMausBot）。夙愿要原作者的更新时手动合：从 `suyuan` 拉 `sync/upstream-<日期>`，`git merge upstream/main`，开 PR，CI 绿了合并、部署。每天自动同步的流程 `.github/workflows/suyuan-sync.yml` 已停用。
 - 别的用户也会碰到的修复，另从 `upstream/main` 拉分支，把提交挑过去，给原作者开 PR。原作者收下后，在 `FORK.md` 把那一行标成「已还」。
 
-改动一律做**加法**：新功能放新文件，原作者的文件只加接入用的几行。改动越少，每天合并原作者更新时越少冲突。
+改动一律做**加法**：新功能放新文件，原作者的文件只加接入用的几行。改动越少，合并原作者更新时越少冲突。
 
 ## 一个改动怎么走
 
-1. **写代码。** 服务端逻辑、数据结构、接口的改动都带 vitest 用例：每天合并原作者的更新时，只有这些用例能发现我们的改动被弄坏了。只改样式和文案的不用写。用例放在新文件 `<被测文件>.suyuan.test.ts`，原作者的测试文件只改被我们改坏的断言。
+1. **写代码。** 服务端逻辑、数据结构、接口的改动都带 vitest 用例：合并原作者的更新时，只有这些用例能发现我们的改动被弄坏了。只改样式和文案的不用写。用例放在新文件 `<被测文件>.suyuan.test.ts`，原作者的测试文件只改被我们改坏的断言。
    完成：相关用例是绿的，`pnpm typecheck` 和 `pnpm lint` 都过。
 2. **在隔离实例上验。** 照 `docs/verification/README.md` 的「Launch」一节起一个隔离实例（临时数据目录，接假模型），用 lcu 在 Chrome 里打开它打印出来的地址，把改动涉及的每个界面状态都点一遍、截图。推送、通知这类 Chrome 能测的，先在 Chrome 里测。验证只用隔离实例：虚拟机上的 8799 端口和 `bot.tokenic.cn` 是夙愿正在用的 bot。
    完成：每个改到的界面状态都有截图，和预期一致。
@@ -30,3 +30,4 @@
 
 - `ssh lizhi-vm` 登录。服务由 LaunchAgent `com.openmausbot.serve` 管，数据在 `~/.openmausbot`。那是夙愿的真实数据，只读着看。
 - 升级只走 `deploy-vm.sh`。`npm install -g openmausbot` 会把 fork 换回官方版。
+- 公网入口 `bot.tokenic.cn` 是北京服务器（`ssh root@82.157.117.245`）上的 nginx，配置在 `/etc/nginx/sites-available/bot.tokenic.cn`，经虚拟机打过来的 ssh 反向隧道转到虚拟机的 8799。这台服务器出口只有约 3 Mbps，是手机打开慢的瓶颈，所以 nginx 对脚本和接口数据开了 gzip。这台服务器上还跑着别的站点，改配置前先备份，`nginx -t` 通过再 `systemctl reload nginx`。

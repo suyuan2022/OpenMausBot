@@ -22,9 +22,17 @@ describe("the fork's hooks into upstream files", () => {
     expect(functionBody(index, "broadcast")).toContain("suyuanFrame(payload)");
   });
 
-  it("the app runs the push hook, shows its switch, and leaves notifications to push where it is on", () => {
-    expect(functionBody(source("src/App.tsx"), "Shell")).toContain("useWebPush(state, dispatch)");
+  it("the app runs the fork's hook, shows the push switch, and leaves notifications to push where it is on", () => {
+    expect(functionBody(source("src/App.tsx"), "Shell")).toContain("useSuyuan(state, dispatch)");
     expect(functionBody(source("src/components/NotificationSettingsRows.tsx"), "NotificationRows")).toContain("<WebPushRow />");
     expect(functionBody(source("src/lib/notify.ts"), "showNotification")).toContain("if (pushHandlesNotifications() && !frame.forPerson) return;");
+  });
+
+  it("the page loads the last-screen cover before anything renders, and the connecting line keeps the hooks its CSS matches", () => {
+    expect(source("src/main.tsx")).toContain('import "@/suyuan/last-frame";');
+    const loading = source("src/App.tsx");
+    expect(loading).toContain("<main data-app-loading={loading.text}");
+    expect(loading).toContain('<Loader2 size={20} className="animate-spin" />');
+    expect(loading).toContain('<div className="text-[14px]">{t(loading.text)}</div>');
   });
 });

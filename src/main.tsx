@@ -16,6 +16,7 @@ import { HomeScreen, SignedOutAtHome } from "./components/HomeScreen";
 import { PageBoundary } from "./components/PageBoundary";
 import { endedBeforeReload, forgetEndedSession } from "./lib/session-ended";
 import "./styles.css";
+import "@/suyuan/last-frame"; // suyuan fork: reopen on the last screen while the bots load
 
 // Before first paint; settleAdvancedModeDefault must run before applySkin writes omb-skin.
 settleAdvancedModeDefault();
