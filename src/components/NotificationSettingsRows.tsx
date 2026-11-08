@@ -9,12 +9,14 @@ import {
   useNotificationSounds,
 } from "@/lib/notification-preferences";
 import { requestNotificationPermission } from "@/lib/notify";
+import { WebPushRow } from "@/suyuan/WebPushRow"; // suyuan fork
 import { SettingRow, Switch } from "./SettingsPrimitives";
 
 export function NotificationRows({ simple = false }: { simple?: boolean }) {
   return (
     <>
       <DeviceNotificationsRow simple={simple} />
+      <WebPushRow />
       <NotificationSoundsRow simple={simple} />
       <NotificationFeedRow simple={simple} />
     </>
