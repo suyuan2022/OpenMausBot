@@ -10,7 +10,7 @@ const KEY = "suyuan:last-frame";
 const MAX_CHARS = 500_000;
 /** Older than this, the frame would show a screen the person no longer expects. */
 const MAX_AGE_MS = 3 * 24 * 3600_000;
-/** Bots still not loaded by then: the live page takes over, its connecting line already showing. The same wait as the
+/** Bots still not loaded by then: the live page takes over, its connecting line usually showing by then. The same wait as the
  * reconnecting strip (src/components/LiveConnectionStrip.tsx), so a frozen screen never passes for a live one longer. */
 export const HOLD_MS = 4_000;
 const SCROLL = "data-suyuan-scroll";
@@ -28,10 +28,14 @@ export interface Frame {
   build: string;
 }
 
-/** The copy that may be kept and shown: nothing that could run or load a page, and nothing anyone typed (a secret
- * pasted into a password field is in its value attribute). Ids stay inside SVGs, whose gradients, clip paths and
- * Mermaid styles point at them; elsewhere they are dropped. */
-export function cleanMarkup(doc: Document, html: string): string {
+/** Inputs a person types into; sliders, boxes and buttons keep their values, which only say where they stand. */
+const TYPED = "input:not([type=range], [type=checkbox], [type=radio], [type=color], [type=button], [type=submit], [type=reset], [type=image])";
+
+/** The copy that may be kept and shown: nothing that could run or load a page, and no typed values (a secret pasted
+ * into a password field is in its value attribute). Ids stay inside SVGs, whose gradients, clip paths and Mermaid
+ * styles point at them; elsewhere they are dropped. Handed back as nodes, so what is shown is what was checked: parsing
+ * the cleaned markup again could build something new. */
+export function cleanMarkup(doc: Document, html: string): HTMLTemplateElement {
   const template = doc.createElement("template");
   template.innerHTML = html;
   const content = template.content;
@@ -43,11 +47,11 @@ export function cleanMarkup(doc: Document, html: string): string {
     // A blob: address dies with the page that made it.
     if (element.getAttribute("src")?.startsWith("blob:")) element.removeAttribute("src");
   }
-  for (const input of content.querySelectorAll("input")) input.removeAttribute("value");
+  for (const input of content.querySelectorAll(TYPED)) input.removeAttribute("value");
   for (const area of content.querySelectorAll("textarea")) area.textContent = "";
   // Pictures wait behind the session, the app's script and the bots on the relay's narrow line.
   for (const image of content.querySelectorAll("img")) image.setAttribute("fetchpriority", "low");
-  return template.innerHTML;
+  return template;
 }
 
 /** The app's markup, cleaned, with each scrolled element's offset written onto it so the copy opens scrolled the same way. */
@@ -55,7 +59,7 @@ export function captureFrame(root: HTMLElement, view: { width: number; height: n
   const scrolled = [...root.querySelectorAll<HTMLElement>("*")].filter((element) => element.scrollTop > 0);
   for (const element of scrolled) element.setAttribute(SCROLL, String(Math.round(element.scrollTop)));
   try {
-    return { html: cleanMarkup(root.ownerDocument, root.innerHTML), ...view, at, build };
+    return { html: cleanMarkup(root.ownerDocument, root.innerHTML).innerHTML, ...view, at, build };
   } finally {
     for (const element of scrolled) element.removeAttribute(SCROLL);
   }
@@ -86,7 +90,7 @@ export function showFrame(doc: Document, frame: Frame): HTMLElement {
   copy.inert = true;
   copy.style.height = "100%";
   // Cleaned again: what localStorage hands back is only as trustworthy as everything else on this origin.
-  copy.innerHTML = cleanMarkup(doc, frame.html);
+  copy.append(cleanMarkup(doc, frame.html).content);
   cover.append(copy);
   doc.body.append(cover);
   for (const element of cover.querySelectorAll<HTMLElement>(`[${SCROLL}]`)) {
@@ -130,7 +134,11 @@ function keep() {
 }
 
 function start() {
-  if (PAGES_WITHOUT_THE_APP.has(location.pathname)) return;
+  if (PAGES_WITHOUT_THE_APP.has(location.pathname)) {
+    // Pairing again, maybe as someone else: the last session's chats must not cover the next one.
+    if (location.pathname === "/pair") forget();
+    return;
+  }
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") keep(); });
   window.addEventListener("pagehide", keep);
   let text: string | null = null;

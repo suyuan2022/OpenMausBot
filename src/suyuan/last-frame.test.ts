@@ -50,17 +50,18 @@ describe("captureFrame and showFrame", () => {
       '<input type="password" value="sk-secret-123"><textarea>草稿里的 key</textarea>',
       '<img src="blob:http://x/1" onerror="window.ran = 1"><img src="/api/bots/b/avatar">',
       '<script>window.ran = 2</script><base href="https://evil.test/"><meta http-equiv="refresh" content="0;url=https://evil.test">',
-      '<iframe src="https://example.com"></iframe><dialog open>快捷键</dialog><b>ok</b>',
+      '<iframe src="https://example.com"></iframe><dialog open>快捷键</dialog><input value="未标类型"><input type="range" value="12"><b>ok</b>',
     ].join("");
     const { html } = captureFrame(root, view(), 0, BUILD);
-    expect(html).not.toMatch(/sk-secret-123|草稿里的 key|blob:|onerror|script|base|meta|iframe|dialog|快捷键/);
+    expect(html).not.toMatch(/sk-secret-123|草稿里的 key|未标类型|blob:|onerror|script|base|meta|iframe|dialog|快捷键/);
+    expect(html).toContain('<input type="range" value="12">');
     expect(html).toContain('<img src="/api/bots/b/avatar" fetchpriority="low">');
     expect(html).toContain("<b>ok</b>");
   });
 
   it("keeps the ids an SVG's gradients and clip paths point at", async () => {
     const { cleanMarkup } = await fresh();
-    const html = cleanMarkup(document, '<div id="row"><svg id="omb-mermaid-1"><defs><linearGradient id="u-grad"></linearGradient></defs><path fill="url(#u-grad)"></path></svg></div>');
+    const html = cleanMarkup(document, '<div id="row"><svg id="omb-mermaid-1"><defs><linearGradient id="u-grad"></linearGradient></defs><path fill="url(#u-grad)"></path></svg></div>').innerHTML;
     expect(html).toContain('<svg id="omb-mermaid-1">');
     expect(html).toContain('id="u-grad"');
     expect(html).not.toContain('id="row"');
@@ -103,6 +104,18 @@ describe("a start with a kept frame", () => {
     await Promise.resolve();
     expect(cover()).toBeNull();
     expect(localStorage.getItem(KEY)).toBeNull();
+  });
+
+  it("forgets the frame on the pairing page, so pairing again never shows the last session", async () => {
+    keepFrame();
+    history.pushState(null, "", "/pair");
+    try {
+      await fresh();
+      expect(cover()).toBeNull();
+      expect(localStorage.getItem(KEY)).toBeNull();
+    } finally {
+      history.pushState(null, "", "/");
+    }
   });
 
   it("lifts by itself when the bots take too long", async () => {
