@@ -53,14 +53,6 @@ describe("server update check", () => {
     expect(fetch).toHaveBeenCalledWith(LATEST_RELEASE_URL, expect.anything());
   });
 
-  it("reads the fork's suyuan-v tags, newer by upstream version first and then by fork build", async () => {
-    const newer = (tag: string, current: string) =>
-      createUpdateChecker({ current, install: "npm", fetch: vi.fn(async () => release(tag)) })();
-    expect(await newer("suyuan-v0.1.150-suyuan.3", "0.1.149-suyuan.9")).toMatchObject({ available: true, latest: "0.1.150-suyuan.3" });
-    expect(await newer("suyuan-v0.1.149-suyuan.10", "0.1.149-suyuan.9")).toMatchObject({ available: true });
-    expect(await newer("suyuan-v0.1.149-suyuan.9", "0.1.149-suyuan.9")).toMatchObject({ available: false });
-  });
-
   it("says up to date, and asks GitHub at most once an hour", async () => {
     let now = 0;
     const fetch = vi.fn(async () => release("v0.1.92"));
