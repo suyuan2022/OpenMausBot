@@ -142,10 +142,17 @@ export function createWebPush(options: {
   /** false: the push service says this subscription is gone for good. */
   async function pushTo(subscription: PushSubscriptionRecord, payload: PushPayload): Promise<boolean> {
     const host = new URL(subscription.endpoint).host;
-    const body = encryptPushPayload(utf8(JSON.stringify(payload)), {
-      p256dh: Buffer.from(subscription.keys.p256dh, "base64url"),
-      auth: Buffer.from(subscription.keys.auth, "base64url"),
-    });
+    let body: Buffer;
+    try {
+      body = encryptPushPayload(utf8(JSON.stringify(payload)), {
+        p256dh: Buffer.from(subscription.keys.p256dh, "base64url"),
+        auth: Buffer.from(subscription.keys.auth, "base64url"),
+      });
+    } catch (error) {
+      // A key no browser would hand out: this device can never be reached, so it is dropped like a gone one.
+      log(`${host}: dropped a subscription whose key is unusable (${error instanceof Error ? error.message : String(error)})`);
+      return false;
+    }
     try {
       const response = await post(subscription.endpoint, {
         method: "POST",

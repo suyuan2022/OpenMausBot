@@ -155,6 +155,18 @@ describe("createWebPush", () => {
     expect(await push.test(laptop.endpoint)).toBe(false);
   });
 
+  it("drops a subscription whose key is not a point on the curve, and still reaches the other devices", async () => {
+    const { push, calls, log, dir } = host();
+    const broken = { endpoint: "https://web.push.apple.com/broken", keys: { p256dh: Buffer.concat([Buffer.from([4]), Buffer.alloc(64)]).toString("base64url"), auth: Buffer.alloc(16).toString("base64url") } };
+    const phone = device();
+    push.subscribe(broken);
+    push.subscribe(phone);
+    await push.deliver(notification("t1"));
+    expect(calls.map((call) => call.url)).toEqual([phone.endpoint]);
+    expect(log).toHaveBeenCalledWith(expect.stringContaining("dropped a subscription whose key is unusable"));
+    expect(JSON.parse(readFileSync(join(dir, PUSH_FILE), "utf8")).subscriptions.map((one: { endpoint: string }) => one.endpoint)).toEqual([phone.endpoint]);
+  });
+
   it("never rejects, even when the push service can't be reached", async () => {
     const { push, log } = host();
     push.subscribe(device());
