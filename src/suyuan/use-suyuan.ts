@@ -1,5 +1,5 @@
 // suyuan fork: the one hook src/App.tsx's shell calls, so every fork feature that needs the app's state plugs in here.
-import { useEffect } from "react";
+import { useEffect, useLayoutEffect } from "react";
 import type { Action, AppState } from "@/state/store";
 import { liftFrame, noteApp, noteAppGone } from "./last-frame";
 import { useWebPush } from "./use-web-push";
@@ -10,8 +10,9 @@ const SETTLE_MS = 150;
 export function useSuyuan(state: AppState, dispatch: (action: Action) => void): void {
   useWebPush(state, dispatch);
   const loaded = state.hydrated === true;
-  noteApp(loaded);
-  useEffect(() => noteAppGone, []);
+  // A layout effect runs inside React's commit, before the cover's watcher hears that #root changed.
+  useLayoutEffect(() => noteApp(loaded), [loaded]);
+  useLayoutEffect(() => noteAppGone, []);
   useEffect(() => {
     if (!loaded) return;
     const timer = setTimeout(liftFrame, SETTLE_MS);

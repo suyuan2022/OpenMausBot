@@ -1,9 +1,9 @@
 /* suyuan fork: the full-screen "Connecting to your bots…" spinner and line (src/App.tsx) show only once connecting has
-   taken a few seconds; a normal start is over before then. Matched by the attribute and classes App.tsx gives them, so
+   taken two seconds; a normal start is over before then. Matched by the attribute and classes App.tsx gives them, so
    if those change upstream the line simply shows at once again. */
 main[data-app-loading="app.loading.connecting"] > svg.animate-spin,
 main[data-app-loading="app.loading.connecting"] > .text-\[14px\] {
-  animation: suyuan-show-late 0.2s ease-out 3s both;
+  animation: suyuan-show-late 0.2s ease-out 2s both;
 }
 
 @keyframes suyuan-show-late {
