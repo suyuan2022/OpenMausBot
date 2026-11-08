@@ -57,7 +57,7 @@ describe("server update check", () => {
     let now = 0;
     const fetch = vi.fn(async () => release("v0.1.92"));
     const check = createUpdateChecker({ current: "0.1.92", install: "npm", fetch, now: () => now });
-    expect(await check()).toMatchObject({ available: false, latest: "0.1.92", command: "npm install -g openmausbot@latest", restart: true });
+    expect(await check()).toMatchObject({ available: false, latest: "0.1.92", command: "cd ~/Documents/OpenMausBot && scripts/suyuan/deploy-vm.sh", restart: false });
     now = 59 * 60_000;
     await check();
     expect(fetch).toHaveBeenCalledTimes(1);
