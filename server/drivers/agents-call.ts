@@ -17,6 +17,7 @@ import { boundedAgentResult } from "./agents-result.ts";
 import { outOfBounds } from "./agents-schema.ts";
 import { callResearchTool, RESEARCH_TOOL_NAMES } from "./agents-research-tools.ts";
 import { callHelperTool, HELPER_TOOL_NAMES } from "./agents-helper-tools.ts";
+import { callChiefReadTool, CHIEF_READ_TOOL_NAMES } from "../suyuan/chief-read-tools.ts";
 import { callUsageLimitsTool, USAGE_LIMITS_TOOL } from "./agents-usage-tool.ts";
 import { callWaitTool, WAIT_TOOL_NAMES } from "./agents-wait-tools.ts";
 import { callComputerAskTool, COMPUTER_ASK_TOOL_NAMES } from "./agents-computer-ask-tool.ts";
@@ -250,6 +251,7 @@ export async function callTool(called: string, input: Json, context: ToolCallCon
   if (TRIGGER_TOOL_NAMES.has(name)) return callTriggerTool(name, args, context);
   if (WAIT_TOOL_NAMES.has(name)) return callWaitTool(name, args, context);
   if (name === USAGE_LIMITS_TOOL) return callUsageLimitsTool(context);
+  if (CHIEF_READ_TOOL_NAMES.has(name)) return callChiefReadTool(name, args, context);
   if (COMPUTER_ASK_TOOL_NAMES.has(name)) return callComputerAskTool(args, context);
   // Second lock: with sharing off the catalog already omits these tools.
   if (SHARED_COMPUTER_TOOL_NAMES.has(name) && !context.sharedComputers) {

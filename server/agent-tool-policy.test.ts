@@ -11,6 +11,8 @@ describe("built-in agent tool read policy", () => {
       "list_threads",
       "assignment_status",
       "session_search",
+      "team_threads",
+      "team_thread_read",
       "tool_result_read",
       "trigger_info",
       "list_waits",
