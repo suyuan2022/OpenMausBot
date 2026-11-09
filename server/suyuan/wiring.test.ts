@@ -156,4 +156,13 @@ describe("the fork's hooks into upstream files", () => {
     expect(viewport).toContain("useFillShortChat(scrollRef, threadId, { shown: transcriptShown, following: follow, startIndex, hasMore, olderPending, count: messages.length });");
     expect(functionBody(source("src/lib/transcript-window.ts"), "followWindowStart")).toContain("const tail = drawnTailStart(messages, TRANSCRIPT_WINDOW_SIZE);");
   });
+
+  it("the composer's voice-call button and the + menu's call modes wait for the Settings switch", () => {
+    const composer = source("src/components/Composer.tsx");
+    expect(composer).toContain("const voiceButton = useVoiceButton() || calling;");
+    expect(composer).toContain("const callShown = voiceButton && (!simpleDock || (!hasContent && !stopInSlot));");
+    expect(composer).toContain("callBotId={voiceButton && bot && !group ? bot.id : undefined}");
+    expect(source("src/components/SettingsModal.tsx")).toContain("<TalkShortcutRow />\n            <VoiceButtonRow />");
+    expect(source("src/components/SettingsSimplePages.tsx")).toContain("<TalkShortcutRow />\n            <VoiceButtonRow />");
+  });
 });

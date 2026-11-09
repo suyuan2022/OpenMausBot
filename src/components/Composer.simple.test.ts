@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Bot, Group } from "@/state/store";
 import { restoreComposerDraft } from "@/lib/drafts";
 import { setCallMode } from "@/lib/call-mode";
+import { setVoiceButton } from "@/suyuan/voice-button";
 import { userBubbleTone } from "@/lib/user-bubble-tone";
 import { BOT_BUTTON, botButtonTone } from "@/lib/bot-button";
 
@@ -91,6 +92,9 @@ beforeEach(() => {
   fixture.liveCall = null;
   fixture.config = undefined;
   setCallMode("turns");
+  const voiceStore = new Map<string, string>();
+  vi.stubGlobal("localStorage", { getItem: (key: string) => voiceStore.get(key) ?? null, setItem: (key: string, value: string) => voiceStore.set(key, value) });
+  setVoiceButton(true);
   fixture.call = null;
   fixture.groupCall = null;
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });

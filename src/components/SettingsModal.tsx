@@ -12,6 +12,7 @@ import { AnalyticsRow } from "./AnalyticsRow";
 import { UpdatesConsentRow } from "./UpdatesConsent";
 import { OpenAtLoginRow } from "./OpenAtLoginRow";
 import { DefaultBotSidebarRow } from "./DefaultBotControls";
+import { VoiceButtonRow } from "@/suyuan/VoiceButtonRow";
 import { TalkShortcutRow, talkShortcutKeywords } from "./TalkShortcutRow";
 import { AttachmentStorageSettings } from "./AttachmentStorageSettings";
 import { DiagnosticsRow } from "./DiagnosticsRow";
@@ -346,6 +347,7 @@ export function SettingsModal() {
             <AdvancedModeRow />
             <DefaultBotSidebarRow />
             <TalkShortcutRow />
+            <VoiceButtonRow />
 
             <ProSettingsCard />
             <CloudUsageSettings />

@@ -67,6 +67,7 @@ import { composerPlaceholder, sendLabels, SIMPLE_COMPOSER, SIMPLE_CONTROL, slotC
 import { PendingApprovalActions, PendingApprovalPanel, pendingApprovals } from "./PendingApproval";
 import { CallButton } from "./CallView";
 import { GroupCallButton } from "./GroupCallView";
+import { useVoiceButton } from "@/suyuan/voice-button";
 import { ApprovalChip, ComposerPlusMenu, GoalToggle, TeachTaskButton } from "./ComposerPlusMenu";
 import { PhonePlus } from "./PhonePlus";
 import { useThreadApproval } from "./thread-approval";
@@ -504,7 +505,9 @@ export function Composer({
   const stoppable = busy || Boolean(!group && bot?.waitingForTeammates);
   // Simple mode's round button is the call, Send while there is text, and Stop while the bot works.
   const stopInSlot = simpleDock && stoppable && !locked && !hasContent && !calling;
-  const callShown = !simpleDock || (!hasContent && !stopInSlot);
+  // suyuan fork: hidden until Settings turns the voice button on; a running call keeps its hang-up button.
+  const voiceButton = useVoiceButton() || calling;
+  const callShown = voiceButton && (!simpleDock || (!hasContent && !stopInSlot));
   const slot = slotColors(bot?.color, Boolean(group));
   // A one-to-one bot at work: Enter does the chosen follow-up and Ctrl/⌘ with it the other one. Rooms keep their own queue.
   const followUpFor = (alternate: boolean) => resolveFollowUp({ running: busy && !group && Boolean(bot), alternate, preferred: followUpDefault, canSteer }) ?? undefined;
@@ -769,7 +772,7 @@ export function Composer({
               goal={goal}
               teach={canLearn ? teachTask : undefined}
               approval={approvalChoice && modeBot && { name: modeBot.name, choice: approvalChoice }}
-              callBotId={bot && !group ? bot.id : undefined}
+              callBotId={voiceButton && bot && !group ? bot.id : undefined}
               place={modeBot && !remoteClient && advanced ? {
                 bot: modeBot,
                 task: composerTask,

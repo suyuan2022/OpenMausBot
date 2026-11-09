@@ -25,6 +25,7 @@ suyuan2022/OpenMausBot 是 [milind-soni/OpenMausBot](https://github.com/milind-s
 | 手机上收件箱是右上角「+」左边的一个圆按钮：有事等夙愿时右上角一个红点，不显示数字；原来头像下面那一整行收件箱在手机上去掉。电脑上不变 | 那一行把 bot 列表整个往下推了一行，收件箱用得没那么频繁，不值得占一整行 | `src/components/Sidebar.tsx` 3 行；新文件 `src/suyuan/PhoneInboxButton.tsx`，用例 `src/suyuan/PhoneInboxButton.dom.test.ts` | 不还：个人偏好 |
 | 手机上不能双指缩放，图片只下载一次：触屏上页面不再被双指捏合、双击缩放（滚动照常，电脑浏览器不变），图片预览里图片自己能双指缩放（1–5 倍）、放大后拖动、双击在 1 倍和 2.5 倍间切换；对话里的图片（他发的、bot 回的、头像）服务端回一年的强缓存，音频和别的文件仍不缓存 | 原来每次重开 App 都把图片重新下一遍，北京中转出口只有约 3 Mbps，跳回 App 要等很久；图片名是随机 UUID、内容不变，缓存安全 | `index.html` viewport 加 1 项，`server/routes/threads.ts` 1 行、`src/suyuan/use-suyuan.ts` 5 行接入，`server/suyuan/wiring.test.ts` 1 条断言；新文件 `server/suyuan/attachment-cache.ts`、`src/suyuan/no-zoom.ts`、`src/suyuan/no-zoom.css`、`src/suyuan/preview-zoom.ts` | 可以还：先问原作者要不要 |
 | 手机首页的头像和 + 往上挪 6px：整行（`data-sidebar-top-row`）底部加 12px 内边距，行高不变、下面的列表不动；头像和 + 离状态栏底边从 12px 变成 6px，不贴近时间 | 夙愿觉得首页左上角头像、右上角加号离顶太远 | 新文件 `src/suyuan/phone-header.css`；`src/suyuan/use-suyuan.ts` 1 行引入 | 不还 |
+| 输入框右下角的语音对话（实时通话）圆钮默认不显示：设置的「通用」里有「显示语音对话按钮」开关，打开才出现；开关存在本机（localStorage），每台设备各管各的。关着时简洁模式 + 菜单里的通话选项也一并隐藏；通话进行中按钮照常显示，好挂断 | 夙愿用不上语音对话，圆钮占着输入框右端 | `src/components/Composer.tsx` 4 行、`src/components/SettingsModal.tsx`、`src/components/SettingsSimplePages.tsx`（简洁模式）各 2 行接入；`Composer.simple.test.ts`、`Composer.phone.test.ts` 在开头打开开关、`ChatView.controls.test.ts` 改成断言默认不显示；新文件 `src/suyuan/voice-button.ts`、`src/suyuan/VoiceButtonRow.tsx` | 不还：这是夙愿自己的偏好 |
 
 ## 待做
 
