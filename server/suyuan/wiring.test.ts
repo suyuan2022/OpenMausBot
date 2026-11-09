@@ -80,4 +80,12 @@ describe("the fork's hooks into upstream files", () => {
     expect(sidebar).toMatch(/<aside\n[^>]*\n\s+data-sidebar\n/);
     expect(sidebar).toContain('open ? "max-md:translate-x-0" : "max-md:-translate-x-full"');
   });
+
+  it("a chat's window counts only drawn rows, and a chat too short to scroll pages older messages in", () => {
+    const viewport = source("src/hooks/use-transcript-viewport.ts");
+    expect(viewport).toContain("const tailStart = drawnTailStart(messages, TRANSCRIPT_WINDOW_SIZE);");
+    expect(viewport.split("const start = drawnExpandStart(messages, startIndex, TRANSCRIPT_WINDOW_SIZE);")).toHaveLength(3);
+    expect(viewport).toContain("useFillShortChat(scrollRef, threadId, { shown: transcriptShown, following: follow, startIndex, hasMore, olderPending, count: messages.length });");
+    expect(functionBody(source("src/lib/transcript-window.ts"), "followWindowStart")).toContain("const tail = drawnTailStart(messages, TRANSCRIPT_WINDOW_SIZE);");
+  });
 });
