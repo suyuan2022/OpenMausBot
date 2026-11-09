@@ -42,6 +42,18 @@ export function pickRoutineThread(routine: Routine, run: RoutineRun, runs: reado
   return holder ? { threadId, busy: true, remember } : { threadId, remember };
 }
 
+/** The pick for a run about to start, with the routine it belongs to; a run that already has a conversation keeps it. */
+export function ownThread(routines: readonly Routine[], run: RoutineRun, runs: readonly RoutineRun[], alive: Alive | undefined): RoutineThreadPick & { routine?: Routine } {
+  const routine = routines.find((candidate) => candidate.id === run.routineId);
+  return !run.threadId && routine && alive ? { ...pickRoutineThread(routine, run, runs, alive), routine } : {};
+}
+
+/** Records the conversation the run ended up in: its own new one (named for the routine, not its first run's time), or the
+ * one it adopted. A conversation joined some other way is not the routine's. */
+export function rememberThread(own: RoutineThreadPick & { routine?: Routine }, threadId: string, joined: string | null): void {
+  if (own.remember && own.routine && (own.threadId ? own.threadId === threadId : joined === null)) own.routine.runThreadId = threadId;
+}
+
 /** The earlier run in this conversation already left its report there, so carrying it in again would say it twice. */
 export const continuesThread = (pick: RoutineThreadPick): boolean => pick.threadId !== undefined;
 

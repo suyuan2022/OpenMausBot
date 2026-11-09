@@ -8838,8 +8838,7 @@ routines = new RoutineManager({
     const source = routineSourceOwner(run);
     if (!source || source.group || source.bot.id !== run.botId) return null;
     return source.threadId;
-  },
-  threadOpen: (botId, threadId) => { const task = store.taskByThread(botId, threadId); return Boolean(task) && task!.archivedAt === undefined; },
+  }, threadOpen: (botId, threadId) => { const task = store.taskByThread(botId, threadId); return Boolean(task) && task!.archivedAt === undefined; },
   createGoalTask: (groupId, title) => store.createGroupTask(groupId, title, false),
   isResultsThread: (botId, threadId) => {
     const bot = store.bot(botId);

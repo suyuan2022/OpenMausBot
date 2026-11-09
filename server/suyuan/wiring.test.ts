@@ -119,10 +119,10 @@ describe("the fork's hooks into upstream files", () => {
 
   it("a routine's runs share one conversation: the manager picks it before a run starts, and the host says which are open", () => {
     const routines = source("server/routines.ts");
-    expect(routines).toContain("pickRoutineThread(routineOf, run, this.runs, this.options.threadOpen)");
+    expect(routines).toContain("const own = ownThread(this.routines, run, this.runs, this.options.threadOpen), state = sameRoutineWorking || own.busy ?");
     expect(routines).toContain("|| own.threadId || null;");
     expect(routines).toContain("continuesThread(own) ? null : continuityCarry(run, this.routines, this.runs)");
-    expect(routines).toContain("routineOf.runThreadId = task.threadId;");
+    expect(routines).toContain("rememberThread(own, task.threadId, joined);");
     const index = source("server/index.ts");
     // The two upstream e2e tests that count a conversation per run turn the fork's switch off through the launcher.
     expect(source("scripts/control-omb.ts")).toContain('"OMB_ROUTINE_ONE_THREAD"');
