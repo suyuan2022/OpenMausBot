@@ -102,6 +102,13 @@ describe("the fork's hooks into upstream files", () => {
     expect(source("src/components/RoomQueueList.tsx")).toContain('<div data-testid="routed-by" className="mt-1 px-1 text-[11px] text-ink-secondary">');
   });
 
+  it("the first-reply notice stays off: the fork sets the variable the rescue reads each time it arms", () => {
+    expect(source("server/suyuan/register.ts")).toContain('process.env.OMB_FIRST_REPLY_NOTICE_MS ??= "0";');
+    const rescue = source("server/first-reply-rescue.ts");
+    expect(functionBody(rescue, "firstReplyNoticeMs")).toContain("const raw = env.OMB_FIRST_REPLY_NOTICE_MS?.trim();");
+    expect(rescue).toContain("const ms = firstReplyNoticeMs();\n    if (ms <= 0) return;");
+  });
+
   it("a chat's window counts only drawn rows, and a chat too short to scroll pages older messages in", () => {
     const viewport = source("src/hooks/use-transcript-viewport.ts");
     expect(viewport).toContain("const tailStart = drawnTailStart(messages, TRANSCRIPT_WINDOW_SIZE);");
