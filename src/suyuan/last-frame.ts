@@ -2,6 +2,10 @@
 // otherwise starts on "Connecting to your bots…" until the bots load, a second or more over the relay. When the app goes
 // out of sight its markup is kept in localStorage; the next start lays that over the page, inert, and lifts it once the
 // bots have loaded. quiet-start.css holds the page's own connecting line back for the first seconds.
+//
+// The app reopens on the last chat, scrolled to its end, and on nothing else: not the bot list, settings or a team map,
+// and not wherever the chat was scrolled to. The frame shows only that, so lifting it moves nothing on screen.
+import { t } from "@/lib/i18n";
 import "./quiet-start.css";
 
 const KEY = "suyuan:last-frame";
@@ -13,7 +17,11 @@ const MAX_AGE_MS = 3 * 24 * 3600_000;
 /** Bots still not loaded by then: the live page takes over, its connecting line usually showing by then. The same wait as the
  * reconnecting strip (src/components/LiveConnectionStrip.tsx), so a frozen screen never passes for a live one longer. */
 export const HOLD_MS = 4_000;
+/** The lifted frame fades rather than vanishes, so whatever arrived meanwhile (a new message) does not jump in. */
+export const FADE_MS = 150;
 const SCROLL = "data-suyuan-scroll";
+/** On the chat's scroller: the copy opens at the end, as the app does. */
+const AT_END = "data-suyuan-end";
 /** Same as src/main.tsx: these pages are not the app, so they neither show nor keep a frame. */
 const PAGES_WITHOUT_THE_APP = new Set(["/home", "/pair", "/desktop-viewer"]);
 /** Whatever could run, load or navigate, plus open dialogs, which in a copy would sit in the page without their backdrop. */
@@ -54,14 +62,33 @@ export function cleanMarkup(doc: Document, html: string): HTMLTemplateElement {
   return template;
 }
 
-/** The app's markup, cleaned, with each scrolled element's offset written onto it so the copy opens scrolled the same way. */
-export function captureFrame(root: HTMLElement, view: { width: number; height: number }, at: number, build: string): Frame {
-  const scrolled = [...root.querySelectorAll<HTMLElement>("*")].filter((element) => element.scrollTop > 0);
+/** The scroller of the chat shown mid-screen, or null when the screen shows something else. The transcript is the
+ * `role="log"` in src/components/ChatView.tsx. */
+export function chatInView(doc: Document, view: { width: number; height: number }): HTMLElement | null {
+  const hit = doc.elementFromPoint(view.width / 2, view.height / 2);
+  const log = hit?.closest('[role="log"]') ?? hit?.querySelector(':scope > [role="log"]');
+  for (let element = log?.parentElement; element; element = element.parentElement) {
+    if (/auto|scroll/.test(getComputedStyle(element).overflowY)) return element;
+  }
+  return null;
+}
+
+/** The app's markup, cleaned, with each scrolled element's offset written onto it so the copy opens scrolled the same way,
+ * except the chat, which opens at its end. The jump-to-latest button goes: at the end the app does not show it. */
+export function captureFrame(root: HTMLElement, chat: HTMLElement, view: { width: number; height: number }, at: number, build: string): Frame {
+  const scrolled = [...root.querySelectorAll<HTMLElement>("*")].filter((element) => element.scrollTop > 0 && element !== chat);
   for (const element of scrolled) element.setAttribute(SCROLL, String(Math.round(element.scrollTop)));
+  chat.setAttribute(AT_END, "");
   try {
-    return { html: cleanMarkup(root.ownerDocument, root.innerHTML).innerHTML, ...view, at, build };
+    const template = cleanMarkup(root.ownerDocument, root.innerHTML);
+    const latest = t("chat.jumpToLatest");
+    for (const button of template.content.querySelectorAll("button[title]")) {
+      if (button.getAttribute("title") === latest) button.remove();
+    }
+    return { html: template.innerHTML, ...view, at, build };
   } finally {
     for (const element of scrolled) element.removeAttribute(SCROLL);
+    chat.removeAttribute(AT_END);
   }
 }
 
@@ -97,6 +124,10 @@ export function showFrame(doc: Document, frame: Frame): HTMLElement {
     element.scrollTop = Number(element.getAttribute(SCROLL));
     element.removeAttribute(SCROLL);
   }
+  for (const element of cover.querySelectorAll<HTMLElement>(`[${AT_END}]`)) {
+    element.scrollTop = element.scrollHeight;
+    element.removeAttribute(AT_END);
+  }
   return cover;
 }
 
@@ -123,8 +154,11 @@ function forget() {
 function keep() {
   const root = document.getElementById("root");
   if (!appShown || !appLoaded || !root) return;
+  // Left on a screen the app does not reopen on: an older frame would show yet another one.
+  const chat = chatInView(document, viewSize());
+  if (!chat) return forget();
   try {
-    const text = JSON.stringify(captureFrame(root, viewSize(), Date.now(), currentBuild()));
+    const text = JSON.stringify(captureFrame(root, chat, viewSize(), Date.now(), currentBuild()));
     if (text.length > MAX_CHARS) forget();
     else localStorage.setItem(KEY, text);
   } catch {
@@ -164,7 +198,10 @@ function start() {
     lift = () => {};
     clearTimeout(timer);
     watcher.disconnect();
-    cover.remove();
+    cover.style.pointerEvents = "none";
+    cover.style.transition = `opacity ${FADE_MS}ms ease-out`;
+    cover.style.opacity = "0";
+    setTimeout(() => cover.remove(), FADE_MS);
   };
 }
 

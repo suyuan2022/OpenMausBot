@@ -35,4 +35,9 @@ describe("the fork's hooks into upstream files", () => {
     expect(loading).toContain('<Loader2 size={20} className="animate-spin" />');
     expect(loading).toContain('<div className="text-[14px]">{t(loading.text)}</div>');
   });
+
+  it("the chat keeps the hooks the last-screen cover finds it by: its transcript log and the jump-to-latest title", () => {
+    expect(source("src/components/ChatView.tsx")).toContain('role="log"');
+    expect(source("src/components/JumpToLatestButton.tsx")).toContain('title={t("chat.jumpToLatest")}');
+  });
 });
