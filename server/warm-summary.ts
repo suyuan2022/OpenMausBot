@@ -5,8 +5,8 @@
 // Claude Code compacting a conversation of about 162k tokens at the start of the person's turn (35 to 58 s), whatever the
 // cache. A summary written in the idle gap after the turn before takes that off the person's wait.
 //
-// After a turn that leaves a conversation big enough, a summary is due a few minutes later (sooner when the next turn would
-// summarize anyway). It is skipped while background work is about to wake the conversation, retried while the bot is busy,
+// After a turn that leaves a conversation big enough, a summary is due once the person has left, before the cache goes cold
+// (sooner when the next turn would summarize anyway). It is skipped while background work is about to wake the conversation, retried while the bot is busy,
 // and given up once the cache has gone cold. A turn that starts meanwhile wins: the summary is abandoned, except when that
 // turn would summarize at its start anyway, which then waits for the summary already being written rather than start its own.
 // How a summary is written (the engine's own compaction on a fork of its session, or OpenMausBot's fold) and what it keeps
@@ -14,14 +14,14 @@
 
 /** Below this a conversation's turns stay fast and cheap enough without a summary, and summarizing would only lose detail. */
 export const WARM_SUMMARY_MIN_TOKENS = 100_000;
-/** Idle this long after a turn: long enough that a quick reply is not raced, well inside a 5-minute API-key cache. */
-export const WARM_SUMMARY_IDLE_MS = 3 * 60_000;
+/** Idle this long after a turn: the person has left, and a subscription's hour-long prompt cache is still warm. */
+export const WARM_SUMMARY_IDLE_MS = 55 * 60_000;
 /** When the next turn would summarize at its start anyway: start almost at once. */
 export const WARM_SUMMARY_SOON_MS = 10_000;
 /** A busy bot, or a routine about to run: look again this much later. */
 export const WARM_SUMMARY_RETRY_MS = 2 * 60_000;
 /** A subscription's prompt cache lives an hour from the last request: after this the summary would write it all again. */
-export const WARM_SUMMARY_GIVE_UP_MS = 50 * 60_000;
+export const WARM_SUMMARY_GIVE_UP_MS = 58 * 60_000;
 /** The longest a turn waits for a summary that it would otherwise have to write itself. */
 export const WARM_SUMMARY_TURN_WAIT_MS = 3 * 60_000;
 

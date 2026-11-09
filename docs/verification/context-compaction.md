@@ -35,7 +35,7 @@ the idle gap after the turn before, while the prompt cache is still warm, so
 the next turn starts small.
 
 - **When:** a direct conversation (not a room or a routine's run) whose turn
-  ended with 100k tokens or more of context gets one about 3 minutes later. A
+  ended with 100k tokens or more of context gets one 55 minutes later. A
   conversation at 80% or more of where Claude Code summarizes by itself
   (`OMB_CLAUDE_AUTOCOMPACT`, 200,000 by default) gets one about 10 seconds
   later, because its next turn would summarize anyway. For other engines,
@@ -65,9 +65,11 @@ the next turn starts small.
   - a teammate working on this conversation's request, or one whose answer
     it awaits;
   - a wait that fired and will carry on here;
-  - the workspace's spend limit reached.
+  - the workspace's spend limit reached;
+  - keep-warm holding the conversation, unless its next turn would
+    summarize anyway.
 
-  It is retried, every 2 minutes for up to 50 minutes after the turn (the
+  It is retried, every 2 minutes for up to 58 minutes after the turn (the
   cache's life), while the bot is busy, memory is short, or one of the bot's
   routines is due.
 - **Opening the conversation:** the app's presence ping names the chat that

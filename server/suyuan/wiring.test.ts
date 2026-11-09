@@ -109,6 +109,12 @@ describe("the fork's hooks into upstream files", () => {
     expect(rescue).toContain("const ms = firstReplyNoticeMs();\n    if (ms <= 0) return;");
   });
 
+  it("a Claude conversation is never folded by OpenMausBot on its own: Claude Code compacts it in its session", () => {
+    const index = source("server/index.ts");
+    expect(index).toContain('import { engineCompactsItself } from "./suyuan/native-compact.ts";');
+    expect(functionBody(index, "compactConversation")).toContain("(cfg.context?.autoCompact === false || engineCompactsItself(instance.driverKind))");
+  });
+
   it("a chat's window counts only drawn rows, and a chat too short to scroll pages older messages in", () => {
     const viewport = source("src/hooks/use-transcript-viewport.ts");
     expect(viewport).toContain("const tailStart = drawnTailStart(messages, TRANSCRIPT_WINDOW_SIZE);");
