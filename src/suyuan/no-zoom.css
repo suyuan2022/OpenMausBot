@@ -1,0 +1,6 @@
+/* suyuan fork: on a touch screen the page is not zoomed by pinch or double tap. iOS Safari has ignored user-scalable=no
+   since iOS 10; touch-action is what it honors (iOS 13+), and no screen here has a zoomable view to spare: the image
+   preview just fits the picture to the window. Scrolling stays. A desktop browser keeps its own zoom. */
+@media (hover: none) and (pointer: coarse) {
+  html, body { touch-action: pan-x pan-y; }
+}
