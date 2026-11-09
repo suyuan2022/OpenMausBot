@@ -14,6 +14,7 @@ suyuan2022/OpenMausBot 是 [milind-soni/OpenMausBot](https://github.com/milind-s
 | 重连不打扰：App 被系统杀掉后重开，先显示上次那个对话的画面（停在最底部，和 App 打开后一样），bot 数据加载完淡出、换成实时界面；离开时停在 bot 列表、设置这类 App 回不去的页面，或者是点推送通知打开的，就不显示；整屏的「正在连接你的机器人…」2 秒后还没连上才出现 | 主屏幕网页 App 在后台常被 iOS 杀掉，重开要经北京中转拉约 1 MB 的数据，这段时间整屏都是「正在连接」 | `src/main.tsx` 1 行；`src/App.tsx` 的 2 行接入调用 `src/suyuan/use-suyuan.ts`，推送也从这里接；新文件 `src/suyuan/last-frame.ts`、`src/suyuan/quiet-start.css` | 可以还：先问原作者要不要 |
 | 表格不再上下乱跳：简洁模式里，回复中表格卡片的宽度只由消息列决定，不跟着表格变 | 原作者的表格组件（`src/components/RichTable.tsx`）可用宽度一变就重新量一次：放得下就挤进消息宽度，放不下就换成固定列宽、左右滑。固定列宽会把消息列撑宽，撑宽后又放得下，于是切回去。列宽需求落在这两个宽度之间的表格（手机上约 273–312 像素）每帧来回切换，整段对话跟着上下跳，荔枝、穿搭对话里就有这样的表 | `src/suyuan/use-suyuan.ts` 1 行引入；新文件 `src/suyuan/steady-tables.css` | 该还：别的用户也会碰到。还的时候把这条 CSS 并进 `src/styles.css` |
 | 手机上 bot 的回复排到右边：触屏上 bot 的气泡和表格卡片一直排到右边，只在最右边留一条 28px 宽的竖栏，给点一下消息才出现的两个按钮（表情回应、⋯）上下叠着放；群聊的按钮和私聊一样只留这两个，回复和复制收进 ⋯ 菜单；只在鼠标悬停时显示的时间不再占位置。电脑上不变 | 原作者按鼠标设计：气泡最多占一行的 80%、离右边至少 82px，表格卡片占 88%，每条消息旁还留着悬停才显示的时间。402px 宽的手机上，bot 回复右边空出 136px；群聊多两个按钮，空出 160px | `src/components/ChatView.tsx` 1 行（导出 `replyAndCopy`），`src/components/GroupView.tsx` 4 行，`src/components/GroupView.message-actions.test.ts` 改 3 行断言；新文件 `src/suyuan/wide-replies.css`，由 `src/suyuan/use-suyuan.ts` 引入 | 可以还：先问原作者要不要 |
+| 左滑返回：手机上从屏幕左边缘往右滑，bot 列表跟着手指滑进来；拖过屏幕宽度的三分之一或者快速一甩就打开，否则弹回去。从左边缘竖着划照常滚动对话 | 主屏幕网页 App 没有 iOS 的侧滑返回，回列表只能点左上角的按钮 | `src/suyuan/use-suyuan.ts` 2 行接入；新文件 `src/suyuan/swipe-back.ts` | 可以还：先问原作者要不要 |
 
 ## 待做
 
