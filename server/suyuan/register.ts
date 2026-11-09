@@ -7,6 +7,11 @@ import { ROUTES } from "../routes/table.ts";
 import { webPushFor } from "./web-push.ts";
 import { createWebPushRoutes } from "./web-push-routes.ts";
 
+// The "hasn't heard back from Claude" notice (server/first-reply-rescue.ts) stays off unless the environment asks for it:
+// its two ways out, switch AI and connect a subscription, are no use here, and the chat's working line already counts
+// the wait. The rescue reads the variable afresh each time it arms, so setting it here covers every turn.
+process.env.OMB_FIRST_REPLY_NOTICE_MS ??= "0";
+
 ROUTES.push(createWebPushRoutes({ push: () => webPushFor(DATA_DIR), isOwner: ownerOrAdmin }));
 
 /** Every frame server/index.ts broadcasts: a notify also goes out as Web Push. */
