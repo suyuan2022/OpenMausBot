@@ -1,7 +1,6 @@
 // suyuan fork: what a Chief reads of a teammate's conversation (server/suyuan/chief-read-threads.ts). A turn can run
 // hundreds of tool steps, so the page is counted in words people said, not in rows: the steps between them fold into one
 // line each, and the person's request that started the turn rides in front when the page would otherwise miss it.
-import { activePath } from "../cloud-chat-merge.ts";
 import { peerProvenanceAuthor } from "../peer-provenance.ts";
 import { redactSecretsInText } from "../redact.ts";
 import type { Message } from "../store.ts";
@@ -93,4 +92,16 @@ export function readablePage(all: readonly Message[], leaf: string | null, hasMo
   if (asked) page.unshift(asked);
   // Anything left unread before the page, apart from the request that was brought forward.
   return { rows: page, earlier: hasMore || branch.slice(0, index + 1).some((message) => message !== request) };
+}
+
+/** The rows on the path from the conversation's live leaf back to its start: an edited message's abandoned branch drops out.
+ * The same walk as cloud-chat-merge.ts's activePath, kept here because importing that module pulls engine drivers into the
+ * Activity log's imports (server/agents-bridge-switch.test.ts forbids it). */
+function activePath(rows: readonly Message[], leaf: string | null): Message[] {
+  const byId = new Map(rows.map((row) => [row.id, row])), path: Message[] = [], seen = new Set<string>();
+  for (let row = leaf ? byId.get(leaf) : undefined; row && !seen.has(row.id); row = row.parentId ? byId.get(row.parentId) : undefined) {
+    seen.add(row.id);
+    path.push(row);
+  }
+  return path.reverse();
 }
