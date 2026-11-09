@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { t } from "@/lib/i18n";
-import { installSwipeBack } from "./swipe-back";
+import { hideBackButton, installSwipeBack } from "./swipe-back";
 
 let stop: () => void;
 let opened: number;
@@ -84,5 +84,19 @@ describe("swipe back", () => {
     swipe(8, 400, [100, 200, 300]);
     expect(opened).toBe(0);
     expect(drawer().style.translate).toBe("");
+  });
+});
+
+describe("the back button", () => {
+  it("is hidden only where the swipe works, with a room's header moving into its place, and comes back when let go", () => {
+    document.getElementById("root")!.insertAdjacentHTML("beforeend", '<div class="@container/roomhead px-5 py-3 pl-11 md:pl-5"></div>');
+    const show = hideBackButton(t("app.openBotList"));
+    const style = document.head.querySelector("style")!;
+    const [, media, selector, header] = style.textContent!.match(/^@media (.+?) \{ (.+?) \{ display: none; \} (.+?) \{ padding-left: 1\.25rem; \} \}$/)!;
+    expect(media).toBe("(hover: none) and (pointer: coarse) and (max-width: 767px)");
+    expect(document.querySelector(selector!)).toBe(document.querySelector("button"));
+    expect(document.querySelector(header!)?.className).toContain("@container/roomhead");
+    show();
+    expect(style.isConnected).toBe(false);
   });
 });
