@@ -283,7 +283,7 @@ it("P2 refuses the person's chat with Mira to a bot that is not her Chief, and h
   await f.say(f.clive.id, f.job, "P2-SAG: tell Mira to keep it.");
   await expect.poll(() => f.keys(f.clive.id), { timeout: 30_000 }).toEqual(["C0"]);
   expect(f.given("C0")).not.toContain("Teammates you manage wait on the person's answer");
-  expect(f.replies("C0")).toEqual([`"${chat}" is not a thread you opened on Mira: use a threadId one of your coordinate_bots receipts gave, or one list_threads shows on them`]);
+  expect(f.replies("C0")).toEqual([`"${chat}" was opened by someone else: to a thread you did not open, send only a one-way notice (reply "none"); to hand Mira work, use thread "standing" or "new"`]);
   expect((await asking(f, chat))?.answered).toBeUndefined();
   expect(f.children()).toEqual([]);
 }), hostTimeout(90_000));
@@ -324,7 +324,7 @@ it("P4 keeps Mira's question from a Clive turn a webhook started: it is not list
   expect(delivered.status).toBe(202);
   await expect.poll(() => f.keys(f.clive.id), { timeout: 30_000 }).toEqual(["C-HOOK"]);
   expect(f.given("C-HOOK")).not.toContain("Teammates you manage wait on the person's answer");
-  expect(f.replies("C-HOOK")).toEqual([`"${chat}" is not a thread you opened on Mira: use a threadId one of your coordinate_bots receipts gave, or one list_threads shows on them`]);
+  expect(f.replies("C-HOOK")).toEqual([`"${chat}" was opened by someone else: to a thread you did not open, send only a one-way notice (reply "none"); to hand Mira work, use thread "standing" or "new"`]);
   expect((await asking(f, chat))?.answered).toBeUndefined();
   expect(f.children()).toEqual([]);
 }), hostTimeout(90_000));
@@ -342,7 +342,7 @@ it("P7 keeps Mira's question from a Clive turn a scheduled routine started: it i
   expect((await f.api("POST", `/api/routines/${routine.body.routine.id}/run`)).status).toBe(201);
   await expect.poll(() => f.keys(f.clive.id), { timeout: 30_000 }).toEqual(["C-ROUTINE"]);
   expect(f.given("C-ROUTINE")).not.toContain("Teammates you manage wait on the person's answer");
-  expect(f.replies("C-ROUTINE")).toEqual([`"${chat}" is not a thread you opened on Mira: use a threadId one of your coordinate_bots receipts gave, or one list_threads shows on them`]);
+  expect(f.replies("C-ROUTINE")).toEqual([`"${chat}" was opened by someone else: to a thread you did not open, send only a one-way notice (reply "none"); to hand Mira work, use thread "standing" or "new"`]);
   expect(await asking(f, chat)).toBeDefined();
   expect((await asking(f, chat))?.answered).toBeUndefined();
   expect(f.children()).toEqual([]);
@@ -358,7 +358,7 @@ it("P5 does not take a message that names other work as the answer to Mira's que
 
   await f.say(f.clive.id, f.job, "P5-SAG: answer the other job.");
   await expect.poll(() => f.keys(f.clive.id), { timeout: 30_000 }).toEqual(["C-ANSWERS"]);
-  expect(f.replies("C-ANSWERS")).toEqual([`"${chat}" is not a thread you opened on Mira: use a threadId one of your coordinate_bots receipts gave, or one list_threads shows on them`]);
+  expect(f.replies("C-ANSWERS")).toEqual([`"${chat}" was opened by someone else: to a thread you did not open, send only a one-way notice (reply "none"); to hand Mira work, use thread "standing" or "new"`]);
   expect((await asking(f, chat))?.answered).toBeUndefined();
 }), hostTimeout(90_000));
 
@@ -381,6 +381,6 @@ it("F3 refuses a thread Clive did not open on Mira, saying where thread ids come
   await f.say(f.clive.id, f.job, "F3-JOB: have Mira look at this in her own chat.");
   await expect.poll(() => f.keys(f.clive.id), { timeout: 30_000 }).toEqual(["C0"]);
   const [refused] = f.replies("C0");
-  expect(refused).toBe(`"${f.mira.activeTaskId}" is not a thread you opened on Mira: use a threadId one of your coordinate_bots receipts gave, or one list_threads shows on them`);
+  expect(refused).toBe(`"${f.mira.activeTaskId}" was opened by someone else: to a thread you did not open, send only a one-way notice (reply "none"); to hand Mira work, use thread "standing" or "new"`);
   expect(f.children()).toEqual([]);
 }), hostTimeout(60_000));

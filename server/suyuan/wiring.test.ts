@@ -116,4 +116,10 @@ describe("the fork's hooks into upstream files", () => {
     expect(viewport).toContain("useFillShortChat(scrollRef, threadId, { shown: transcriptShown, following: follow, startIndex, hasMore, olderPending, count: messages.length });");
     expect(functionBody(source("src/lib/transcript-window.ts"), "followWindowStart")).toContain("const tail = drawnTailStart(messages, TRANSCRIPT_WINDOW_SIZE);");
   });
+
+  it("workThreadFor takes a one-way notice into a live thread someone else opened, and refuses new work there", () => {
+    const body = functionBody(source("server/host/work-thread.ts"), "workThreadFor");
+    expect(body).toContain("if (usable && input.notice && !task.openedBy?.roomLane) return task;");
+    expect(body).toContain("was opened by someone else");
+  });
 });
