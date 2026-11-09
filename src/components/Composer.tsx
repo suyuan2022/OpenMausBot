@@ -925,7 +925,7 @@ export function Composer({
             )}
           />
           <div data-composer-actions className={cn("flex items-center", simpleDock ? "gap-2" : "gap-1", !singleRow && !simpleDock && "@max-[30rem]/composer:ml-auto", stacked && "ml-auto")}>
-          {(simpleDock ? stoppable : busy) && !locked && (
+          {(simpleDock ? stoppable : busy) && !locked && (!hasContent || blocking || attachmentPending) && (
           <button
             onClick={interruptTurn}
             aria-label={t("chat.stopTurn")}
