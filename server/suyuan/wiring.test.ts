@@ -102,6 +102,12 @@ describe("the fork's hooks into upstream files", () => {
     expect(source("src/components/RoomQueueList.tsx")).toContain('<div data-testid="routed-by" className="mt-1 px-1 text-[11px] text-ink-secondary">');
   });
 
+  it("the phone list's avatar row is lifted by phone-header.css, found by the row's data attribute", () => {
+    expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/phone-header\.css";/m);
+    expect(source("src/components/Sidebar.tsx")).toContain('data-sidebar-top-row={corner ? "corner" : true}');
+    expect(source("src/suyuan/phone-header.css")).toContain('[data-sidebar-top-row="true"]');
+  });
+
   it("the first-reply notice stays off: the fork sets the variable the rescue reads each time it arms", () => {
     expect(source("server/suyuan/register.ts")).toContain('process.env.OMB_FIRST_REPLY_NOTICE_MS ??= "0";');
     const rescue = source("server/first-reply-rescue.ts");
