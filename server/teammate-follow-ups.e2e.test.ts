@@ -375,7 +375,7 @@ it("P6 does not take a one-way notice as the answer to Mira's question to the pe
   expect((await asking(f, chat))?.answered).toBeUndefined();
 }), hostTimeout(90_000));
 
-it("F3 refuses a thread Clive did not open on Mira, saying where thread ids come from", () => scenario(async (f) => {
+it("F3 refuses work in a thread Clive did not open on Mira, saying a notice or standing or new is the way", () => scenario(async (f) => {
   f.script(f.clive.id, { key: "C0", match: ["F3-JOB"], steps: [
     { arguments: { bot_ids: [f.mira.id], message: "F3-BRIEF: look at this.", thread: f.mira.activeTaskId }, expectError: true }], reply: "C0: refused." });
   await f.say(f.clive.id, f.job, "F3-JOB: have Mira look at this in her own chat.");
