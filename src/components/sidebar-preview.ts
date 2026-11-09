@@ -12,6 +12,7 @@ import { isClientCancellation, isStoppedTurnName } from "../../shared/client-can
 import { roomWorkingPreview } from "@/lib/room-threads";
 import { localizedCard } from "@/lib/widget-text";
 import { widgetToText } from "../../shared/widget";
+import { busyInOwnChats } from "@/suyuan/own-work";
 
 /** The newest message a preview can show. A receipt or a screen frame says nothing about the conversation on its own. */
 export function lastPreviewable<T extends { kind: string }>(messages: readonly T[] | undefined): T | undefined {
@@ -21,7 +22,7 @@ export function lastPreviewable<T extends { kind: string }>(messages: readonly T
 export function botPreview(bot: Bot, visible: Message[], instances: InstanceInfo[], advanced: boolean): string {
   if (bot.activity === "waiting-on-you") return t("sidebar.preview.waiting");
   if (bot.waitingForTeammates) return t("sidebar.preview.waitingOnTeammate");
-  if (bot.busy) return t("sidebar.preview.working");
+  if (busyInOwnChats(bot)) return t("sidebar.preview.working");
   return lastLine(bot, visible, instances, advanced);
 }
 

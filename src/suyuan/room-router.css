@@ -1,0 +1,12 @@
+/* suyuan fork: rooms on Auto pick who answers with DeepSeek, which names one bot (server/suyuan/room-router.ts), so
+   the line under a routed reply would always read "picked by OpenRouter · 100%". It says only that the reply was picked
+   automatically; a reply without it went to the room's lead because the router failed. The locale keeps its {percent}
+   placeholder (the pre-push locale check), so the words come from here, in Chinese, the one language this fork uses. */
+[data-testid="routed-by"] {
+  font-size: 0;
+}
+
+[data-testid="routed-by"]::after {
+  content: "自动挑选";
+  font-size: 11px;
+}
