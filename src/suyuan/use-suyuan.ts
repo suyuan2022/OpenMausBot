@@ -6,6 +6,7 @@ import type { Action, AppState } from "@/state/store";
 import { chatAlone } from "./chat-alone";
 import { liftFrame, noteApp, noteAppGone } from "./last-frame";
 import "./steady-tables.css";
+import { installSwipeBack } from "./swipe-back";
 import { useWebPush } from "./use-web-push";
 import "./wide-replies.css";
 
@@ -19,6 +20,7 @@ export function useSuyuan(state: AppState, dispatch: (action: Action) => void): 
   // A layout effect runs inside React's commit, before the cover's watcher hears that #root changed.
   useLayoutEffect(() => noteApp(loaded, alone), [loaded, alone]);
   useLayoutEffect(() => noteAppGone, []);
+  useEffect(() => installSwipeBack(), []);
   useEffect(() => {
     if (!loaded) return;
     const timer = setTimeout(liftFrame, SETTLE_MS);

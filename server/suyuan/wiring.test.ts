@@ -69,4 +69,15 @@ describe("the fork's hooks into upstream files", () => {
     expect(room).toContain('menu={simple ? [...replyAndCopy(() => onReply(m), botText), ...botMenu] : botMenu}>');
     expect(source("src/components/ReplyBlocks.tsx")).toContain("data-reply-blocks");
   });
+
+  it("the phone's bot list keeps the button and the drawer the left-edge swipe opens it by", () => {
+    expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("useEffect(() => installSwipeBack(), []);");
+    const app = source("src/App.tsx");
+    expect(app).toContain('aria-label={t("app.openBotList")}');
+    expect(app).toContain("aria-expanded={drawerOpen}");
+    expect(app).toContain("onClick={() => setDrawerOpen(true)}");
+    const sidebar = source("src/components/Sidebar.tsx");
+    expect(sidebar).toMatch(/<aside\n[^>]*\n\s+data-sidebar\n/);
+    expect(sidebar).toContain('open ? "max-md:translate-x-0" : "max-md:-translate-x-full"');
+  });
 });
