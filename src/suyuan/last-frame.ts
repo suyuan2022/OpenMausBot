@@ -3,8 +3,9 @@
 // out of sight its markup is kept in localStorage; the next start lays that over the page, inert, and lifts it once the
 // bots have loaded. quiet-start.css holds the page's own connecting line back for the first seconds.
 //
-// The app reopens on the last chat, scrolled to its end, and on nothing else: not the bot list, settings or a team map,
-// and not wherever the chat was scrolled to. The frame shows only that, so lifting it moves nothing on screen.
+// The app reopens on the last chat at its latest messages, scrolled to the end, with no side panel open, and every other
+// scroller at its top. The frame shows only that, so lifting it moves nothing on screen; left on anything else (the bot
+// list, settings, a team map, an older stretch of a chat), the app keeps no frame.
 import { t } from "@/lib/i18n";
 import "./quiet-start.css";
 
@@ -19,9 +20,11 @@ const MAX_AGE_MS = 3 * 24 * 3600_000;
 export const HOLD_MS = 4_000;
 /** The lifted frame fades rather than vanishes, so whatever arrived meanwhile (a new message) does not jump in. */
 export const FADE_MS = 150;
-const SCROLL = "data-suyuan-scroll";
+/** Chat rows wholly further above the end than this many screens never show in the copy, which opens at the end. */
+const SCREENS_KEPT = 2;
 /** On the chat's scroller: the copy opens at the end, as the app does. */
 const AT_END = "data-suyuan-end";
+const OUT_OF_SIGHT = "data-suyuan-out-of-sight";
 /** Same as src/main.tsx: these pages are not the app, so they neither show nor keep a frame. */
 const PAGES_WITHOUT_THE_APP = new Set(["/home", "/pair", "/desktop-viewer"]);
 /** Whatever could run, load or navigate, plus open dialogs, which in a copy would sit in the page without their backdrop. */
@@ -62,32 +65,51 @@ export function cleanMarkup(doc: Document, html: string): HTMLTemplateElement {
   return template;
 }
 
-/** The scroller of the chat shown mid-screen, or null when the screen shows something else. The transcript is the
- * `role="log"` in src/components/ChatView.tsx. */
+/** The "Show later messages (N more)" button a chat opened around an older message (a pin, a search hit) ends in. */
+function showsLater(button: Element): boolean {
+  const [before, after] = t("chat.showLater", { count: "\u0000" }).split("\u0000");
+  const text = button.textContent ?? "";
+  return text.length > before.length + after.length && text.startsWith(before) && text.endsWith(after);
+}
+
+/** The scroller of the chat shown mid-screen at its latest messages, or null when the screen shows something else. The
+ * transcripts are the `role="log"` in src/components/ChatView.tsx and GroupView.tsx. */
 export function chatInView(doc: Document, view: { width: number; height: number }): HTMLElement | null {
   const hit = doc.elementFromPoint(view.width / 2, view.height / 2);
   const log = hit?.closest('[role="log"]') ?? hit?.querySelector(':scope > [role="log"]');
-  for (let element = log?.parentElement; element; element = element.parentElement) {
+  if (!log || [...log.querySelectorAll("button")].some(showsLater)) return null;
+  for (let element = log.parentElement; element; element = element.parentElement) {
     if (/auto|scroll/.test(getComputedStyle(element).overflowY)) return element;
   }
   return null;
 }
 
-/** The app's markup, cleaned, with each scrolled element's offset written onto it so the copy opens scrolled the same way,
- * except the chat, which opens at its end. The jump-to-latest button goes: at the end the app does not show it. */
+/** Where an element ends on the page. The chat's rows are `display: contents` wrappers, drawn only through their
+ * children; one drawing nothing ends nowhere. */
+function bottomOf(element: Element): number {
+  if (element.getClientRects().length > 0) return element.getBoundingClientRect().bottom;
+  return Math.max(-Infinity, ...[...element.children].map(bottomOf));
+}
+
+/** The app's markup, cleaned, the chat marked to open at its end without the rows it never shows there. The
+ * jump-to-latest button goes: at the end the app does not show it. */
 export function captureFrame(root: HTMLElement, chat: HTMLElement, view: { width: number; height: number }, at: number, build: string): Frame {
-  const scrolled = [...root.querySelectorAll<HTMLElement>("*")].filter((element) => element.scrollTop > 0 && element !== chat);
-  for (const element of scrolled) element.setAttribute(SCROLL, String(Math.round(element.scrollTop)));
+  const contentTop = chat.getBoundingClientRect().top - chat.scrollTop;
+  const keptFrom = chat.scrollHeight - SCREENS_KEPT * chat.clientHeight;
+  const rows = [...(chat.querySelector('[role="log"]')?.children ?? [])];
+  const unseen = rows.filter((row) => bottomOf(row) - contentTop < keptFrom);
+  for (const row of unseen) row.setAttribute(OUT_OF_SIGHT, "");
   chat.setAttribute(AT_END, "");
   try {
     const template = cleanMarkup(root.ownerDocument, root.innerHTML);
+    for (const row of template.content.querySelectorAll(`[${OUT_OF_SIGHT}]`)) row.remove();
     const latest = t("chat.jumpToLatest");
     for (const button of template.content.querySelectorAll("button[title]")) {
       if (button.getAttribute("title") === latest) button.remove();
     }
     return { html: template.innerHTML, ...view, at, build };
   } finally {
-    for (const element of scrolled) element.removeAttribute(SCROLL);
+    for (const row of unseen) row.removeAttribute(OUT_OF_SIGHT);
     chat.removeAttribute(AT_END);
   }
 }
@@ -105,8 +127,8 @@ export function usableFrame(text: string | null, view: { width: number; height: 
   }
 }
 
-/** Lays the frame over the page. The cover takes taps and its copy none: a tap on a frozen button would land on the
- * half-loaded page underneath. */
+/** Lays the frame over the page, its chat at the end. The cover takes taps and its copy none: a tap on a frozen button
+ * would land on the half-loaded page underneath. */
 export function showFrame(doc: Document, frame: Frame): HTMLElement {
   const cover = doc.createElement("div");
   cover.id = "suyuan-last-frame";
@@ -120,20 +142,14 @@ export function showFrame(doc: Document, frame: Frame): HTMLElement {
   copy.append(cleanMarkup(doc, frame.html).content);
   cover.append(copy);
   doc.body.append(cover);
-  for (const element of cover.querySelectorAll<HTMLElement>(`[${SCROLL}]`)) {
-    element.scrollTop = Number(element.getAttribute(SCROLL));
-    element.removeAttribute(SCROLL);
-  }
-  for (const element of cover.querySelectorAll<HTMLElement>(`[${AT_END}]`)) {
-    element.scrollTop = element.scrollHeight;
-    element.removeAttribute(AT_END);
-  }
+  for (const chat of cover.querySelectorAll<HTMLElement>(`[${AT_END}]`)) chat.scrollTop = chat.scrollHeight;
   return cover;
 }
 
 let appShown = false;
 let appLoaded = false;
-let lift = () => {};
+let appChatAlone = false;
+let lift = (_now?: boolean) => {};
 
 function viewSize() {
   return { width: window.innerWidth, height: window.innerHeight };
@@ -155,7 +171,7 @@ function keep() {
   const root = document.getElementById("root");
   if (!appShown || !appLoaded || !root) return;
   // Left on a screen the app does not reopen on: an older frame would show yet another one.
-  const chat = chatInView(document, viewSize());
+  const chat = appChatAlone ? chatInView(document, viewSize()) : null;
   if (!chat) return forget();
   try {
     const text = JSON.stringify(captureFrame(root, chat, viewSize(), Date.now(), currentBuild()));
@@ -175,6 +191,8 @@ function start() {
   }
   document.addEventListener("visibilitychange", () => { if (document.visibilityState === "hidden") keep(); });
   window.addEventListener("pagehide", keep);
+  // Opened from a notification (public/suyuan-push-sw.js): the app goes to that conversation, not the last one.
+  if (new URLSearchParams(location.search).has("pushThread")) return;
   let text: string | null = null;
   try {
     text = localStorage.getItem(KEY);
@@ -185,19 +203,27 @@ function start() {
   const root = document.getElementById("root");
   if (!frame || !root) return;
   const cover = showFrame(document, frame);
+  // Fonts and pictures arriving under the frame make its chat taller: it stays at the end, as the app's own does.
+  const chats = [...cover.querySelectorAll<HTMLElement>(`[${AT_END}]`)];
+  const pin = typeof ResizeObserver === "function"
+    ? new ResizeObserver(() => { for (const chat of chats) chat.scrollTop = chat.scrollHeight; })
+    : null;
+  for (const chat of chats) for (const child of chat.children) pin?.observe(child);
   const timer = setTimeout(() => lift(), HOLD_MS);
   // The first thing drawn into #root is not the app (the pairing page, an error): the frame is chats this page
-  // should not show again.
+  // should not show again, not even fading.
   const watcher = new MutationObserver(() => {
     if (appShown) return watcher.disconnect();
-    lift();
+    lift(true);
     forget();
   });
   watcher.observe(root, { childList: true });
-  lift = () => {
+  lift = (now = false) => {
     lift = () => {};
     clearTimeout(timer);
     watcher.disconnect();
+    pin?.disconnect();
+    if (now) return cover.remove();
     cover.style.pointerEvents = "none";
     cover.style.transition = `opacity ${FADE_MS}ms ease-out`;
     cover.style.opacity = "0";
@@ -205,10 +231,12 @@ function start() {
   };
 }
 
-/** The app's shell is on the page: `loaded` once the bots have loaded. */
-export function noteApp(loaded: boolean): void {
+/** The app's shell is on the page: `loaded` once the bots have loaded, `chatAlone` while it shows a chat and no side
+ * panel the app would reopen without. */
+export function noteApp(loaded: boolean, chatAlone: boolean): void {
   appShown = true;
   appLoaded = loaded;
+  appChatAlone = chatAlone;
 }
 
 /** The app's shell went away, which only a session ending or a crash does: the kept frame goes with it. */

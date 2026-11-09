@@ -21,6 +21,10 @@ const cover = () => document.getElementById("suyuan-last-frame");
 const lifting = () => cover()?.style.opacity === "0" && cover()?.style.pointerEvents === "none";
 /** The page shows whatever matches `selector` mid-screen. */
 const pointAt = (selector: string) => vi.spyOn(document, "elementFromPoint").mockImplementation(() => document.querySelector(selector));
+const hide = () => {
+  vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+  document.dispatchEvent(new Event("visibilitychange"));
+};
 
 beforeEach(() => {
   document.body.innerHTML = `<div id="root"></div><script type="module" src="${BUILD}"></script>`;
@@ -30,10 +34,11 @@ beforeEach(() => {
 afterEach(() => {
   cover()?.remove();
   vi.restoreAllMocks();
+  vi.unstubAllGlobals();
 });
 
 describe("captureFrame and showFrame", () => {
-  it("copies the app with the chat at its end, other scrolled parts where they were, and leaves the live page untouched", async () => {
+  it("copies the app with its chat at the end and every other scroller at its top, and leaves the live page untouched", async () => {
     const { captureFrame, chatInView, showFrame } = await fresh();
     const root = document.getElementById("root")!;
     root.innerHTML = `${CHAT}<button title="${t("chat.jumpToLatest")}">↓</button>`;
@@ -46,23 +51,42 @@ describe("captureFrame and showFrame", () => {
     expect(chat).toBe(scroller);
 
     const frame = captureFrame(root, chat, view(), 1000, BUILD);
-    expect(frame.html).toContain('data-suyuan-scroll="420"');
     expect(frame.html).toContain("data-suyuan-end");
     expect(frame.html).not.toContain("<button");
-    expect(side.hasAttribute("data-suyuan-scroll")).toBe(false);
     expect(scroller.hasAttribute("data-suyuan-end")).toBe(false);
     expect(root.querySelector("button")).not.toBeNull();
 
     vi.spyOn(Element.prototype, "scrollHeight", "get").mockReturnValue(900);
     const shown = showFrame(document, frame);
-    expect(shown.querySelector<HTMLElement>(".side")!.scrollTop).toBe(420);
+    expect(shown.querySelector<HTMLElement>(".side")!.scrollTop).toBe(0);
     expect(shown.querySelector<HTMLElement>(".scroller")!.scrollTop).toBe(900);
-    expect(shown.querySelector("[data-suyuan-end], [data-suyuan-scroll]")).toBeNull();
     expect(shown.firstElementChild!.hasAttribute("inert")).toBe(true);
     expect(shown.getAttribute("aria-hidden")).toBe("true");
   });
 
-  it("finds the chat only when it is what the screen shows mid-screen", async () => {
+  it("keeps only the chat rows within two screens of its end, the ones the copy can show", async () => {
+    const { captureFrame } = await fresh();
+    const root = document.getElementById("root")!;
+    // Each row is a `display: contents` wrapper, as in src/components/ChatView.tsx.
+    root.innerHTML = '<div class="scroller"><div role="log">'
+      + ["300", "599", "700", "1000"].map((bottom) => `<div class="contents"><p data-bottom="${bottom}">第 ${bottom} 行</p></div>`).join("")
+      + "</div></div>";
+    vi.spyOn(Element.prototype, "getClientRects").mockImplementation(function (this: Element) {
+      return (this.classList.contains("contents") ? [] : [{}]) as unknown as DOMRectList;
+    });
+    vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
+      const bottom = Number(this.getAttribute("data-bottom") ?? 0);
+      return { top: 0, bottom, left: 0, right: 0, width: 0, height: 0, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
+    });
+    vi.spyOn(Element.prototype, "scrollHeight", "get").mockReturnValue(1000);
+    vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(200);
+    const { html } = captureFrame(root, root.querySelector<HTMLElement>(".scroller")!, view(), 0, BUILD);
+    expect(html).not.toMatch(/第 300 行|第 599 行/);
+    expect(html).toMatch(/第 700 行[\s\S]*第 1000 行/);
+    expect(root.querySelector("[data-suyuan-out-of-sight]")).toBeNull();
+  });
+
+  it("finds the chat only when it is what the screen shows mid-screen, at its latest messages", async () => {
     const { chatInView } = await fresh();
     const root = document.getElementById("root")!;
     root.innerHTML = CHAT;
@@ -75,6 +99,10 @@ describe("captureFrame and showFrame", () => {
     pointAt(".side p");
     expect(chatInView(document, view())).toBeNull();
     pointAt(".nothing");
+    expect(chatInView(document, view())).toBeNull();
+    // Opened around an older message, the chat ends in a button that loads the later ones.
+    root.querySelector('[role="log"]')!.insertAdjacentHTML("beforeend", `<button>${t("chat.showLater", { count: 12 })}</button>`);
+    pointAt(".line");
     expect(chatInView(document, view())).toBeNull();
   });
 
@@ -116,7 +144,7 @@ describe("usableFrame", () => {
 });
 
 describe("a start with a kept frame", () => {
-  const keepFrame = () => localStorage.setItem(KEY, JSON.stringify({ html: "<p>上次的画面</p>", ...view(), at: Date.now(), build: BUILD }));
+  const keepFrame = (html = "<p>上次的画面</p>") => localStorage.setItem(KEY, JSON.stringify({ html, ...view(), at: Date.now(), build: BUILD }));
 
   it("covers the page until the app says its bots have loaded, then fades out", async () => {
     vi.useFakeTimers();
@@ -124,7 +152,7 @@ describe("a start with a kept frame", () => {
       keepFrame();
       const { noteApp, liftFrame, FADE_MS } = await fresh();
       expect(cover()?.textContent).toBe("上次的画面");
-      noteApp(false);
+      noteApp(false, true);
       document.getElementById("root")!.innerHTML = "<main>connecting</main>";
       await Promise.resolve();
       expect(cover()).not.toBeNull();
@@ -138,12 +166,37 @@ describe("a start with a kept frame", () => {
     }
   });
 
-  it("lifts at once and forgets the frame when the page is not the app", async () => {
+  it("keeps the frame's chat at its end while fonts and pictures make it taller, until it lifts", async () => {
+    const watching: { resized: () => void; disconnected: boolean }[] = [];
+    vi.stubGlobal("ResizeObserver", class {
+      entry = { resized: () => {}, disconnected: false };
+      constructor(resized: () => void) {
+        this.entry.resized = resized;
+        watching.push(this.entry);
+      }
+      observe() {}
+      disconnect() {
+        this.entry.disconnected = true;
+      }
+    });
+    const height = vi.spyOn(Element.prototype, "scrollHeight", "get").mockReturnValue(500);
+    keepFrame('<div class="scroller" data-suyuan-end=""><div role="log">对话</div></div>');
+    const { liftFrame } = await fresh();
+    const chat = cover()!.querySelector<HTMLElement>(".scroller")!;
+    expect(chat.scrollTop).toBe(500);
+    height.mockReturnValue(800);
+    watching[0].resized();
+    expect(chat.scrollTop).toBe(800);
+    liftFrame();
+    expect(watching[0].disconnected).toBe(true);
+  });
+
+  it("takes the frame off at once and forgets it when the page is not the app", async () => {
     keepFrame();
     await fresh();
     document.getElementById("root")!.innerHTML = "<form>pairing</form>";
     await Promise.resolve();
-    expect(lifting()).toBe(true);
+    expect(cover()).toBeNull();
     expect(localStorage.getItem(KEY)).toBeNull();
   });
 
@@ -154,6 +207,18 @@ describe("a start with a kept frame", () => {
       await fresh();
       expect(cover()).toBeNull();
       expect(localStorage.getItem(KEY)).toBeNull();
+    } finally {
+      history.pushState(null, "", "/");
+    }
+  });
+
+  it("shows no frame when a notification opened the app, which then goes to that conversation", async () => {
+    keepFrame();
+    history.pushState(null, "", "/?pushBot=b1&pushThread=t1");
+    try {
+      await fresh();
+      expect(cover()).toBeNull();
+      expect(localStorage.getItem(KEY)).not.toBeNull();
     } finally {
       history.pushState(null, "", "/");
     }
@@ -178,32 +243,41 @@ describe("keeping a frame", () => {
     const { noteApp } = await fresh();
     document.getElementById("root")!.innerHTML = CHAT;
     pointAt(".line");
-    noteApp(false);
+    noteApp(false, true);
     window.dispatchEvent(new Event("pagehide"));
     expect(localStorage.getItem(KEY)).toBeNull();
-    noteApp(true);
-    window.dispatchEvent(new Event("pagehide"));
+    noteApp(true, true);
+    hide();
     const kept = JSON.parse(localStorage.getItem(KEY)!);
     expect(kept).toMatchObject({ build: BUILD, ...view() });
     expect(kept.html).toContain("收工卡写好了");
   });
 
-  it("forgets the frame when the page is left on anything but a chat, which the app does not reopen on", async () => {
+  it("forgets the frame when the page goes away on anything but the chat alone, which the app does not reopen on", async () => {
     const { noteApp } = await fresh();
     document.getElementById("root")!.innerHTML = CHAT;
-    noteApp(true);
+    const kept = () => localStorage.getItem(KEY) !== null;
+    noteApp(true, true);
+    pointAt(".line");
+    hide();
+    expect(kept()).toBe(true);
+    // The bot list fills the screen.
+    pointAt(".side p");
+    hide();
+    expect(kept()).toBe(false);
     pointAt(".line");
     window.dispatchEvent(new Event("pagehide"));
-    expect(localStorage.getItem(KEY)).not.toBeNull();
-    pointAt(".side p");
+    expect(kept()).toBe(true);
+    // A side panel is open beside the chat.
+    noteApp(true, false);
     window.dispatchEvent(new Event("pagehide"));
-    expect(localStorage.getItem(KEY)).toBeNull();
+    expect(kept()).toBe(false);
   });
 
   it("drops the old frame when the new one is too big or can't be stored, and when the session ends", async () => {
     const { noteApp, noteAppGone } = await fresh();
     const root = document.getElementById("root")!;
-    noteApp(true);
+    noteApp(true, true);
     pointAt(".line");
     root.innerHTML = CHAT;
     window.dispatchEvent(new Event("pagehide"));

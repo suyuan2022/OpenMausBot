@@ -10,8 +10,11 @@ const SETTLE_MS = 150;
 export function useSuyuan(state: AppState, dispatch: (action: Action) => void): void {
   useWebPush(state, dispatch);
   const loaded = state.hydrated === true;
+  // The app reopens on the chat with these panels closed; only a pinned notification tray comes back open.
+  const chatAlone = state.activeView === "chat" && !state.settingsOpen && !state.computerOpen && !state.inspectorOpen
+    && !state.activityOpen && (!state.notificationsOpen || state.notificationsPinned);
   // A layout effect runs inside React's commit, before the cover's watcher hears that #root changed.
-  useLayoutEffect(() => noteApp(loaded), [loaded]);
+  useLayoutEffect(() => noteApp(loaded, chatAlone), [loaded, chatAlone]);
   useLayoutEffect(() => noteAppGone, []);
   useEffect(() => {
     if (!loaded) return;
