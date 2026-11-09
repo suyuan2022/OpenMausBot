@@ -7,6 +7,7 @@ import { chatAlone } from "./chat-alone";
 import { liftFrame, noteApp, noteAppGone } from "./last-frame";
 import "./steady-tables.css";
 import { useWebPush } from "./use-web-push";
+import "./wide-replies.css";
 
 /** Long enough for the live chat to lay out and scroll before the frozen copy over it goes. */
 const SETTLE_MS = 150;

@@ -69,8 +69,9 @@ describe("room message actions", () => {
   it("gives a bot reply the same tray as a 1:1 answer", () => {
     const html = markup([text("a", "bot", "The build is green")]);
     expect(html).toContain('data-testid="message-actions"');
-    expect(html).toContain("Copy message");
-    expect(html).toContain("Reply to message");
+    // suyuan fork: simple mode keeps reply and copy in the more menu, as a 1:1 answer does.
+    expect(html).not.toContain("Copy message");
+    expect(html).not.toContain("Reply to message");
     expect(html).toContain('aria-haspopup="menu"');
     expect(html).not.toContain("Show raw markdown");
     expect(html).not.toContain("Pin message");
@@ -124,7 +125,7 @@ describe("room message actions", () => {
     expect(html.match(/aria-label="Save a copy of report\.pdf"/g)).toHaveLength(1);
     expect(html).toMatch(/<section[^>]*class="mt-2\.5 /);
     expect(html).toContain('data-testid="message-actions"');
-    expect(html).toContain("Reply to message");
+    expect(html).not.toContain("Reply to message");
     expect(html).toContain('aria-haspopup="menu"');
   });
 });
