@@ -19,7 +19,8 @@ const SWIPE_SCREEN = `(hover: none) and (pointer: coarse) and ${PHONE}`;
 
 const backButton = (label: string) => `#root button[aria-label="${CSS.escape(label)}"]`;
 /** A room's header, indented on a phone (pl-11) to clear the button. */
-export const ROOM_HEADER = '#root [class~="@container/roomhead"].pl-11';
+const INDENTED_HEADER = '[class~="@container/roomhead"].pl-11';
+export const ROOM_HEADER = `#root ${INDENTED_HEADER}`;
 
 interface Drag {
   drawer: HTMLElement;
@@ -101,6 +102,14 @@ export function installSwipeBack(doc: Document = document): () => void {
     doc.removeEventListener("touchend", end);
     doc.removeEventListener("touchcancel", cancel);
   };
+}
+
+/** The last-screen cover (last-frame.ts) shows a copy of #root before the style below is in, so on a touch phone the
+ * copy leaves the button out and gives a room's header the same room as the live page. */
+export function withoutBackButton(copy: ParentNode, label: string = t("app.openBotList")): void {
+  if (typeof matchMedia !== "function" || !matchMedia(SWIPE_SCREEN).matches) return;
+  copy.querySelector(`button[aria-label="${CSS.escape(label)}"]`)?.remove();
+  for (const header of copy.querySelectorAll<HTMLElement>(INDENTED_HEADER)) header.style.paddingLeft = "1.25rem";
 }
 
 /** Where the swipe works the button goes; still in the page, it opens the list when the swipe clicks it. A room's

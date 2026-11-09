@@ -1243,7 +1243,7 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
       data-sidebar
       onClick={(event) => {
         // The phone's list covers the whole screen: choosing the bot that is already open has to dismiss it too.
-        if (phone && open && event.target instanceof Element && !(event.target instanceof HTMLInputElement) && event.target.closest("[data-sidebar-bot-row], [data-sidebar-group-row], [data-sidebar-thread-row], [data-sidebar-hero]")) onClose();
+        if (phone && open && event.target instanceof Element && !(event.target instanceof HTMLInputElement) && event.target.closest("[data-sidebar-bot-row], [data-sidebar-group-row], [data-sidebar-thread-row]:not([role=checkbox]), [data-sidebar-hero]")) onClose();
       }}
       style={{ "--sidebar-width": `${sizing.width}px` } as CSSProperties}
       className={cn(

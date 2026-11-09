@@ -98,7 +98,8 @@ describe("bot row expansion follows the visible thread tree", () => {
   });
 
   it.each([
-    [{ busy: true }, '<span dir="auto" data-sidebar-working-phrase="" class="truncate">Thinking</span>'],
+    // suyuan fork: the row says working for the bot's own conversation (src/suyuan/own-work.ts), so the thread is busy too.
+    [{ busy: true, tasks: [{ threadId: "current", title: "Current", createdAt: 1, busy: true }] }, '<span dir="auto" data-sidebar-working-phrase="" class="truncate">Thinking</span>'],
     [{ activity: "waiting-on-you" }, '<span dir="auto" class="truncate">Waiting for you…'],
     [{ waitingForTeammates: true }, '<span dir="auto" class="truncate">Waiting on a teammate…'],
   ] as const)("keeps sole-thread activity visible after a reveal (%j)", (status, label) => {

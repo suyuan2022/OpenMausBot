@@ -22,6 +22,7 @@ vi.mock("@/lib/cloud-guest", () => ({ useCanWriteIn: () => true }));
 vi.stubGlobal("fetch", () => new Promise(() => {}));
 const { Sidebar } = await import("./Sidebar");
 const { BotEditorStore, initialState } = await import("@/state/store");
+const { t } = await import("@/lib/i18n");
 
 const task = (threadId: string, title: string): Task =>
   ({ threadId, title, createdAt: 1, updatedAt: 1, busy: false, activity: "idle", modelSelection: { instanceId: "test", model: "m" }, approvalMode: "ask" });
@@ -56,13 +57,19 @@ afterEach(() => {
   layout.phone = true;
 });
 
-async function tapOpen(selector: string, groups = [shoes]) {
+const settle = () => new Promise((resolve) => setTimeout(resolve, 0));
+
+async function tapOpen(selector: string, groups = [shoes], { selecting = false } = {}) {
   const onClose = vi.fn();
   const value = { state: { ...state, groups }, dispatch: vi.fn(), flushBotPatches: async () => null, refreshInstances: async () => {}, refreshModels: async () => {} };
   flushSync(() => root.render(createElement(BotEditorStore, { value, children: createElement(Sidebar, { open: true, onClose }) })));
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await settle();
+  if (selecting) {
+    [...host.querySelectorAll("button")].find((button) => button.textContent === t("task.bulk.select"))!.click();
+    await settle();
+  }
   const row = host.querySelector<HTMLElement>(selector);
-  expect(row?.getAttribute("aria-current")).toBe("page");
+  expect(row?.getAttribute(selecting ? "role" : "aria-current")).toBe(selecting ? "checkbox" : "page");
   row!.click();
   return onClose;
 }
@@ -74,9 +81,14 @@ describe("Sidebar: tapping the open room", () => {
     expect(await tapOpen(openRoom)).toHaveBeenCalled();
   });
 
+  const threads = [{ threadId: "shoes-now", title: "Sneakers", createdAt: 2 }, { threadId: "shoes-old", title: "Boots", createdAt: 1 }];
+
   it("closes it from the room's open thread too", async () => {
-    const threads = [{ threadId: "shoes-now", title: "Sneakers", createdAt: 2 }, { threadId: "shoes-old", title: "Boots", createdAt: 1 }];
     expect(await tapOpen('[data-sidebar-thread-row="shoes-now"]', [{ ...shoes, tasks: threads }])).toHaveBeenCalled();
+  });
+
+  it("keeps it open while the room's threads are being ticked for a bulk action", async () => {
+    expect(await tapOpen('[data-sidebar-thread-row="shoes-now"]', [{ ...shoes, tasks: threads }], { selecting: true })).not.toHaveBeenCalled();
   });
 
   it("leaves the wide screen's side list alone", async () => {
