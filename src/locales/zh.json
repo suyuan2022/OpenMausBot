@@ -4639,7 +4639,7 @@
   "room.holds.stopTitle": "只停止 {name}，群组聊天里的其他成员继续工作",
   "room.holds.avatarHeld": "{name} — 已暂停（由你停止）",
   "room.routedBy": "由 Jev 挑选 · {percent}%",
-  "room.routedBy.openrouter": "自动挑选",
+  "room.routedBy.openrouter": "由 OpenRouter 挑选 · {percent}%",
   "room.routedBy.workersai": "由 Clef 挑选 · {percent}%",
   "room.turnLimit.aria": "此对话的轮次时长上限",
   "room.turnLimit.default": "默认（{minutes} 分钟）",

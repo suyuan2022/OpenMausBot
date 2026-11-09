@@ -93,7 +93,8 @@ describe("the fork's hooks into upstream files", () => {
       .filter((file) => /deciderReady\([^)]*"roomRouting"/.test(source(join("server", file))));
     expect(asks).toEqual([]);
     expect(source("src/lib/group-routing.ts")).toContain("return Boolean(config?.decider?.enabled && config.decider.jobs.roomRouting);");
-    // The router answers as an OpenRouter-style backend, whose label (src/locales/zh.json) reads "自动挑选".
-    expect(source("src/components/RoomQueueList.tsx")).toContain('routedBy.provider === "openrouter" ? "room.routedBy.openrouter"');
+    // room-router.css rewords the line under a routed reply, found by its test id.
+    expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/room-router\.css";/m);
+    expect(source("src/components/RoomQueueList.tsx")).toContain('<div data-testid="routed-by" className="mt-1 px-1 text-[11px] text-ink-secondary">');
   });
 });
