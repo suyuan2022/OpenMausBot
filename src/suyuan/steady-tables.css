@@ -1,0 +1,10 @@
+/* suyuan fork: a chat table's room must not depend on the table. RichTable (src/components/RichTable.tsx) measures its
+   scroller to choose between columns fitted to the message and roomy fixed ones. The fixed columns' min-width widened
+   the message column, so the table then fit and went back to fitted columns, which narrowed the column again: a table
+   whose columns need between those two widths flipped every frame, and the chat below it jumped up and down. Sized by
+   its container alone, the wrapper keeps one width whatever its table does. Only in simple mode's table card
+   (ReplyBlocks.tsx), which spans the message: advanced mode's reply, a conversational bubble and a widget row all
+   shrink toward their content, and would squash a table sized this way. */
+[data-reply-table] .chat-md > .chat-table {
+  contain: inline-size;
+}

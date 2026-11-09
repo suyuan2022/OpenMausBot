@@ -44,4 +44,11 @@ describe("the fork's hooks into upstream files", () => {
     }
     expect(source("src/components/JumpToLatestButton.tsx")).toContain('title={t("chat.jumpToLatest")}');
   });
+
+  it("a reply's table card keeps the three hooks steady-tables.css finds its table by", () => {
+    expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/steady-tables\.css";/m);
+    expect(source("src/components/ReplyBlocks.tsx")).toContain('<div key={index} data-reply-table className="my-2 w-full');
+    expect(source("src/components/ChatMarkdown.tsx")).toContain('<div className="chat-md min-w-0 [&>*+*]:mt-2">{markdown}</div>');
+    expect(source("src/components/RichTable.tsx")).toContain('<div hidden={open} className="chat-table">');
+  });
 });

@@ -5,6 +5,7 @@ import { useInboxPanel } from "@/state/inbox";
 import type { Action, AppState } from "@/state/store";
 import { chatAlone } from "./chat-alone";
 import { liftFrame, noteApp, noteAppGone } from "./last-frame";
+import "./steady-tables.css";
 import { useWebPush } from "./use-web-push";
 
 /** Long enough for the live chat to lay out and scroll before the frozen copy over it goes. */
