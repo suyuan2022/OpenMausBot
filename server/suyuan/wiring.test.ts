@@ -80,4 +80,17 @@ describe("the fork's hooks into upstream files", () => {
     expect(sidebar).toMatch(/<aside\n[^>]*\n\s+data-sidebar\n/);
     expect(sidebar).toContain('open ? "max-md:translate-x-0" : "max-md:-translate-x-full"');
   });
+
+  it("rooms on Auto ask the fork's router who answers, and the app hears room routing is on", () => {
+    const index = source("server/index.ts");
+    expect(index).toContain("const decider = withRoomRouter(createDecider({ config: () => cfg, dataDir: DATA_DIR }), () => cfg);");
+    expect(index).toContain("decideRoomResponder(decider, roomRoutingInput(");
+    // Every "can rooms route?" question counts the router: a new upstream call to deciderReady would leave it out.
+    expect(index).not.toContain('deciderReady(cfg, "roomRouting")');
+    expect(index.match(/roomRoutingReady\(cfg\)/g)).toHaveLength(3);
+    expect(index).toContain("decider: withRoomRouterStatus(describeDecider(cfg), cfg),");
+    expect(source("src/lib/group-routing.ts")).toContain("return Boolean(config?.decider?.enabled && config.decider.jobs.roomRouting);");
+    expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/room-router\.css";/m);
+    expect(source("src/components/RoomQueueList.tsx")).toContain('data-testid="routed-by"');
+  });
 });

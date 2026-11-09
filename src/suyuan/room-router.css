@@ -1,0 +1,5 @@
+/* suyuan fork: rooms set to Auto pick who answers with one model asked for one name (server/suyuan/room-router.ts),
+   so the line under a routed reply would always read "picked by OpenRouter · 100%". It goes. */
+[data-testid="routed-by"] {
+  display: none;
+}
