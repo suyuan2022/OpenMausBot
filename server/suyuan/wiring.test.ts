@@ -105,7 +105,11 @@ describe("the fork's hooks into upstream files", () => {
   it("the phone list's avatar row is lifted by phone-header.css, found by the row's data attribute", () => {
     expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/phone-header\.css";/m);
     expect(source("src/components/Sidebar.tsx")).toContain('data-sidebar-top-row={corner ? "corner" : true}');
-    expect(source("src/suyuan/phone-header.css")).toContain('[data-sidebar-top-row="true"]');
+    expect(source("src/suyuan/phone-header.css")).toContain('[data-sidebar-top-row="true"].max-md\\:h-16');
+    // The lift needs that row to be 64px high on a phone with its content centred.
+    const sidebar = source("src/components/Sidebar.tsx");
+    expect(sidebar).toContain('density !== "icons" && !simpleDesk && !lights && "h-12 max-md:h-16"');
+    expect(sidebar).toContain('data-sidebar-top-row={corner ? "corner" : true}\n        className={cn(\n          "flex items-center",');
   });
 
   it("the first-reply notice stays off: the fork sets the variable the rescue reads each time it arms", () => {
