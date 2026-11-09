@@ -124,6 +124,8 @@ describe("the fork's hooks into upstream files", () => {
     expect(source("server/agent-tool-policy.ts")).toContain('"team_threads",\n  "team_thread_read",');
     // They ride list_threads's route, so they get its sender, its fence on shown threads and its capability check.
     expect(source("server/routes/internal-threads.ts")).toContain("const chiefRead = createChiefReadRoutes(deps);");
+    // The store handed in must carry what the read needs: the tail of a thread, and whether the caller is in a room.
+    expect(source("server/routes/internal-threads.ts")).toContain('"messagesTail" | "groupByThread">');
     expect(source("server/routes/internal-threads.ts")).toContain("return async (ctx) => (await chiefRead(ctx)) === PASS ? threads(ctx) : undefined;");
     expect(source("server/index.ts")).toMatch(/createInternalThreadRoutes\(\{[^]*?shown: \(id\) => !proactive\.fence\.confines\(id\)/);
     // A confined turn gets neither tool: outside-fence.ts does not list the routes.

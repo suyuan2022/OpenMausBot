@@ -4,10 +4,10 @@
 import { chiefLevel } from "../chief-level.ts";
 import type { Coordinator } from "../coordinator.ts";
 import { canManage } from "../peer-roster.ts";
-import { peerProvenanceAuthor } from "../peer-provenance.ts";
 import { redactSecretsInText } from "../redact.ts";
-import type { BotRecord, Message, Store, TaskRecord } from "../store.ts";
+import type { BotRecord, Store, TaskRecord } from "../store.ts";
 import { PASS, type RouteHandler } from "../routes/table.ts";
+import { readablePage, TAIL_ROWS } from "./chief-read-view.ts";
 
 export const TEAM_THREADS_PATH = "/api/internal/team-threads";
 export const TEAM_THREAD_MESSAGES_PATH = "/api/internal/team-thread-messages";
@@ -16,9 +16,7 @@ export const THREADS_DEFAULT = 8;
 export const THREADS_MAX = 20;
 export const MESSAGES_DEFAULT = 10;
 export const MESSAGES_MAX = 30;
-/** One message's body, and the whole reply: a long run would otherwise fill the Chief's context. */
-export const MESSAGE_CHARS = 1500;
-export const REPLY_CHARS = 16000;
+export { MESSAGE_CHARS, REPLY_CHARS, TAIL_ROWS, type TeamMessageRow } from "./chief-read-view.ts";
 
 export interface TeamThreadRow {
   threadId: string; title: string;
@@ -26,14 +24,8 @@ export interface TeamThreadRow {
   lastActivityAt: number;
 }
 
-export interface TeamMessageRow {
-  id: string; at: number; speaker: string; kind: string;
-  /** A one-line summary for a tool call or card; the body (cut, secrets masked) for a text message. */
-  text: string; clipped?: true;
-}
-
 export function createChiefReadRoutes(deps: {
-  store: Pick<Store, "bot" | "bots" | "tasks" | "taskByThread" | "messagesTail">;
+  store: Pick<Store, "bot" | "bots" | "tasks" | "taskByThread" | "messagesTail" | "groupByThread">;
   coordinator: Pick<Coordinator, "awaitingAnswer" | "parkedDirect" | "activeDirect">;
   from: BotRecord;
   fromThreadId: string;
@@ -62,6 +54,8 @@ export function createChiefReadRoutes(deps: {
     if (method !== "GET" || (path !== TEAM_THREADS_PATH && path !== TEAM_THREAD_MESSAGES_PATH)) return PASS;
     if (!deps.ownsThread(from.id, deps.fromThreadId)) return json(res, 403, { error: "source conversation does not belong to sender" });
     if (!chiefLevel(from)) return json(res, 403, { error: "only a Chief of Staff can read a teammate's conversations" });
+    // A room's members would see what a one-to-one read brings in, and nothing tells them it was read.
+    if (store.groupByThread(deps.fromThreadId)) return json(res, 400, { error: "this tool is only for one-to-one conversations: ask in your own chat with the person" });
     // Not "botId": index.ts reads that query key as the sender and refuses a call that names anyone else.
     const botId = (url.searchParams.get("targetBotId") ?? "").trim().slice(0, 128);
     if (!botId) return json(res, 400, { error: "bot_id is required: a teammate's id from list_bots" });
@@ -85,36 +79,11 @@ export function createChiefReadRoutes(deps: {
     if (!task || !deps.shown(threadId)) return json(res, 404, { error: `no such thread on ${target.name}: call team_threads for the ones you can read` });
     const limit = clip(url.searchParams.get("limit"), MESSAGES_MAX) || MESSAGES_DEFAULT;
     // A page from the tail, not the whole thread, and nothing is loaded for the teammate's next turn.
-    const { messages, hasMore } = store.messagesTail(threadId, limit);
-    let budget = REPLY_CHARS;
-    const rows: TeamMessageRow[] = [];
-    for (const message of messages.slice().reverse()) {
-      const row = describe(message, target.name);
-      if (budget <= 0) break;
-      budget -= row.text.length;
-      rows.push(row);
-    }
-    rows.reverse();
+    const { messages, hasMore, activeLeafId } = store.messagesTail(threadId, TAIL_ROWS);
+    const { rows, earlier } = readablePage(messages, activeLeafId, hasMore, limit, target.name);
     return json(res, 200, {
       bot: { id: target.id, name: target.name }, threadId, title: redactSecretsInText(task.title), state: stateOf(target, task),
-      messages: rows, earlier: hasMore || rows.length < messages.length,
+      messages: rows, earlier,
     });
   };
-}
-
-/** Whose words these are, and either the text (cut, secrets masked: a person's lines are stored as typed) or one line for the rest. */
-export function describe(message: Message, botName: string): TeamMessageRow {
-  const peer = message.peerAsk?.name ?? (message.text ? peerProvenanceAuthor(message.text) : null);
-  const speaker = peer ? `@${peer} (another bot, not the person)` : message.role === "user" ? "the person" : message.from?.name ?? botName;
-  const base = { id: message.id, at: message.at, speaker, kind: message.kind };
-  // A digest repeats the reply above it, so it reads as one line like the other cards.
-  if (message.kind === "text" && message.text) {
-    const text = redactSecretsInText(message.text);
-    return text.length > MESSAGE_CHARS ? { ...base, text: `${text.slice(0, MESSAGE_CHARS)}…`, clipped: true } : { ...base, text };
-  }
-  if (message.kind === "activity" && message.tool) {
-    const detail = message.tool.summary ? `: ${message.tool.summary.replace(/\s+/g, " ").slice(0, 120)}` : "";
-    return { ...base, text: redactSecretsInText(`${message.tool.name}${message.tool.ok === false ? " (failed)" : ""}${detail}`) };
-  }
-  return { ...base, text: `[${message.kind}${message.text ? `: ${redactSecretsInText(message.text.replace(/\s+/g, " ").slice(0, 120))}` : ""}]` };
 }

@@ -5,7 +5,7 @@ import { DATA_DIR } from "../config.ts";
 import { availableTools, catalogProfileFromEnv } from "../drivers/agents-catalog.ts";
 import { callToolForTest } from "./chief-read-tools.suyuan.helper.ts";
 import { Store, type BotRecord } from "../store.ts";
-import { createChiefReadRoutes, MESSAGE_CHARS, TEAM_THREAD_MESSAGES_PATH, TEAM_THREADS_PATH } from "./chief-read-threads.ts";
+import { createChiefReadRoutes, MESSAGE_CHARS, REPLY_CHARS, TEAM_THREAD_MESSAGES_PATH, TEAM_THREADS_PATH } from "./chief-read-threads.ts";
 
 const selection = () => ({ instanceId: "claude", model: "claude-sonnet-5" });
 
@@ -81,15 +81,78 @@ describe("a Chief reading a teammate's conversations", () => {
     expect(messages[0]!.text.length).toBeLessThanOrEqual(MESSAGE_CHARS + 1);
     expect(messages[0]!.clipped).toBe(true);
     expect(messages[1]!.text).not.toContain("abcdefghijklmnopqrstuvwxyz0123456789");
-    expect(messages[2]!.text).toBe("Bash (failed): pnpm test failed");
+    expect(messages[2]!.text).toBe("(1 tool step, last: Bash (failed): pnpm test failed)");
   });
 
-  it("shows a turn digest as one short line, not a second copy of the reply", async () => {
+  it("leaves out a turn digest: it repeats the reply above it", async () => {
     const f = fixture();
-    const id = f.threadOf(f.maus, "Digest");
+    const id = f.threadOf(f.maus, "Digest", [["the reply", "bot"]]);
     f.store.appendMessage(id, { role: "bot", kind: "digest", text: "d".repeat(500) });
-    const [message] = (await f.read(f.chief, TEAM_THREAD_MESSAGES_PATH, { targetBotId: f.maus.id, threadId: id })).body.messages as Array<{ text: string }>;
-    expect(message!.text).toBe(`[digest: ${"d".repeat(120)}]`);
+    const messages = (await f.read(f.chief, TEAM_THREAD_MESSAGES_PATH, { targetBotId: f.maus.id, threadId: id })).body.messages as Array<{ text: string }>;
+    expect(messages.map((m) => m.text)).toEqual(["the reply"]);
+  });
+
+  it("reads the words of a turn that ran hundreds of tool steps: the request in front, steps folded, all within the caps", async () => {
+    const f = fixture();
+    const id = f.threadOf(f.maus, "Big job");
+    const request = f.store.appendMessage(id, { role: "user", kind: "text", text: "Port the whole build to esbuild" });
+    f.store.appendMessage(id, { role: "bot", kind: "text", text: "Starting with the config", requestMessageId: request.id });
+    for (let step = 1; step <= 200; step++) f.store.appendMessage(id, { role: "bot", kind: "activity", tool: { name: "Bash", ok: true, summary: `pnpm test ${step}` }, requestMessageId: request.id });
+    f.store.appendMessage(id, { role: "bot", kind: "text", text: "Config done, tests running", requestMessageId: request.id });
+    for (let step = 1; step <= 150; step++) f.store.appendMessage(id, { role: "bot", kind: "activity", tool: { name: "Edit", ok: true, summary: `file ${step}` }, requestMessageId: request.id });
+    const { body } = await f.read(f.chief, TEAM_THREAD_MESSAGES_PATH, { targetBotId: f.maus.id, threadId: id, limit: "2" });
+    const rows = body.messages as Array<{ speaker: string; text: string }>;
+    expect(rows.map((row) => row.text)).toEqual([
+      "Port the whole build to esbuild",
+      "Starting with the config",
+      "(200 tool steps, last: Bash: pnpm test 200)",
+      "Config done, tests running",
+      "(150 tool steps, last: Edit: file 150)",
+    ]);
+    expect(rows[0]!.speaker).toBe("the person");
+    expect(JSON.stringify(rows).length).toBeLessThan(16000);
+    // Everything is shown: the request was brought forward, not skipped.
+    expect(body.earlier).toBe(false);
+    const short = (await f.read(f.chief, TEAM_THREAD_MESSAGES_PATH, { targetBotId: f.maus.id, threadId: id, limit: "1" })).body;
+    expect((short.messages as Array<{ text: string }>).map((row) => row.text)).toEqual([
+      "Port the whole build to esbuild", "(200 tool steps, last: Bash: pnpm test 200)", "Config done, tests running", "(150 tool steps, last: Edit: file 150)",
+    ]);
+    expect(short.earlier).toBe(true);
+  });
+
+  it("keeps the whole reply within its cap when every message is long", async () => {
+    const f = fixture();
+    const id = f.threadOf(f.maus, "Essays");
+    for (let n = 0; n < 40; n++) f.store.appendMessage(id, { role: "bot", kind: "text", text: `${n} ${"w".repeat(MESSAGE_CHARS)}` });
+    const rows = (await f.read(f.chief, TEAM_THREAD_MESSAGES_PATH, { targetBotId: f.maus.id, threadId: id, limit: "30" })).body.messages as Array<{ text: string }>;
+    expect(rows.reduce((sum, row) => sum + row.text.length, 0)).toBeLessThan(REPLY_CHARS + MESSAGE_CHARS + 10);
+    expect(rows.at(-1)!.text.startsWith("39 ")).toBe(true);
+  });
+
+  it("reads only the current branch after the person edited a message", async () => {
+    const f = fixture();
+    const id = f.threadOf(f.maus, "Edited");
+    const first = f.store.appendMessage(id, { role: "user", kind: "text", text: "old question" });
+    f.store.appendMessage(id, { role: "bot", kind: "text", text: "old answer" });
+    const edited = f.store.branchMessage(id, first.id, "new question")!;
+    f.store.appendMessage(id, { role: "bot", kind: "text", text: "new answer" });
+    const rows = (await f.read(f.chief, TEAM_THREAD_MESSAGES_PATH, { targetBotId: f.maus.id, threadId: id })).body.messages as Array<{ text: string }>;
+    expect(rows.map((row) => row.text).filter((text) => /question|answer/.test(text))).toEqual(["new question", "new answer"]);
+    expect(edited.id).toBeTruthy();
+  });
+
+  it("gives the words of a step a teammate handed over or back, cut and with secrets masked", async () => {
+    const f = fixture();
+    const id = f.threadOf(f.maus, "Handoff");
+    f.store.appendMessage(id, { role: "bot", kind: "activity", tool: { name: "Messaged @Peer", ok: true, output: `Peer says: the key is sk-ant-api03-abcdefghijklmnopqrstuvwxyz0123456789 ${"z".repeat(MESSAGE_CHARS)}` },
+      comm: { groupId: "g", withBotId: f.peer.id, withName: "Peer", withColor: "#000" } });
+    f.store.appendMessage(id, { role: "bot", kind: "activity", tool: { name: "Opened thread", ok: true, output: "short result" }, threadRef: { botId: f.peer.id, threadId: "t", title: "T" } });
+    const rows = (await f.read(f.chief, TEAM_THREAD_MESSAGES_PATH, { targetBotId: f.maus.id, threadId: id })).body.messages as Array<{ speaker: string; text: string; clipped?: boolean }>;
+    const handed = rows.find((row) => row.text.startsWith("Messaged @Peer"))!;
+    expect(handed.speaker).toBe("@Peer (another bot, not the person)");
+    expect(handed.text).not.toContain("abcdefghijklmnopqrstuvwxyz0123456789");
+    expect(handed.clipped).toBe(true);
+    expect(rows.some((row) => row.text === "Opened thread: short result")).toBe(true);
   });
 
   it("labels another bot's line as a bot, not the person", async () => {
@@ -98,6 +161,22 @@ describe("a Chief reading a teammate's conversations", () => {
     f.store.appendMessage(id, { role: "user", kind: "text", text: "can you check the logs", peerAsk: { botId: f.peer.id, name: "Peer" } });
     const [message] = (await f.read(f.chief, TEAM_THREAD_MESSAGES_PATH, { targetBotId: f.maus.id, threadId: id })).body.messages as Array<{ speaker: string }>;
     expect(message!.speaker).toBe("@Peer (another bot, not the person)");
+  });
+
+  it("refuses to read from inside a room, and says why", async () => {
+    const f = fixture();
+    const id = f.threadOf(f.maus, "Plans", [["hello", "bot"]]);
+    const room = f.store.createGroup("Launch", [f.chief.id, f.maus.id]);
+    const inRoom = createChiefReadRoutes({
+      store: f.store, coordinator: { awaitingAnswer: () => false, parkedDirect: () => undefined, activeDirect: () => undefined } as never,
+      from: f.chief, fromThreadId: room.threadId, ownsThread: () => true, shown: () => true, threadBusy: () => false, queuedThreadPosition: () => null,
+    });
+    for (const [path, query] of [[TEAM_THREADS_PATH, { targetBotId: f.maus.id }], [TEAM_THREAD_MESSAGES_PATH, { targetBotId: f.maus.id, threadId: id }]] as const) {
+      let out: { status: number; body: { error?: string } } | undefined;
+      await inRoom({ res: {}, path, method: "GET", url: new URL(`http://x${path}?${new URLSearchParams(query)}`), json: (_res: unknown, status: number, body: never) => { out = { status, body }; } } as never);
+      expect(out?.status).toBe(400);
+      expect(out?.body.error).toContain("one-to-one");
+    }
   });
 
   it("refuses anyone who is not a Chief of Staff, even in the teammate's department", async () => {
@@ -149,7 +228,7 @@ describe("a Chief reading a teammate's conversations", () => {
     await f.read(f.chief, TEAM_THREAD_MESSAGES_PATH, { targetBotId: f.maus.id, threadId: id });
     expect(JSON.stringify([f.store.taskByThread(f.maus.id, id), f.store.messagesFor(id), f.store.bot(f.maus.id)?.activity])).toBe(before);
     expect(f.store.taskByThread(f.maus.id, id)?.unread).toBe(true);
-    expect([...new Set(f.calls)].sort()).toEqual(["coordinator.awaitingAnswer", "coordinator.parkedDirect", "coordinator.activeDirect", "store.bot", "store.messagesTail", "store.taskByThread", "store.tasks"].sort());
+    expect([...new Set(f.calls)].sort()).toEqual(["coordinator.awaitingAnswer", "coordinator.parkedDirect", "coordinator.activeDirect", "store.bot", "store.groupByThread", "store.messagesTail", "store.taskByThread", "store.tasks"].sort());
   });
 });
 
