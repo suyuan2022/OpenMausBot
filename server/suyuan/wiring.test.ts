@@ -29,7 +29,8 @@ describe("the fork's hooks into upstream files", () => {
   });
 
   it("the page loads the last-screen cover before anything renders, and the connecting line keeps the hooks its CSS matches", () => {
-    expect(source("src/main.tsx")).toContain('import "@/suyuan/last-frame";');
+    // A regex, not the line as a string: scripts/ci-scope.test.ts would read the string as this test importing the module.
+    expect(source("src/main.tsx")).toMatch(/^import "@\/suyuan\/last-frame";/m);
     const loading = source("src/App.tsx");
     expect(loading).toContain("<main data-app-loading={loading.text}");
     expect(loading).toContain('<Loader2 size={20} className="animate-spin" />');
