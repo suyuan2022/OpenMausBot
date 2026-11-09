@@ -19,7 +19,7 @@
     pointer-events: none;
   }
   [data-reply-table] [data-table-card][data-suyuan-plate] .table-plate,
-  [data-reply-table] [data-table-card]:focus-within .table-plate {
+  [data-reply-table] .table-plate:focus-within {
     opacity: 1;
     pointer-events: auto;
   }
@@ -29,7 +29,7 @@
     min-width: 28px;
     min-height: 28px;
   }
-  [data-reply-table] th button > svg:not(.opacity-100) {
+  [data-reply-table] th button:not(:focus-visible) > svg:not(.opacity-100) {
     opacity: 0;
   }
 }
