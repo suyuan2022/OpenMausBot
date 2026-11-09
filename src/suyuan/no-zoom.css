@@ -1,6 +1,15 @@
 /* suyuan fork: on a touch screen the page is not zoomed by pinch or double tap. iOS Safari has ignored user-scalable=no
-   since iOS 10; touch-action is what it honors (iOS 13+), and no screen here has a zoomable view to spare: the image
-   preview just fits the picture to the window. Scrolling stays. A desktop browser keeps its own zoom. */
+   since iOS 10; touch-action is what it honors (iOS 13+). WebKit resets touch-action to auto at the first scrolling
+   container going up from the touched element, so it is set on every element, not on html. It sits in the base layer so
+   Tailwind's utilities (touch-none on the avatar crop) still win. Scrolling stays. A desktop browser keeps its zoom. */
+@layer base {
+  @media (hover: none) and (pointer: coarse) {
+    * { touch-action: pan-x pan-y; }
+  }
+}
+/* The image preview zooms its own picture (preview-zoom.ts): hand it every finger on the picture and its box. Unlayered,
+   so it beats the base rule above. */
 @media (hover: none) and (pointer: coarse) {
-  html, body { touch-action: pan-x pan-y; }
+  [role="dialog"][aria-modal="true"] img.object-contain,
+  [role="dialog"][aria-modal="true"] :has(> img.object-contain) { touch-action: none; }
 }
