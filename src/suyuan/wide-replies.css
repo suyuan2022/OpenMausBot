@@ -25,6 +25,10 @@
     bottom: min(0px, calc((100% - var(--suyuan-tray-height)) / 2));
     flex-direction: column;
   }
+  /* Shown, the buttons sit above the next message, which would otherwise take the taps on their lower half. */
+  [data-message-row].items-start [data-testid="message-actions"][data-shown] {
+    z-index: 1;
+  }
   /* A bubble, but not the wrapper of a reply split around tables: that one spans the row, and the buttons sit beside
      its first block (ReplyBlocks.tsx). */
   [data-message-row].items-start [data-chat-bubble="simple"]:not(:has([data-reply-blocks])) {
