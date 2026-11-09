@@ -6,6 +6,7 @@ import { useInboxPanel } from "@/state/inbox";
 import type { Action, AppState } from "@/state/store";
 import { chatAlone } from "./chat-alone";
 import { liftFrame, noteApp, noteAppGone } from "./last-frame";
+import "./room-router.css";
 import "./steady-tables.css";
 import { hideBackButton, installSwipeBack } from "./swipe-back";
 import { useWebPush } from "./use-web-push";

@@ -1,6 +1,6 @@
 // suyuan fork: the few lines in upstream files that plug the fork in. A daily merge of upstream that drops one of them
 // would silently switch a feature off, since every other test only exercises the fork's own files; this one goes red.
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -83,5 +83,22 @@ describe("the fork's hooks into upstream files", () => {
     const sidebar = source("src/components/Sidebar.tsx");
     expect(sidebar).toMatch(/<aside\n[^>]*\n\s+data-sidebar\n/);
     expect(sidebar).toContain('open ? "max-md:translate-x-0" : "max-md:-translate-x-full"');
+  });
+
+  it("rooms on Auto ask the fork's router who answers, and the app hears room routing is on", () => {
+    const index = source("server/index.ts");
+    expect(index).toContain("const decider = withRoomRouter(createDecider({ config: () => cfg, dataDir: DATA_DIR }), () => cfg);");
+    expect(index).toContain("decideRoomResponder(decider, roomRoutingInput(group.name, routedText(text, replyTo), ");
+    expect(index.match(/roomRoutingReady\(cfg\)/g)).toHaveLength(3);
+    expect(index).toContain("decider: withRoomRouterStatus(describeDecider(cfg), cfg),");
+    // Every "can rooms route?" question counts the router: an upstream deciderReady(…, "roomRouting") anywhere would not.
+    const asks = readdirSync(join(ROOT, "server"), { recursive: true, encoding: "utf8" })
+      .filter((file) => file.endsWith(".ts") && !file.endsWith(".test.ts") && !file.startsWith("suyuan"))
+      .filter((file) => /deciderReady\([^)]*"roomRouting"/.test(source(join("server", file))));
+    expect(asks).toEqual([]);
+    expect(source("src/lib/group-routing.ts")).toContain("return Boolean(config?.decider?.enabled && config.decider.jobs.roomRouting);");
+    // room-router.css rewords the line under a routed reply, found by its test id.
+    expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/room-router\.css";/m);
+    expect(source("src/components/RoomQueueList.tsx")).toContain('<div data-testid="routed-by" className="mt-1 px-1 text-[11px] text-ink-secondary">');
   });
 });

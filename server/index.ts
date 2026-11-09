@@ -320,7 +320,7 @@ import {
 } from "./store.ts";
 import * as tts from "./tts/index.ts";
 import { voiceNoteFailure } from "./tts/errors.ts";
-import { createDecider, deciderReady, describeDecider } from "./decider/index.ts"; import { createExtractor, describeHelpers } from "./extractor/index.ts";
+import { createDecider, describeDecider } from "./decider/index.ts"; import { createExtractor, describeHelpers } from "./extractor/index.ts";
 import { createStopLineRoutes } from "./routes/stop-line.ts"; import { decideRoomResponder } from "./decider/room-routing.ts"; import { roomRoutingInput } from "./host/room-routing-input.ts";
 import { createLiveSession, liveAttachUrl, liveHistoryFrom, LiveSessionError, type LiveBot, type LiveHistoryMessage } from "./live-call.ts";
 import { LiveCallController, LiveCallSignedOutError, openLiveSocket } from "./live-call-controller.ts";
@@ -594,7 +594,7 @@ import { createBotSkillsRoutes } from "./routes/bot-skills.ts";
 import { createSkillShareRoutes } from "./routes/skill-share.ts";
 import { createTeamContextRoutes } from "./routes/team-context.ts";
 import { createDeciderRoutes } from "./routes/decider.ts"; import { createCloudSendRoutes } from "./routes/cloud-send.ts"; import { claudeCodeSkillInputs } from "./setup-import.ts"; import { createCloudConnectionsHost } from "./cloud-connections-host.ts";
-import { createUpdateCheckRoutes, serverUpdateChecker } from "./routes/update-check.ts"; import { createTimeZoneRoutes } from "./routes/time-zone.ts"; import { suyuanFrame } from "./suyuan/register.ts"; // suyuan fork
+import { createUpdateCheckRoutes, serverUpdateChecker } from "./routes/update-check.ts"; import { createTimeZoneRoutes } from "./routes/time-zone.ts"; import { suyuanFrame } from "./suyuan/register.ts"; import { roomRoutingReady, routedText, withRoomRouter, withRoomRouterStatus } from "./suyuan/room-router.ts"; // suyuan fork
 import { createBrowserSiteRoutes } from "./routes/browser-sites.ts";
 import { createInternalSignInRoutes } from "./routes/sign-in.ts";
 import { createInternalMcpRoutes } from "./routes/internal-mcp.ts";
@@ -790,7 +790,7 @@ if (hostedModels) {
 bindThreadLogCapProvider(() => threadEventLogMaxBytes(cfg));
 bindDecisionRetention(() => decisionRetentionDays(cfg.decisions?.retentionDays));
 bindSafetyFloor(() => cfg);
-const decider = createDecider({ config: () => cfg, dataDir: DATA_DIR }); const extractor = createExtractor({ config: () => cfg, timeZone: () => proactive.brief.timeZone() });
+const decider = withRoomRouter(createDecider({ config: () => cfg, dataDir: DATA_DIR }), () => cfg); const extractor = createExtractor({ config: () => cfg, timeZone: () => proactive.brief.timeZone() });
 const customDomainVerifier = createCustomDomainVerifier({ environmentId: ENVIRONMENT_ID });
 const emailSignIn = createEmailSignIn({
   allow: signInAllowList,
@@ -3632,7 +3632,7 @@ function createChannel(value: unknown): GroupRecord {
     if (!responder) throw Object.assign(new Error("invalid setup.defaultResponder"), { status: 400 });
     setup = { bulletin: requested.bulletin, defaultResponder: responder, completed: true };
   }
-  return store.createGroup(name, memberIds, false, section, setup ?? (deciderReady(cfg, "roomRouting") ? { defaultResponder: { kind: "auto" } } : undefined));
+  return store.createGroup(name, memberIds, false, section, setup ?? (roomRoutingReady(cfg) ? { defaultResponder: { kind: "auto" } } : undefined));
 }
 
 function updateChannel(groupId: string, value: unknown): GroupRecord {
@@ -10795,7 +10795,7 @@ function startGroupTurn(
   }
   // Read the room before this message is appended just below.
   const autoCandidate = !group.dm && channelMode === "chat" && group.defaultResponder.kind === "auto" &&
-    deciderReady(cfg, "roomRouting");
+    roomRoutingReady(cfg);
   const historyBeforeSend = autoCandidate
     ? (() => {
         const before = store.messagesFor(threadId);
@@ -10926,7 +10926,7 @@ function startGroupTurn(
     operation.requestMessageId = message.id;
   }
   const routing = autoRoute
-    ? decideRoomResponder(decider, roomRoutingInput(group.name, text, routableMembers, historyBeforeSend, userNameFor(group.threadId), options.sender), {
+    ? decideRoomResponder(decider, roomRoutingInput(group.name, routedText(text, replyTo), routableMembers, historyBeforeSend, userNameFor(group.threadId), options.sender), {
         signal: operation.cancellation.signal,
       })
     : null;
@@ -11782,7 +11782,7 @@ function configStatus() {
     vps: { configured: Boolean(vpsSshAlias(cfg)), sshAlias: vpsSshAlias(cfg) ?? "" },
     opencodeGo: { ...keyStatus(cfg.opencodeGo?.apiKey), providerKeys: Object.keys(openCodeProviderKeys(cfg)) },
     tts: tts.describeVoice(cfg),
-    decider: describeDecider(cfg), helpers: describeHelpers(cfg),
+    decider: withRoomRouterStatus(describeDecider(cfg), cfg), helpers: describeHelpers(cfg),
     imageGen: avatarImageStatus(cfg), savedKeys: nestedKeyStatus(cfg),
     live: liveSettingsFor(cfg),
     profile: CLOUD_TEAM ? NOBODY_PROFILE : { name: cfg.profile?.name ?? "", email: cfg.profile?.email ?? "", aboutMe: cfg.profile?.aboutMe ?? "", ...(cfg.profile?.avatarUrl ? { avatarUrl: cfg.profile.avatarUrl } : {}) },
@@ -14339,7 +14339,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
             name: redactSecretsInText(parsed.data.name), memberIds, section: chief.section,
             setup: {
               bulletin: redactSecretsInText(parsed.data.bulletin ?? ""),
-              defaultResponder: deciderReady(cfg, "roomRouting") ? { kind: "auto", fallbackBotId: chief.id } : { kind: "member", botId: chief.id },
+              defaultResponder: roomRoutingReady(cfg) ? { kind: "auto", fallbackBotId: chief.id } : { kind: "member", botId: chief.id },
             },
           });
           internalCapability.createdRooms = (internalCapability.createdRooms ?? 0) + 1;

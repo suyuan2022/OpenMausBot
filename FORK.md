@@ -17,6 +17,7 @@ suyuan2022/OpenMausBot 是 [milind-soni/OpenMausBot](https://github.com/milind-s
 | 左滑返回：手机上从屏幕左边缘往右滑，bot 列表跟着手指滑进来；拖过屏幕宽度的三分之一或者快速一甩就打开，否则弹回去。从左边缘竖着划照常滚动对话。手机触屏上不再显示左上角的返回按钮（按钮还在页面里，左滑就是点它），群聊页头也不再给它留空；重开 App 时先盖上的上次画面里同样没有这个按钮 | 主屏幕网页 App 没有 iOS 的侧滑返回，回列表只能点左上角的按钮；有了左滑，这个按钮就多余了 | `src/suyuan/use-suyuan.ts` 5 行接入；新文件 `src/suyuan/swipe-back.ts`，`src/suyuan/last-frame.ts` 存画面时调用它 | 可以还：先问原作者要不要 |
 | 点已经打开的群组能收起列表：手机上 bot 列表盖住整屏时，点当前已经打开的群组或群里的对话，列表收起、回到对话；勾选对话做批量操作时不收起 | 原作者只处理了点当前 bot 的情况，点当前群组没反应，得先点别的再点回来 | `src/components/Sidebar.tsx` 1 行 | 可以还：别的用户也会碰到 |
 | 列表里 bot 那行只为它自己的对话显示「工作中」：它在群里干活时，那行照常显示私聊的最后一句，由群组那行显示谁在干活 | 原来 bot 在群里干活时，列表里它那行也显示「思考中」，看着像私聊在忙 | `src/components/SidebarBotActivity.tsx`、`src/components/sidebar-preview.ts` 各 2 行接入，`src/components/SidebarBotListItem.expansion.test.ts` 改 1 条用例的数据（让那个对话本身在忙）；新文件 `src/suyuan/own-work.ts` | 不还：这是夙愿自己的偏好 |
+| 群组「自动」由 DeepSeek 挑谁来回答：设成「自动」的群里，没 @ 任何人的消息先交给 DeepSeek（经 LithosAI 中转、关掉思考），它读群里的聊天文字（不含工具调用；引用回复时连同被引用的那句），只回一个 bot 名字，就由那个 bot 来回，用时约 0.5–2 秒；3 秒内没答上来、或者答的不是群里的 bot，就由群的负责人回。由它挑的回复下面写着「自动挑选」，没有这行的就是退回给了负责人。新建的群默认「自动」。群设置里的文案不再提 Jev，「Jev 已关闭」的提示不再显示。地址、模型、密钥写在数据目录的 `suyuan-room-router.json`，没有这个文件就和原来一样 | 原作者的自动分派要 TypeSafe Jev 的密钥，没有就一律交给负责人 | `server/index.ts` 改 8 行、不增行，`src/locales/zh.json` 改 5 句文案，`src/suyuan/use-suyuan.ts` 1 行引入；新文件 `server/suyuan/room-router.ts`、`src/suyuan/room-router.css`（「自动挑选」这几个字写在这里：语言包要求那句保留百分比占位符） | 不还 |
 
 ## 待做
 
