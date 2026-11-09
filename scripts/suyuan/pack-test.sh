@@ -8,7 +8,7 @@ cd ${0:A:h}/../..
 
 latest=$(gh release view -R suyuan2022/OpenMausBot --json tagName -q .tagName)
 # A tree without the newest release's commits would quietly take its changes off the phone.
-git fetch -q origin "refs/tags/$latest:refs/tags/$latest"
+git fetch -q origin "refs/tags/${latest}:refs/tags/${latest}"
 git merge-base --is-ancestor "$latest" HEAD || { echo "HEAD lacks $latest: merge suyuan in first" >&2; exit 1; }
 # The g keeps a hash of digits only from reading as a number, which semver forbids to start with 0.
 commit=g$(git rev-parse --short HEAD)
