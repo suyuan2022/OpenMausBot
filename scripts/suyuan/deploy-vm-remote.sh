@@ -77,11 +77,24 @@ npm install -g "$target" </dev/null
 # A test build (pack-test.sh) is never what --rollback returns to.
 [[ $current_spec != "$target" && $current_spec != *.test.* ]] && echo "$current_spec" > "$STORE/previous"
 echo "$target" > "$STORE/current"
-launchctl kickstart -k "gui/$(id -u)/$LABEL"
-for _ in {1..60}; do
-  answering && break
-  sleep 2
-done
-answering || { echo "server is not answering on 8799; try: deploy-vm.sh --rollback --force" >&2; exit 1; }
+restart() {
+  launchctl kickstart -k "gui/$(id -u)/$LABEL"
+  for _ in {1..60}; do
+    answering && return 0
+    sleep 2
+  done
+  return 1
+}
+if ! restart; then
+  # A build that never starts leaves no bot to put it back, the one that deployed it from lizhi-vm included.
+  back=$(cat "$STORE/previous" 2>/dev/null || true)
+  [[ -n $back && $back != "$target" ]] || { echo "server is not answering on 8799; try: deploy-vm.sh --rollback --force" >&2; exit 1; }
+  echo "server is not answering on 8799 with ${target:t}; putting back ${back:t}" >&2
+  npm install -g "$back" </dev/null
+  echo "$back" > "$STORE/current"
+  restart || { echo "${back:t} is not answering either; look at the server's log" >&2; exit 1; }
+  echo "openmausbot $before -> $(openmausbot --version): back on ${back:t}, since ${target:t} did not start" >&2
+  exit 1
+fi
 echo "openmausbot $before -> $(openmausbot --version)"
 ls -t "$STORE"/*.tgz 2>/dev/null | tail -n +6 | while read -r old; do trash "$old" 2>/dev/null || true; done
