@@ -4,7 +4,7 @@
 
 ## 分支
 
-- `suyuan`：部署分支，也是默认分支。每个改动从它拉 `fix/<名字>` 或 `feat/<名字>`，开 PR 合回 `suyuan`。
+- `suyuan`：部署分支，也是默认分支。每个改动从它拉 `fix/<名字>` 或 `feat/<名字>`，开 PR 合回 `suyuan`。改动要叠在另一个还没合并的改动上时，从那个分支拉，PR 的 base 设成它；合并时从最上层往下合，最后把最底下那个合进 `suyuan`。
 - `upstream/main`：原作者的代码（remote `upstream` 指向 milind-soni/OpenMausBot）。夙愿要原作者的更新时手动合：从 `suyuan` 拉 `sync/upstream-<日期>`，`git merge upstream/main`，开 PR，CI 绿了合并、部署。每天自动同步的流程 `.github/workflows/suyuan-sync.yml` 已停用。
 - 别的用户也会碰到的修复，另从 `upstream/main` 拉分支，把提交挑过去，给原作者开 PR。原作者收下后，在 `FORK.md` 把那一行标成「已还」。
 
@@ -17,6 +17,11 @@
 1. **写代码。** 服务端逻辑、数据结构、接口的改动都带 vitest 用例：合并原作者的更新时，只有这些用例能发现我们的改动被弄坏了。只改样式和文案的不用写，靠第 2 步量出来的数字。用例放在新文件 `<被测文件>.suyuan.test.ts`，原作者的测试文件只改被我们改坏的断言。接进原作者文件的那几行，在 `server/suyuan/wiring.test.ts` 加一条断言钉住。
    完成：相关用例是绿的，`pnpm typecheck` 和 `pnpm lint` 都过。
 2. **在隔离实例上验。** 照 `docs/verification/README.md` 的「Launch」一节起一个隔离实例（临时数据目录，接假模型），用 lcu 在 Chrome 里打开它打印出来的地址，把改动涉及的每个界面状态都点一遍、截图。推送、通知这类 Chrome 能测的，先在 Chrome 里测。验证只用隔离实例：虚拟机上的 8799 端口和 `bot.tokenic.cn` 是夙愿正在用的 bot。
+   几个不好查的做法：
+   - 假模型的回复用环境变量 `FAKE_CLAUDE_REPLIES`（JSON 字符串数组，按顺序一条条回）和 `FAKE_CLAUDE_REPLY_STATE`（记到第几条的文件）指定，用来造带表格、长段落的回复。
+   - `scripts/control-omb.ts` 的帮助里有发消息、建 bot、建群的命令。往同一个对话里连发，要带上第一次 `run` 返回的 `--task`，不然每条都开一个新对话。
+   - 隔离实例第一次打开会弹几层新手引导，先点掉。
+   - 模拟手机要用 CDP 同时设 `Emulation.setDeviceMetricsOverride`（402×874）和 `Emulation.setTouchEmulationEnabled`，只设屏幕尺寸的话 `(hover: none)` 不成立，只在触屏上生效的样式看不到。
    修 bug 先复现：照夙愿描述的现象，在隔离实例里造出同样的条件（屏幕宽度、对话内容、操作），把现象量成数字或录下来，对上了再动手；修完在同样条件下再量一次。复现不出来，回去问清楚现象。
    完成：修 bug 的，修前量得到现象、修后量不到；每个改到的界面状态都有截图，和预期一致。
 3. **交夙愿在手机上确认。** 改动里有只能在手机上判断的部分（真机推送、主屏幕网页 App 的手感、iPhone Safari 上的渲染），开 PR 之前先装一个测试版给他试：`scripts/suyuan/pack-test.sh` 把当前工作区打成测试版安装包并打印路径，`scripts/suyuan/deploy-vm.sh <那个路径>` 装到虚拟机。测试项只列手机上才能判断的，写清测什么、在哪测、看到什么算对；Chrome 里能测的第 2 步已经测完。没有这类部分就跳过这步；改到数据格式或数据迁移的也不装测试版，因为换回正式版只换程序、不换回数据。
