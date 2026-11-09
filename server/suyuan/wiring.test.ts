@@ -44,4 +44,40 @@ describe("the fork's hooks into upstream files", () => {
     }
     expect(source("src/components/JumpToLatestButton.tsx")).toContain('title={t("chat.jumpToLatest")}');
   });
+
+  it("a reply's table card keeps the hooks steady-tables.css finds its table by, and a width that ignores its content", () => {
+    expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/steady-tables\.css";/m);
+    expect(source("src/components/ReplyBlocks.tsx")).toMatch(/data-reply-table className="[^"]*\bw-full\b/);
+    expect(source("src/components/RichTable.tsx")).toContain('className="chat-table"');
+    // A table sized by its card alone would collapse if the card shrank to its content.
+    for (const view of ["src/components/ChatView.tsx", "src/components/GroupView.tsx"]) {
+      expect(source(view)).toContain('tabled ? "w-full" : "w-fit"');
+    }
+  });
+
+  it("a bot's message keeps the hooks wide-replies.css widens it by, and a room's shows the chat's two buttons", () => {
+    expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/wide-replies\.css";/m);
+    const time = '"self-end pb-1 text-[11px] tabular-nums text-ink-tertiary opacity-0 transition-opacity group-hover:opacity-100';
+    const chat = source("src/components/ChatView.tsx");
+    expect(chat).toContain('<div {...{ [MESSAGE_ROW]: "" }} className={cn("group flex w-full flex-col", user ? "animate-msg-in items-end" : "items-start"');
+    expect(chat).toContain('data-chat-bubble={simple ? "simple" : ""}');
+    expect(chat).toContain(time);
+    const room = source("src/components/GroupView.tsx");
+    expect(room).toContain('<div {...{ [MESSAGE_ROW]: "" }} className={cn("group flex w-full flex-col", user ? "items-end" : "items-start")}>');
+    expect(room).toContain('data-chat-bubble={simple ? "simple" : ""}');
+    expect(room).toContain(time);
+    expect(room).toContain('menu={simple ? [...replyAndCopy(() => onReply(m), botText), ...botMenu] : botMenu}>');
+    expect(source("src/components/ReplyBlocks.tsx")).toContain("data-reply-blocks");
+  });
+
+  it("the phone's bot list keeps the button and the drawer the left-edge swipe opens it by", () => {
+    expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("useEffect(() => installSwipeBack(), []);");
+    const app = source("src/App.tsx");
+    expect(app).toContain('aria-label={t("app.openBotList")}');
+    expect(app).toContain("aria-expanded={drawerOpen}");
+    expect(app).toContain("onClick={() => setDrawerOpen(true)}");
+    const sidebar = source("src/components/Sidebar.tsx");
+    expect(sidebar).toMatch(/<aside\n[^>]*\n\s+data-sidebar\n/);
+    expect(sidebar).toContain('open ? "max-md:translate-x-0" : "max-md:-translate-x-full"');
+  });
 });
