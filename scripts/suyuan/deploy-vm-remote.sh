@@ -74,7 +74,8 @@ fi
 
 current_spec=$(cat "$STORE/current" 2>/dev/null || echo "openmausbot@$before")
 npm install -g "$target" </dev/null
-[[ $current_spec != "$target" ]] && echo "$current_spec" > "$STORE/previous"
+# A test build (pack-test.sh) is never what --rollback returns to.
+[[ $current_spec != "$target" && $current_spec != *.test.* ]] && echo "$current_spec" > "$STORE/previous"
 echo "$target" > "$STORE/current"
 launchctl kickstart -k "gui/$(id -u)/$LABEL"
 for _ in {1..60}; do
