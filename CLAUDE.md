@@ -41,3 +41,14 @@
 - 升级只走 `deploy-vm.sh`。`npm install -g openmausbot` 会把 fork 换回官方版。
 - `deploy-vm.sh` 最长要跑十几分钟，`pack-test.sh` 也要几分钟，都用 Bash 的后台运行或把超时调到 15 分钟。部署断线不影响部署本身，日志在虚拟机的 `~/.openmausbot-releases/deploy.log`。
 - 公网入口 `bot.tokenic.cn` 是北京服务器（`ssh root@82.157.117.245`）上的 nginx，配置在 `/etc/nginx/sites-available/bot.tokenic.cn`，经虚拟机打过来的 ssh 反向隧道转到虚拟机的 8799。这台服务器出口只有约 3 Mbps，是手机打开慢的瓶颈，所以 nginx 对脚本和接口数据开了 gzip。这台服务器上还跑着别的站点，改配置前先备份，`nginx -t` 通过再 `systemctl reload nginx`。
+
+## 在虚拟机上干活（Maus 工程师）
+
+bot「Maus 工程师」跑在 `lizhi-vm` 的 OpenMausBot 服务里，仓库在虚拟机的 `~/Documents/OpenMausBot`，夙愿在手机上给它派活。上面的流程照走，不同的只有这几处：
+
+- 上面写「在 MacBook 上跑」「`ssh lizhi-vm`」的，在这里直接在本机跑。
+- 装测试版、部署正式版都用 `scripts/suyuan/deploy-self.sh`，参数和 `deploy-vm.sh` 一样，只是没有 `--force`。重启服务会把你自己也重启，所以它在后台等所有 bot 都空闲才装，你自己也算在内：它一跑完，你就告诉夙愿「在等空闲，装完会重启」，然后结束这一轮。服务重启后夙愿再找你时，先读 `~/.openmausbot-releases/deploy.log` 的末尾，确认装上了。
+- 装测试版、部署正式版会重启夙愿正在用的服务，合并 PR 会改动部署分支 `suyuan`：这三件事每次都要他在当次对话里明确同意。
+- 这台机器上同时跑着夙愿的真实 bot。隔离实例只用 `scripts/control-omb.ts launch` 起的临时实例，不碰 8799 端口。Chrome 和 lcu 也是共用的：测试时用 lcu 新开标签页，测完关掉自己开的，别的标签页不碰。跑全量测试、打包这类吃 CPU 的活之前看一眼 `uptime`，负载高就等一等。
+- 虚拟机连 GitHub 时通时断：`gh`、`git push` 失败就隔几分钟再试，试几次还不行就告诉夙愿。
+- 夙愿在手机上读你的回复：结论放最前面，写短。PR 和文档动笔前读 `~/.claude/guides/写给谁看.md`。
