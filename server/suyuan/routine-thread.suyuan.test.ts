@@ -89,17 +89,34 @@ describe("a routine keeps one conversation", () => {
     expect(h.created).toHaveLength(2);
   });
 
-  it("never writes two runs into the conversation at once: a manual run waits for the scheduled one", async () => {
+  it("never writes two runs into the conversation at once: a manual run beside a running one gets a conversation of its own, not remembered", async () => {
     const h = harness();
     const routine = make(h);
     await runOnce(h, 41);
     h.manager.runNow(routine.id);
     await h.manager.tick();
-    expect(h.started).toHaveLength(1);
+    expect(h.started.map((one) => one.threadId)).toEqual(["thread-1", "thread-2"]);
+    expect(h.created[1]!.title).toContain("Outfit ·");
+    expect(h.manager.listRoutines()[0]!.runThreadId).toBe("thread-1");
     h.finish("thread-1");
-    await h.manager.tick();
-    expect(h.started.map((one) => one.threadId)).toEqual(["thread-1", "thread-1"]);
-    expect(h.created).toHaveLength(1);
+    h.finish("thread-2");
+    await runOnce(h, 82);
+    expect(h.started.at(-1)!.threadId).toBe("thread-1");
+  });
+
+  it("a run cancelled while it waited leaves its conversation closed: the next run opens a new one and the routine remembers it", async () => {
+    const h = harness();
+    make(h);
+    await runOnce(h, 41);
+    const runs = (h.manager as unknown as { runs: Array<{ status: string; waitingSince?: number }> }).runs;
+    runs[0]!.status = "cancelled";
+    runs[0]!.waitingSince = START;
+    await runOnce(h, 82);
+    expect(h.started.map((one) => one.threadId)).toEqual(["thread-1", "thread-2"]);
+    expect(h.manager.listRoutines()[0]!.runThreadId).toBe("thread-2");
+    h.finish("thread-2");
+    await runOnce(h, 123);
+    expect(h.started.at(-1)!.threadId).toBe("thread-2");
   });
 
   it("queue overlap still lines the next run up behind the running one", async () => {
@@ -167,16 +184,13 @@ describe("a routine keeps one conversation", () => {
     expect(h.created).toHaveLength(1);
   });
 
-  it("a webhook run waits while the last one is still running in the conversation", async () => {
+  it("a webhook run beside a running one gets a conversation of its own", async () => {
     const h = harness();
     hook(h, 1);
     await h.manager.tick();
     hook(h, 2);
     await h.manager.tick();
-    expect(h.started).toHaveLength(1);
-    h.finish("thread-1");
-    await h.manager.tick();
-    expect(h.started.map((one) => one.threadId)).toEqual(["thread-1", "thread-1"]);
+    expect(h.started.map((one) => one.threadId)).toEqual(["thread-1", "thread-2"]);
   });
 
   it("a webhook run goes to a conversation of its own while the last one waits for an answer, and its conversation is gone once deleted", async () => {

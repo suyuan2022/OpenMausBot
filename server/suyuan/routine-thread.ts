@@ -4,8 +4,6 @@ import type { Routine, RoutineRun } from "../routines.ts";
 export type RoutineThreadPick = {
   /** The conversation to write into; absent when the routine has none yet, so the run opens one. */
   threadId?: string;
-  /** Another run is writing in that conversation right now: wait, never write two runs into it at once. */
-  busy?: boolean;
   /** The routine should remember the conversation this run ends up in (its own new one, or one it adopted). */
   remember?: boolean;
 };
@@ -38,12 +36,14 @@ export function pickRoutineThread(routine: Routine | undefined, run: RoutineRun,
     if (latest?.threadId && alive(run.botId, latest.threadId)) threadId = latest.threadId;
   }
   if (!threadId) return { remember: true };
-  const holder = runs.find((other) => other.id !== run.id && other.routineId === run.routineId && other.threadId === threadId &&
-    ["running", "waiting"].includes(other.status));
-  // A run waiting on an answer keeps the conversation as it is: this run goes to a conversation of its own.
-  if (holder?.status === "waiting") return {};
-  const remember = threadId !== routine?.runThreadId;
-  return holder ? { threadId, busy: true, remember } : { threadId, remember };
+  const here = runs.filter((other) => other.id !== run.id && other.routineId === run.routineId && other.threadId === threadId);
+  // Never two runs in one conversation: while one is working or waiting on an answer there, this run gets a conversation of its
+  // own (not remembered), as upstream runs it in a free slot. A run that was cancelled while waiting leaves its question
+  // unanswered in the conversation, which is then closed: the next run opens a new one and the routine remembers that instead.
+  const last = here.reduce<RoutineRun | undefined>((latest, other) => !latest || other.createdAt >= latest.createdAt ? other : latest, undefined);
+  if (here.some((other) => ["running", "waiting"].includes(other.status))) return {};
+  if (last?.status === "cancelled" && last.waitingSince !== undefined) return { remember: true };
+  return { threadId, remember: threadId !== routine?.runThreadId };
 }
 
 /** The pick for a run about to start, with the routine it belongs to; a run that already has a conversation keeps it. */

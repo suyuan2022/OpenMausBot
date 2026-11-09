@@ -1107,7 +1107,7 @@ export class RoutineManager {
         }
         const sameRoutineWorking = triggerSource === "schedule" && this.runs.some(other =>
           other.id !== run.id && other.routineId === run.routineId && ["running", "waiting"].includes(other.status));
-        const own = ownThread(this.routines, run, this.runs, this.options.threadOpen), state = sameRoutineWorking || own.busy ? "busy" : this.targetState(run);
+        const own = ownThread(this.routines, run, this.runs, this.options.threadOpen), state = sameRoutineWorking ? "busy" : this.targetState(run);
         if (state === "busy") {
           if (run.deferredAt == null) {
             run.deferredAt = now;

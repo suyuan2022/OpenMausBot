@@ -119,7 +119,7 @@ describe("the fork's hooks into upstream files", () => {
 
   it("a routine's runs share one conversation: the manager picks it before a run starts, and the host says which are open", () => {
     const routines = source("server/routines.ts");
-    expect(routines).toContain("const own = ownThread(this.routines, run, this.runs, this.options.threadOpen), state = sameRoutineWorking || own.busy ?");
+    expect(routines).toContain("const own = ownThread(this.routines, run, this.runs, this.options.threadOpen), state = sameRoutineWorking ?");
     expect(routines).toContain("|| own.threadId || null;");
     expect(routines).toContain("carryOutside(own, run, this.runs, continuityCarry(run, this.routines, this.runs))");
     expect(routines).toContain("rememberThread(own, task.threadId, joined);");
