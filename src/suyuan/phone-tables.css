@@ -1,0 +1,35 @@
+/* suyuan fork: a reply's table card on a phone looks like the one on a computer. Upstream's touch rules (RichTable.tsx)
+   give the card a 44px empty band across its top for three 40px buttons, and show every header's sort arrow, because a
+   touch screen has no hover to reveal them. On a 402px phone that made a one-row table a third taller than on a
+   computer, with its header pushed down. Here the card starts at its header, the buttons are the computer's small
+   pill floating over the header's right end, shown by a tap on the card where the computer's waits for the pointer
+   (table-plate.ts sets the mark), and the arrows stay hidden until the column is sorted, as there. */
+@media (hover: none) and (pointer: coarse) and (max-width: 40rem) {
+  [data-reply-table] [data-table-card] {
+    padding-top: 0;
+  }
+  [data-reply-table] .table-plate {
+    top: 0.375rem;
+    inset-inline-end: 0.375rem;
+    gap: 0.125rem;
+    padding: 0.125rem;
+    background: var(--color-composer);
+    box-shadow: 0 0 0 0.5px color-mix(in srgb, var(--color-ink) 10%, transparent);
+    opacity: 0;
+    pointer-events: none;
+  }
+  [data-reply-table] [data-table-card][data-suyuan-plate] .table-plate,
+  [data-reply-table] [data-table-card]:focus-within .table-plate {
+    opacity: 1;
+    pointer-events: auto;
+  }
+  [data-reply-table] .table-plate .table-action {
+    width: 28px;
+    height: 28px;
+    min-width: 28px;
+    min-height: 28px;
+  }
+  [data-reply-table] th button > svg:not(.opacity-100) {
+    opacity: 0;
+  }
+}

@@ -55,6 +55,17 @@ describe("the fork's hooks into upstream files", () => {
     }
   });
 
+  it("a table card keeps the hooks phone-tables.css reshapes it by", () => {
+    expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/phone-tables\.css";/m);
+    expect(source("src/suyuan/use-suyuan.ts")).toContain("useEffect(() => installTablePlate(), []);");
+    const table = source("src/components/RichTable.tsx");
+    expect(table).toContain("<div data-table-card className={TABLE_CARD}");
+    expect(table).toContain('className="table-plate ');
+    expect(table).toContain("touch:pt-11");
+    expect(table).toContain('sort?.column === index ? "opacity-100" : "opacity-0 group-hover/th:opacity-100');
+    expect(source("src/components/ReplyBlocks.tsx")).toContain("data-reply-table");
+  });
+
   it("a bot's message keeps the hooks wide-replies.css widens it by, and a room's shows the chat's two buttons", () => {
     expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/wide-replies\.css";/m);
     const time = '"self-end pb-1 text-[11px] tabular-nums text-ink-tertiary opacity-0 transition-opacity group-hover:opacity-100';
