@@ -1,5 +1,5 @@
-// suyuan fork: on a phone, a swipe from the screen's left edge brings back the bot list, as the button at the top left
-// does. The list is a drawer (aside[data-sidebar], src/components/Sidebar.tsx) parked off screen to the left; the swipe
+// suyuan fork: on a phone, a swipe from the screen's left edge brings back the bot list, in place of the button at the
+// top left, which touch phones no longer show. The list is a drawer (aside[data-sidebar], src/components/Sidebar.tsx) parked off screen to the left; the swipe
 // drags it in under the finger and, let go far or fast enough, opens it through that button (src/App.tsx), so the
 // app's own state follows. iOS gives a home-screen web app no back gesture, so the edge is free.
 import { t } from "@/lib/i18n";
@@ -14,6 +14,12 @@ const OPEN_SHARE = 1 / 3;
 const FLING = 0.5;
 /** Where the list is a drawer: below Tailwind's md. */
 const PHONE = "(max-width: 767px)";
+/** Where the swipe stands in for the button: a touch screen with the drawer. */
+const SWIPE_SCREEN = `(hover: none) and (pointer: coarse) and ${PHONE}`;
+
+const backButton = (label: string) => `#root button[aria-label="${CSS.escape(label)}"]`;
+/** A room's header, indented on a phone (pl-11) to clear the button. */
+export const ROOM_HEADER = '#root [class~="@container/roomhead"].pl-11';
 
 interface Drag {
   drawer: HTMLElement;
@@ -27,7 +33,7 @@ interface Drag {
 }
 
 function parts(doc: Document): { drawer: HTMLElement; button: HTMLButtonElement } | null {
-  const button = doc.querySelector<HTMLButtonElement>(`#root button[aria-label="${CSS.escape(t("app.openBotList"))}"]`);
+  const button = doc.querySelector<HTMLButtonElement>(backButton(t("app.openBotList")));
   const drawer = doc.querySelector<HTMLElement>("#root aside[data-sidebar]");
   return button && drawer && button.getAttribute("aria-expanded") !== "true" ? { drawer, button } : null;
 }
@@ -95,4 +101,14 @@ export function installSwipeBack(doc: Document = document): () => void {
     doc.removeEventListener("touchend", end);
     doc.removeEventListener("touchcancel", cancel);
   };
+}
+
+/** Where the swipe works the button goes; still in the page, it opens the list when the swipe clicks it. A room's
+ * header (src/components/RoomHeader.tsx) gives up the room it kept for the button. `label` is the button's name in the
+ * language shown; returns what brings the button back. */
+export function hideBackButton(label: string, doc: Document = document): () => void {
+  const style = doc.createElement("style");
+  style.textContent = `@media ${SWIPE_SCREEN} { ${backButton(label)} { display: none; } ${ROOM_HEADER} { padding-left: 1.25rem; } }`;
+  doc.head.append(style);
+  return () => style.remove();
 }
