@@ -8,6 +8,9 @@ import { chatAlone } from "./chat-alone";
 import { liftFrame, noteApp, noteAppGone } from "./last-frame";
 import "./room-router.css";
 import "./steady-tables.css";
+import "./no-zoom.css";
+import { installNoZoom } from "./no-zoom";
+import { installPreviewZoom } from "./preview-zoom";
 import { hideBackButton, installSwipeBack } from "./swipe-back";
 import { installTrayAtFinger } from "./tray-at-finger";
 import { useWebPush } from "./use-web-push";
@@ -25,6 +28,8 @@ export function useSuyuan(state: AppState, dispatch: (action: Action) => void): 
   useLayoutEffect(() => noteAppGone, []);
   useEffect(() => installSwipeBack(), []);
   useEffect(() => installTrayAtFinger(), []);
+  useEffect(() => installNoZoom(), []);
+  useEffect(() => installPreviewZoom(), []);
   // Read on every render: the button's name changes when the language pack arrives.
   const backLabel = t("app.openBotList");
   useEffect(() => hideBackButton(backLabel), [backLabel]);

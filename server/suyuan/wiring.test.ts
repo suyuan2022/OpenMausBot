@@ -70,6 +70,17 @@ describe("the fork's hooks into upstream files", () => {
     expect(source("src/components/ReplyBlocks.tsx")).toContain("data-reply-blocks");
   });
 
+  it("the phone never pinch-zooms, and a stored picture is served with a long cache", () => {
+    expect(source("index.html")).toContain("maximum-scale=1");
+    expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/no-zoom\.css";/m);
+    expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("useEffect(() => installNoZoom(), []);");
+    expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("useEffect(() => installPreviewZoom(), []);");
+    // preview-zoom.ts finds the picture by these classes and roles.
+    expect(source("src/components/AttachmentPreview.tsx")).toContain('"block max-h-full max-w-full rounded-lg object-contain');
+    expect(source("src/components/AttachmentPreview.tsx")).toContain('aria-modal="true"');
+    expect(source("server/routes/threads.ts")).toContain('"cache-control": attachmentCacheControl(attachment.mime),');
+  });
+
   it("the phone's bot list keeps the button and the drawer the left-edge swipe opens it by", () => {
     const hook = functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan");
     expect(hook).toContain("useEffect(() => installSwipeBack(), []);");
