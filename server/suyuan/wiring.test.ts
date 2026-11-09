@@ -71,14 +71,15 @@ describe("the fork's hooks into upstream files", () => {
   });
 
   it("the phone never pinch-zooms, and a stored picture is served with a long cache", () => {
-    expect(source("index.html")).toContain("maximum-scale=1");
+    // no-zoom.ts caps the scale on this tag at run time.
+    expect(source("index.html")).toContain('<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />');
     expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/no-zoom\.css";/m);
     expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("useEffect(() => installNoZoom(), []);");
     expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("useEffect(() => installPreviewZoom(), []);");
     // preview-zoom.ts finds the picture by these classes and roles.
     expect(source("src/components/AttachmentPreview.tsx")).toContain('"block max-h-full max-w-full rounded-lg object-contain');
     expect(source("src/components/AttachmentPreview.tsx")).toContain('aria-modal="true"');
-    expect(source("server/routes/threads.ts")).toContain('"cache-control": attachmentCacheControl(attachment.mime),');
+    expect(source("server/routes/threads.ts")).toContain('"cache-control": attachmentCacheControl(attachment.mime, viewerFor(auth).kind === "all" && !member && !deps.memberDefaultBot && !workspaceAccess),');
   });
 
   it("the phone's bot list keeps the button and the drawer the left-edge swipe opens it by", () => {
