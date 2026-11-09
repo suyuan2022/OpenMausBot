@@ -37,8 +37,8 @@ describe("the fork's hooks into upstream files", () => {
     expect(loading).toContain('<div className="text-[14px]">{t(loading.text)}</div>');
   });
 
-  it("the composer drops its Stop button while there is text or an attachment to send", () => {
-    expect(source("src/components/Composer.tsx")).toContain("{(simpleDock ? stoppable : busy) && !locked && !hasContent && (");
+  it("the composer drops its Stop button while there is text or an attachment to send, unless the field is disabled", () => {
+    expect(source("src/components/Composer.tsx")).toContain("{(simpleDock ? stoppable : busy) && !locked && (!hasContent || blocking || attachmentPending) && (");
   });
 
   it("the chats keep the hooks the last-screen cover finds them by: the transcript log and the two buttons' wording", () => {
