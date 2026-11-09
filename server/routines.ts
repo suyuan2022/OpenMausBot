@@ -35,6 +35,7 @@ import { applyHolds, holdCauses, type AppliedHolds } from "./routine-holds.ts";
 import { sanitizeInput } from "./routine-input.ts";
 import { applyCheckResult, routineLine, runLineFields, type RoutineLineCodes, type RoutineTroubleCode } from "./routine-lines.ts";
 import { checkHold, CHECK_BOOT_HOLD_MS, type CheckHold } from "./routine-check-pacing.ts";
+import { continuesThread, pickRoutineThread, type RoutineThreadPick } from "./suyuan/routine-thread.ts";
 import { resolveRoutineResultsThread, routineRunDefinition, type ResultsThreadAllocation } from "./routine-run-definition.ts";
 
 export type { RoutineContextAttachment, RoutineIntervalWindow, RoutineRunStatus, RoutineRunTrigger };
@@ -79,6 +80,8 @@ export interface Routine extends RoutineTroubleCode {
   heldFor?: RoutineHoldCause;
   sourceThreadId?: string;
   resultsThreadId?: string;
+  /** suyuan: the one conversation every run of this routine writes into (server/suyuan/routine-thread.ts). */
+  runThreadId?: string;
   installedPackage?: RoutinePackageStamp;
   nextRunAt: number | null;
   createdAt: number;
@@ -228,6 +231,8 @@ export interface RoutineManagerOptions {
   goalState?: (groupId: string | undefined, coordinatorBotId: string) => "ready" | "busy" | "missing";
   createTask: (botId: string, title: string, run?: RoutineRun) => { threadId: string } | null;
   joinConversation?: (run: RoutineRun) => string | null;
+  /** suyuan: whether a routine's run conversation still exists and is not archived. */
+  threadOpen?: (botId: string, threadId: string) => boolean;
   createGoalTask?: (groupId: string, title: string) => { threadId: string } | null;
   isResultsThread?: (botId: string, threadId: string) => boolean;
   resolveResultsThread?: (routine: Routine, forceNew: boolean) => { threadId: string; main?: true } | undefined;
@@ -1107,7 +1112,10 @@ export class RoutineManager {
         }
         const sameRoutineWorking = triggerSource === "schedule" && this.runs.some(other =>
           other.id !== run.id && other.routineId === run.routineId && ["running", "waiting"].includes(other.status));
-        const state = sameRoutineWorking ? "busy" : this.targetState(run);
+        const routineOf = this.routines.find((candidate) => candidate.id === run.routineId);
+        const own: RoutineThreadPick = !run.threadId && routineOf && this.options.threadOpen
+          ? pickRoutineThread(routineOf, run, this.runs, this.options.threadOpen) : {};
+        const state = sameRoutineWorking || own.busy ? "busy" : this.targetState(run);
         if (state === "busy") {
           if (run.deferredAt == null) {
             run.deferredAt = now;
@@ -1128,8 +1136,9 @@ export class RoutineManager {
         }
         const startedAt = this.now();
         const suffix = ` · ${new Date(startedAt).toLocaleString("en-US", { month: "short", day: "numeric", hour: "numeric", minute: "2-digit" })}`;
-        const title = `${run.routineName.slice(0, 80 - suffix.length).trimEnd()}${suffix}`;
-        const joined = run.threadId || (run.target === "room-goal" ? null : this.options.joinConversation?.(run)) || null;
+        // A conversation that every run writes into is named for the routine, not for its first run's time.
+        const title = own.remember && !own.threadId ? run.routineName.slice(0, 80).trimEnd() : `${run.routineName.slice(0, 80 - suffix.length).trimEnd()}${suffix}`;
+        const joined = run.threadId || (run.target === "room-goal" ? null : this.options.joinConversation?.(run)) || own.threadId || null;
         const task = joined
           ? { threadId: joined }
           : run.target === "room-goal"
@@ -1144,6 +1153,7 @@ export class RoutineManager {
           continue;
         }
         Object.assign(run, { threadId: task.threadId, startedAt, status: "running" } satisfies Partial<RoutineRun>);
+        if (own.remember && routineOf && (own.threadId ? own.threadId === task.threadId : joined === null)) routineOf.runThreadId = task.threadId;
         try { this.save(); } catch (error) { Object.assign(run, { status: "queued", startedAt: undefined } satisfies Partial<RoutineRun>); throw error; }
         this.emitRun(run);
         try {
@@ -1170,7 +1180,7 @@ export class RoutineManager {
             await this.options.startTurn(
               run.botId,
               task.threadId,
-              composeExecutionPrompt({ id: run.routineId, name: run.routineName, trigger: triggerSource, runOn: run.runOn ?? "maus" }, prompt, run.attachments, continuityCarry(run, this.routines, this.runs), run.retried),
+              composeExecutionPrompt({ id: run.routineId, name: run.routineName, trigger: triggerSource, runOn: run.runOn ?? "maus" }, prompt, run.attachments, continuesThread(own) ? null : continuityCarry(run, this.routines, this.runs), run.retried),
               run.runOn ?? "maus",
               triggerSource,
               (message) => this.failThread(task.threadId, message, { cause: "refused" }),

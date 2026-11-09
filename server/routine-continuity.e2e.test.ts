@@ -3,7 +3,7 @@ import { expect, it } from "vitest";
 import { launchVerificationServer, runControlOmb } from "../scripts/control-omb.ts";
 
 it("passes the previous report to the real fake-engine turn only when continuity is enabled", async () => {
-  const fixture = await launchVerificationServer();
+  const fixture = await launchVerificationServer({ ...process.env, OMB_ROUTINE_ONE_THREAD: "0" }); // suyuan: these check a conversation per run
   const env = { OPENMAUSBOT_URL: fixture.info.url };
   const api = async (method: string, path: string, body?: unknown) => {
     const response = await fetch(`${fixture.info.url}${path}`, {

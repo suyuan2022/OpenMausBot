@@ -116,4 +116,17 @@ describe("the fork's hooks into upstream files", () => {
     expect(viewport).toContain("useFillShortChat(scrollRef, threadId, { shown: transcriptShown, following: follow, startIndex, hasMore, olderPending, count: messages.length });");
     expect(functionBody(source("src/lib/transcript-window.ts"), "followWindowStart")).toContain("const tail = drawnTailStart(messages, TRANSCRIPT_WINDOW_SIZE);");
   });
+
+  it("a routine's runs share one conversation: the manager picks it before a run starts, and the host says which are open", () => {
+    const routines = source("server/routines.ts");
+    expect(routines).toContain("pickRoutineThread(routineOf, run, this.runs, this.options.threadOpen)");
+    expect(routines).toContain("|| own.threadId || null;");
+    expect(routines).toContain("continuesThread(own) ? null : continuityCarry(run, this.routines, this.runs)");
+    expect(routines).toContain("routineOf.runThreadId = task.threadId;");
+    const index = source("server/index.ts");
+    // The two upstream e2e tests that count a conversation per run turn the fork's switch off through the launcher.
+    expect(source("scripts/control-omb.ts")).toContain('"OMB_ROUTINE_ONE_THREAD"');
+    expect(index).toContain("threadOpen: (botId, threadId) =>");
+    expect(index).toContain("takesOverFrom(execution.routineRunId, run, routines?.listRuns() ?? [])");
+  });
 });

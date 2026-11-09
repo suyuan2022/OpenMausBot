@@ -10,7 +10,7 @@ import { waitForExit } from "./testing/cleanup.ts";
 import { splitLaunchNote } from "./testing/launch-note.ts";
 
 it("reports every run into the bot's main thread while fresh executions, approvals, deletion and unread stay reachable", async () => {
-  const fixture = await launchVerificationServer();
+  const fixture = await launchVerificationServer({ ...process.env, OMB_ROUTINE_ONE_THREAD: "0" }); // suyuan: these check a conversation per run
   const evidence: unknown[] = [{ fixture: fixture.info }];
   let broker: Socket | undefined;
   const api = async (method: string, path: string, body?: unknown, status = 200) => {

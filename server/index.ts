@@ -594,7 +594,7 @@ import { createBotSkillsRoutes } from "./routes/bot-skills.ts";
 import { createSkillShareRoutes } from "./routes/skill-share.ts";
 import { createTeamContextRoutes } from "./routes/team-context.ts";
 import { createDeciderRoutes } from "./routes/decider.ts"; import { createCloudSendRoutes } from "./routes/cloud-send.ts"; import { claudeCodeSkillInputs } from "./setup-import.ts"; import { createCloudConnectionsHost } from "./cloud-connections-host.ts";
-import { createUpdateCheckRoutes, serverUpdateChecker } from "./routes/update-check.ts"; import { createTimeZoneRoutes } from "./routes/time-zone.ts"; import { suyuanFrame } from "./suyuan/register.ts"; import { roomRoutingReady, routedText, withRoomRouter, withRoomRouterStatus } from "./suyuan/room-router.ts"; // suyuan fork
+import { createUpdateCheckRoutes, serverUpdateChecker } from "./routes/update-check.ts"; import { createTimeZoneRoutes } from "./routes/time-zone.ts"; import { suyuanFrame } from "./suyuan/register.ts"; import { takesOverFrom } from "./suyuan/routine-thread.ts"; import { roomRoutingReady, routedText, withRoomRouter, withRoomRouterStatus } from "./suyuan/room-router.ts"; // suyuan fork
 import { createBrowserSiteRoutes } from "./routes/browser-sites.ts";
 import { createInternalSignInRoutes } from "./routes/sign-in.ts";
 import { createInternalMcpRoutes } from "./routes/internal-mcp.ts";
@@ -8709,8 +8709,8 @@ function syncRoutineRunToSource(run: RoutineRun): string | null {
   // Mark only the fresh execution: on its first running update, before dispatch adds any transcript.
   if (run.target === "bot" && run.threadId && run.threadId !== sourceThreadId) {
     const execution = store.taskByThread(run.botId, run.threadId);
-    const freshExecution = execution && run.status === "running" && !execution.routineRunId &&
-      store.messagesFor(run.threadId).length === 0;
+    const freshExecution = execution && run.status === "running" && (!execution.routineRunId &&
+      store.messagesFor(run.threadId).length === 0 || takesOverFrom(execution.routineRunId, run, routines?.listRuns() ?? []));
     if (execution && freshExecution) {
       store.patchTask(run.botId, run.threadId, { routineRunId: run.id, unread: false });
     } else if (execution?.routineRunId === run.id && execution.unread) {
@@ -8839,6 +8839,7 @@ routines = new RoutineManager({
     if (!source || source.group || source.bot.id !== run.botId) return null;
     return source.threadId;
   },
+  threadOpen: (botId, threadId) => { const task = store.taskByThread(botId, threadId); return Boolean(task) && task!.archivedAt === undefined; },
   createGoalTask: (groupId, title) => store.createGroupTask(groupId, title, false),
   isResultsThread: (botId, threadId) => {
     const bot = store.bot(botId);
