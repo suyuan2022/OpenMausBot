@@ -33,11 +33,11 @@ describe("workThreadFor", () => {
     expect(() => fromLiaison("run-1", false)).toThrow(/handed you work: answer it there with reply "none"/);
   });
 
-  it("gives new work to the thread that handed the sender work only for the running assignment, and says so otherwise", () => {
-    expect(() => fromLiaison("run-0", false)).toThrow(/was opened by someone else/);
+  it("takes that notice only for the running assignment's requester, not a stale opener of a reused thread", () => {
+    expect(() => fromLiaison("run-0", true)).toThrow(/is not a thread you opened on Bugfixer/);
     expect(() => workThreadFor(store, { botId: "bugfixer", botName: "Bugfixer", fromBotId: "liaison", fromThreadId: "liaison-work", thread: "run-1",
-      notice: false, answering: undefined, also: () => true, reach: () => true })).toThrow(/was opened by someone else/);
-    expect(() => fromLiaison("run-1", false, () => true, { botId: "someone", threadId: "run-1" })).toThrow(/was opened by someone else/);
+      notice: true, answering: undefined, also: () => true, reach: () => true })).toThrow(/is not a thread you opened on Bugfixer/);
+    expect(() => fromLiaison("run-1", true, () => true, { botId: "someone", threadId: "run-1" })).toThrow(/is not a thread you opened on Bugfixer/);
   });
 
   it("says in plain words that confined work stays out of a thread it may not reach, opened by the sender or not", () => {
@@ -46,7 +46,10 @@ describe("workThreadFor", () => {
     expect(() => workThreadFor(store, { botId: "bugfixer", botName: "Bugfixer", fromBotId: "liaison", fromThreadId: "liaison-chat", thread: "run-1", notice: true, answering: run1, also: () => true, reach })).toThrow(OUTSIDE_STAYS_HERE);
   });
 
-  it("refuses an archived thread or one `also` rules out, even for a notice", () => {
+  it("refuses any other thread, an archived one, or one `also` rules out, even for a notice", () => {
+    const anyOther = { ...store, taskByThread: () => task("someone-elses") };
+    expect(() => workThreadFor(anyOther, { botId: "bugfixer", botName: "Bugfixer", fromBotId: "liaison", fromThreadId: "liaison-chat", thread: "someone-elses", notice: true, answering: run1, also: () => true, reach: () => true }))
+      .toThrow(/is not a thread you opened on Bugfixer/);
     expect(() => fromLiaison("archived-run", true, () => true, { botId: "bugfixer", threadId: "archived-run" })).toThrow(/is not a thread you opened/);
     expect(() => fromLiaison("run-1", true, () => false)).toThrow(/is not a thread you opened/);
   });

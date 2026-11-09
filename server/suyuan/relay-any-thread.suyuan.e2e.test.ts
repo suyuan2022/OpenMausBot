@@ -9,6 +9,7 @@ import { expect, it } from "vitest";
 import { launchVerificationServer, runControlOmb } from "../../scripts/control-omb.ts";
 import { hostTimeout } from "../testing/host-timeout.ts";
 import { ownTurnText } from "../testing/room-handoff-agent.ts";
+import { WAITS_ON_PERSON } from "./relay-gate.ts";
 
 
 type Row = Record<string, any>;
@@ -95,13 +96,15 @@ async function scenario(test: (f: any) => Promise<void>) {
 
 
 const NOTE = "[From @Clive (bot)";
+const NOT_OPENED = (thread: string) => `"${thread}" is not a thread you opened on Mira: use a threadId one of your coordinate_bots receipts gave, or one list_threads shows on them`;
+/** The thread's record as saved: its opener, level and always-allow list. */
+const record = (f: any, thread: string): any => (JSON.parse(readFileSync(join(f.dataDir, "bots.json"), "utf8")) as any[])
+  .find((bot) => bot.id === f.mira.id)?.tasks?.find((task: any) => task.threadId === thread);
 
 it("R1 lands Clive's one-way notice in the thread the person opened on Mira, marked as from Clive, and refuses work that wants a report there", () => scenario(async (f) => {
   const thread = f.mira.activeTaskId as string;
-  const record = () => (JSON.parse(readFileSync(join(f.dataDir, "bots.json"), "utf8")) as any[]).find((bot) => bot.id === f.mira.id)?.tasks?.find((task: any) => task.threadId === thread);
-  await expect.poll(() => record()?.threadId, { timeout: 15_000 }).toBe(thread);
-  const before = record().openedBy;
-  expect(before, "the person opened this thread").toBeUndefined();
+  await expect.poll(() => record(f, thread)?.threadId, { timeout: 15_000 }).toBe(thread);
+  expect(record(f, thread).openedBy, "the person opened this thread").toBeUndefined();
   f.script(f.clive.id, { key: "C0", match: ["R1-JOB"], steps: [
     { arguments: { bot_ids: [f.mira.id], message: "R1-NOTICE: the deadline moved to Friday.", thread, reply: "none" } },
     { arguments: { bot_ids: [f.mira.id], message: "R1-WORK: redo the page.", thread }, expectError: true }], reply: "C0: done." });
@@ -111,11 +114,69 @@ it("R1 lands Clive's one-way notice in the thread the person opened on Mira, mar
   await expect.poll(() => f.keys(f.mira.id), { timeout: 30_000 }).toEqual(["M0"]);
   const [notice, refused] = f.replies("C0");
   expect(notice.receipts).toEqual([expect.objectContaining({ outcome: expect.stringMatching(/queued|injected/), threadId: thread })]);
-  expect(refused).toBe(`"${thread}" was opened by someone else: to a thread you did not open, send only a one-way notice (reply "none"); to hand Mira work, use thread "standing" or "new"`);
-  expect(f.given("M0")).toContain(NOTE);
-  expect(f.turns(f.mira.id).map((record: any) => record.threadId)).toEqual([thread]);
+  expect(refused, "work that wants a report is refused with upstream's words").toBe(NOT_OPENED(thread));
+  expect(f.told("M0"), "Mira's turn text says who sent it").toContain(NOTE);
+  expect(f.turns(f.mira.id).map((turn: any) => turn.threadId)).toEqual([thread]);
   await expect.poll(async () => await f.said(thread, "M0: noted."), { timeout: 30_000 }).toBe(1);
-  expect(record().openedBy, "the thread keeps its opener").toEqual(before);
+  const landed = (await f.messages(thread)).filter((message: any) => JSON.stringify(message).includes("R1-NOTICE"));
+  expect(landed.map((message: any) => message.from?.botId)).toContain(f.clive.id);
+  expect(record(f, thread).openedBy, "the thread keeps its opener").toBeUndefined();
+  expect(record(f, thread).outside, "a person's thread is not marked outside").toBeFalsy();
   expect(f.children().map((row: any) => row.reply)).toEqual(["none"]);
   expect(f.children().map((row: any) => row.assignee?.destination?.threadId)).toEqual([thread]);
+}), hostTimeout(90_000));
+
+it("R2 leaves the person's thread at its own approval level and always-allow list when a Chief on Full access drops a notice in", () => scenario(async (f) => {
+  const thread = f.mira.activeTaskId as string;
+  expect((await f.api("PATCH", `/api/bots/${f.clive.id}`, { approvalMode: "full", applyToAllThreads: true })).status).toBe(200);
+  expect((await f.api("PATCH", `/api/bots/${f.mira.id}`, { approvalMode: "ask", applyToAllThreads: true })).status).toBe(200);
+  expect((await f.api("PATCH", `/api/bots/${f.mira.id}`, { alwaysAllow: ["Bash"] })).status).toBe(200);
+  expect((await f.api("PATCH", `/api/bots/${f.mira.id}/tasks/${thread}`, { refreshPermissions: true })).status).toBe(200);
+  await expect.poll(() => record(f, thread)?.alwaysAllow, { timeout: 15_000 }).toEqual(["Bash"]);
+  const before = record(f, thread);
+  expect(before.approvalMode).toBe("ask");
+  f.script(f.clive.id, { key: "C0", match: ["R2-JOB"], steps: [{ arguments: { bot_ids: [f.mira.id], message: "R2-NOTICE: the deadline moved.", thread, reply: "none" } }], reply: "C0: done." });
+  f.script(f.mira.id, { key: "M0", match: ["R2-NOTICE"], reply: "M0: noted." });
+  await f.say(f.clive.id, f.job, "R2-JOB: tell Mira about the deadline.");
+  await expect.poll(() => f.keys(f.mira.id), { timeout: 30_000 }).toEqual(["M0"]);
+  await expect.poll(async () => await f.said(thread, "M0: noted."), { timeout: 30_000 }).toBe(1);
+  expect(record(f, thread)).toMatchObject({ approvalMode: "ask", alwaysAllow: ["Bash"] });
+  expect((await f.messages(thread)).filter((message: any) => / — handed on by /.test(message.tool?.name ?? ""))).toEqual([]);
+}), hostTimeout(90_000));
+
+it("R3 refuses a notice from a Clive turn a webhook or a routine started, with upstream's words, and leaves the thread unmarked", () => scenario(async (f) => {
+  const thread = f.mira.activeTaskId as string;
+  await expect.poll(() => record(f, thread)?.threadId, { timeout: 15_000 }).toBe(thread);
+  const notice = (key: string) => ({ key, match: [`${key}-RUN`], steps: [{ arguments: { bot_ids: [f.mira.id], message: "Keep it", thread, reply: "none" }, expectError: true }], reply: `${key}: refused.` });
+  f.script(f.clive.id, notice("R3-HOOK"), notice("R3-ROUTINE"));
+  const hook = await f.api("POST", "/api/webhooks", { name: "R3", prompt: "R3-HOOK-RUN: tell Mira to keep it.", botId: f.clive.id, runOn: "maus" });
+  expect(hook.status, JSON.stringify(hook.body)).toBe(201);
+  expect((await fetch(hook.body.credential.url, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status).toBe(202);
+  await expect.poll(() => f.keys(f.clive.id), { timeout: 30_000 }).toEqual(["R3-HOOK"]);
+  const routine = await f.api("POST", "/api/routines", { name: "R3", prompt: "R3-ROUTINE-RUN: tell Mira to keep it.", botId: f.clive.id, schedule: { type: "daily", time: "09:00", weekdays: [1] } });
+  expect(routine.status, JSON.stringify(routine.body)).toBe(201);
+  expect((await f.api("POST", `/api/routines/${routine.body.routine.id}/run`)).status).toBe(201);
+  await expect.poll(() => f.keys(f.clive.id), { timeout: 30_000 }).toEqual(["R3-HOOK", "R3-ROUTINE"]);
+  expect(f.replies("R3-HOOK")).toEqual([NOT_OPENED(thread)]);
+  expect(f.replies("R3-ROUTINE")).toEqual([NOT_OPENED(thread)]);
+  expect(f.keys(f.mira.id)).toEqual([]);
+  expect(f.children()).toEqual([]);
+  expect(record(f, thread).outside, "the refused turn did not mark the person's thread outside").toBeFalsy();
+}), hostTimeout(90_000));
+
+it("R4 refuses a notice into a thread that waits on the person's answer, and the card stays theirs", () => scenario(async (f) => {
+  await f.askMeFirst();
+  const thread = f.mira.activeTaskId as string;
+  const question = "Keep the old pricing page as a backup?";
+  f.script(f.mira.id, { key: "M1", match: ["R4"], timeoutMs: 90_000,
+    steps: [{ server: "ogb", tool: "ask_user", arguments: { question, choices: ["Keep it", "Delete it"] }, capture: { answer: "([\\s\\S]+)" } }], reply: "R4-RESULT: done with {{answer}}" });
+  f.script(f.clive.id, { key: "C0", match: ["R4-SAG"], steps: [{ arguments: { bot_ids: [f.mira.id], message: "Keep it", thread, reply: "none" }, expectError: true }], reply: "C0: refused." });
+  await f.say(f.mira.id, thread, "R4: redo the pricing page.");
+  const card = async () => (await f.messages(thread)).find((message: any) => message.card?.subtitle === question)?.card;
+  await expect.poll(async () => (await card()) !== undefined, { timeout: 30_000 }).toBe(true);
+  await f.say(f.clive.id, f.job, "R4-SAG: let Mira know.");
+  await expect.poll(() => f.keys(f.clive.id), { timeout: 30_000 }).toEqual(["C0"]);
+  expect(f.replies("C0")).toEqual([WAITS_ON_PERSON]);
+  expect((await card())?.answered).toBeUndefined();
+  expect(f.children()).toEqual([]);
 }), hostTimeout(90_000));

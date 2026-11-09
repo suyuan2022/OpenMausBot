@@ -15,34 +15,36 @@ const tasks = [
   task("archived", by("scout", "Scout", "scout-chat"), { archivedAt: 1 }), task("lane", by("scout", "Scout", "room", { roomLane: true } as never)),
 ];
 const store = { taskByThread: (_bot: string, threadId: string) => tasks.find((t) => t.threadId === threadId), workThread: () => undefined };
-const fromChief = (thread: string, notice: boolean, reach: (task: TaskRecord) => boolean = () => true) => workThreadFor(store,
-  { botId: "maus", botName: "Maus", fromBotId: "chief", fromThreadId: "chief-chat", thread, notice, answering: undefined, also: () => true, reach });
+const NOT_OPENED = /is not a thread you opened on Maus/;
+const fromChief = (thread: string, notice: boolean, others: ((task: TaskRecord) => boolean) | null = () => true, reach: (task: TaskRecord) => boolean = () => true) => workThreadFor(store,
+  { botId: "maus", botName: "Maus", fromBotId: "chief", fromThreadId: "chief-chat", thread, notice, answering: undefined, also: () => true, reach, ...(others ? { others } : {}) });
 
 describe("workThreadFor, notices into threads someone else opened", () => {
-  it("takes a one-way notice into a thread a person or another bot opened, and leaves who opened it alone", () => {
-    for (const thread of ["by-person", "by-scout"]) {
-      const found = fromChief(thread, true);
-      expect(found?.threadId).toBe(thread);
-      expect(found?.openedBy?.botId).not.toBe("chief");
-    }
-    expect(fromChief("by-scout", true)?.openedBy).toEqual(tasks[1]!.openedBy);
+  it("takes a one-way notice into a thread a person or another bot opened when `others` allows it", () => {
+    for (const thread of ["by-person", "by-scout"]) expect(fromChief(thread, true)?.threadId).toBe(thread);
   });
 
-  it("refuses new work there and says to use standing or new", () => {
+  it("refuses with upstream's words when `others` says no, or is not given, and for any send that wants a report", () => {
     for (const thread of ["by-person", "by-scout"]) {
-      expect(() => fromChief(thread, false)).toThrow(/only a one-way notice.*"standing" or "new"/);
+      expect(() => fromChief(thread, true, () => false)).toThrow(NOT_OPENED);
+      expect(() => fromChief(thread, true, null)).toThrow(NOT_OPENED);
+      expect(() => fromChief(thread, false)).toThrow(NOT_OPENED);
     }
+  });
+
+  it("lets what `others` throws through, so a thread can say why it takes nothing", () => {
+    expect(() => fromChief("by-person", true, () => { throw new Error("waiting on the person"); })).toThrow("waiting on the person");
   });
 
   it("still refuses an archived thread, a room lane, and a thread outside its reach", () => {
-    expect(() => fromChief("archived", true)).toThrow(/is not a thread you opened/);
-    expect(() => fromChief("lane", true)).toThrow(/is not a thread you opened|opened by someone else/);
-    expect(() => fromChief("by-person", true, () => false)).toThrow(OUTSIDE_STAYS_HERE);
-    expect(() => fromChief("by-person", false, () => false)).toThrow(OUTSIDE_STAYS_HERE);
+    expect(() => fromChief("archived", true)).toThrow(NOT_OPENED);
+    expect(() => fromChief("lane", true)).toThrow(NOT_OPENED);
+    expect(() => fromChief("by-person", true, () => true, () => false)).toThrow(OUTSIDE_STAYS_HERE);
   });
 
-  it("keeps a thread the sender opened working for both kinds of send", () => {
-    expect(fromChief("by-chief", false)?.threadId).toBe("by-chief");
-    expect(fromChief("by-chief", true)?.threadId).toBe("by-chief");
+  it("keeps a thread the sender opened working for both kinds of send, without asking `others`", () => {
+    const never = () => { throw new Error("asked"); };
+    expect(fromChief("by-chief", false, never)?.threadId).toBe("by-chief");
+    expect(fromChief("by-chief", true, never)?.threadId).toBe("by-chief");
   });
 });

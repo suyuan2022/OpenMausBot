@@ -1,0 +1,19 @@
+// suyuan fork: when a one-way notice may go into a thread someone else opened (server/host/work-thread.ts asks). Only a turn
+// a person is behind may do it, from a conversation that may read the target (outside the fence and the bot API), the same
+// two conditions upstream sets before a Chief speaks for the person. A thread that waits on the person's answer takes
+// nothing: the notice would queue behind the card and run once they answered.
+import type { TaskRecord } from "../store.ts";
+
+export const WAITS_ON_PERSON = "That thread is waiting on the person's answer, so it takes no message from a teammate now. Leave it to them, or tell them what is waiting.";
+
+export interface RelayGateDeps {
+  personBehind(botId: string, threadId: string): boolean;
+  readableFrom(threadId: string): (other: string) => boolean;
+  openPersonCard(threadId: string): unknown;
+}
+
+export const relayGate = (deps: RelayGateDeps, fromBotId: string, fromThreadId: string) => (task: TaskRecord): boolean => {
+  if (!deps.personBehind(fromBotId, fromThreadId) || !deps.readableFrom(fromThreadId)(task.threadId)) return false;
+  if (deps.openPersonCard(task.threadId)) throw new Error(WAITS_ON_PERSON);
+  return true;
+};

@@ -117,9 +117,10 @@ describe("the fork's hooks into upstream files", () => {
     expect(functionBody(source("src/lib/transcript-window.ts"), "followWindowStart")).toContain("const tail = drawnTailStart(messages, TRANSCRIPT_WINDOW_SIZE);");
   });
 
-  it("workThreadFor takes a one-way notice into a live thread someone else opened, and refuses new work there", () => {
-    const body = functionBody(source("server/host/work-thread.ts"), "workThreadFor");
-    expect(body).toContain("if (usable && input.notice && !task.openedBy?.roomLane) return task;");
-    expect(body).toContain("was opened by someone else");
+  it("coordinate_bots lets a notice into a thread someone else opened only through the relay gate, and hands no level down into one", () => {
+    expect(source("server/host/work-thread.ts")).toContain("if (usable && input.notice && !task.openedBy?.roomLane && input.others?.(task)) return task;");
+    const index = source("server/index.ts");
+    expect(index).toContain("others: relayGate({ personBehind: teammatePrompts.personBehind, readableFrom: threadReadableFrom, openPersonCard }, internalSender.id, internalCapability.threadId)");
+    expect(index).toContain("if (!continued || continued.openedBy?.botId === internalSender.id) delegatedLevel.apply(internalSender, internalCapability.threadId, internalCapability.roomHandoffId ?? generation, recipient, target.threadId);");
   });
 });
