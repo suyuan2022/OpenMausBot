@@ -2,7 +2,7 @@
    the ⋯ menu) that a tap shows beside it. Upstream sizes a simple bubble for a mouse: at most 80% of the row and 82px short of it,
    a table card at 88%, and beside each message keeps a time that only hover shows, invisible but taking its width. On a
    402px phone a reply stopped 136px short of the edge, and a room's, with four buttons, 160px. */
-@media (hover: none) and (pointer: coarse) {
+@media (hover: none) and (pointer: coarse) and (max-width: 40rem) {
   /* The time beside a message: hover-only, so never seen on a touch screen. */
   [data-message-row] > div > span.tabular-nums.self-end {
     display: none;
@@ -12,18 +12,29 @@
      the bubble, where its buttons stand one above the other: at the bottom of a reply taller than they are, centred
      on a shorter one so they reach no more than 13px past it either way, inside the 16px between messages. Out of
      the row's flow, they leave a short reply's height alone. */
-  [data-message-row].items-start {
+  [data-message-row].items-start:has([data-chat-bubble="simple"]) {
     --suyuan-tray: 32px;
-    --suyuan-tray-height: 61px;
   }
-  [data-message-row].items-start :has(> [data-testid="message-actions"]) {
+  [data-message-row].items-start:has([data-chat-bubble="simple"]) :has(> [data-testid="message-actions"]) {
     position: relative;
   }
-  [data-message-row].items-start [data-testid="message-actions"] {
+  /* Its height follows its buttons, 30px each: two most of the time, three while reading aloud or showing the raw
+     text, one beside a message relayed from another bot. An open menu sits inside it too, and does not count. */
+  [data-message-row].items-start:has([data-chat-bubble="simple"]) [data-testid="message-actions"] {
+    --suyuan-tray-height: 61px;
     position: absolute;
     right: 0;
     bottom: min(0px, calc((100% - var(--suyuan-tray-height)) / 2));
     flex-direction: column;
+  }
+  [data-message-row].items-start [data-testid="message-actions"]:not(:has(> :nth-child(2):not([role="menu"]))) {
+    --suyuan-tray-height: 31px;
+  }
+  [data-message-row].items-start [data-testid="message-actions"]:has(> :nth-child(3):not([role="menu"])) {
+    --suyuan-tray-height: 91px;
+  }
+  [data-message-row].items-start [data-testid="message-actions"]:has(> :nth-child(4):not([role="menu"])) {
+    --suyuan-tray-height: 121px;
   }
   /* Shown, the buttons sit above the next message, which would otherwise take the taps on their lower half. */
   [data-message-row].items-start [data-testid="message-actions"][data-shown] {
@@ -31,10 +42,10 @@
   }
   /* A bubble, but not the wrapper of a reply split around tables: that one spans the row, and the buttons sit beside
      its first block (ReplyBlocks.tsx). */
-  [data-message-row].items-start [data-chat-bubble="simple"]:not(:has([data-reply-blocks])) {
+  [data-message-row].items-start:has([data-chat-bubble="simple"]) [data-chat-bubble="simple"]:not(:has([data-reply-blocks])) {
     max-width: min(var(--chat-bubble-max), calc(100% - var(--suyuan-tray)));
   }
-  [data-message-row].items-start [data-reply-table] {
+  [data-message-row].items-start:has([data-chat-bubble="simple"]) [data-reply-table] {
     max-width: calc(100% - var(--suyuan-tray));
   }
 }
