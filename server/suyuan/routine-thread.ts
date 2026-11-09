@@ -1,9 +1,12 @@
 // suyuan fork: a routine writes every run into one conversation instead of opening a new one each time.
+import { ROUTINE_SUPERSEDED } from "../routine-execution.ts";
 import type { Routine, RoutineRun } from "../routines.ts";
 
 export type RoutineThreadPick = {
   /** The conversation to write into; absent when the routine has none yet, so the run opens one. */
   threadId?: string;
+  /** The run goes to a conversation of its own beside a working one: marked, so a later run never mistakes it for the routine's. */
+  side?: boolean;
   /** The routine should remember the conversation this run ends up in (its own new one, or one it adopted). */
   remember?: boolean;
 };
@@ -30,7 +33,7 @@ export function pickRoutineThread(routine: Routine | undefined, run: RoutineRun,
     let latest: RoutineRun | undefined;
     for (const other of runs) {
       if (other.routineId !== run.routineId || other.id === run.id || !other.threadId || other.botId !== run.botId) continue;
-      if (other.threadId === routine?.sourceThreadId || other.threadId === (routine ?? run).resultsThreadId) continue;
+      if (other.sideThread || other.threadId === routine?.sourceThreadId || other.threadId === (routine ?? run).resultsThreadId) continue;
       if (!latest || other.createdAt >= latest.createdAt) latest = other;
     }
     if (latest?.threadId && alive(run.botId, latest.threadId)) threadId = latest.threadId;
@@ -38,11 +41,11 @@ export function pickRoutineThread(routine: Routine | undefined, run: RoutineRun,
   if (!threadId) return { remember: true };
   const here = runs.filter((other) => other.id !== run.id && other.routineId === run.routineId && other.threadId === threadId);
   // Never two runs in one conversation: while one is working or waiting on an answer there, this run gets a conversation of its
-  // own (not remembered), as upstream runs it in a free slot. A run that was cancelled while waiting leaves its question
-  // unanswered in the conversation, which is then closed: the next run opens a new one and the routine remembers that instead.
+  // own (not remembered), as upstream runs it in a free slot. A run whose wait was superseded by the next scheduled run leaves
+  // its question unanswered in the conversation, which is then closed: the next run opens a new one and the routine remembers that instead.
   const last = here.reduce<RoutineRun | undefined>((latest, other) => !latest || other.createdAt >= latest.createdAt ? other : latest, undefined);
-  if (here.some((other) => ["running", "waiting"].includes(other.status))) return {};
-  if (last?.status === "cancelled" && last.waitingSince !== undefined) return { remember: true };
+  if (here.some((other) => ["running", "waiting"].includes(other.status))) return { side: true };
+  if (last?.error === ROUTINE_SUPERSEDED) return { remember: true };
   return { threadId, remember: threadId !== routine?.runThreadId };
 }
 
@@ -54,7 +57,8 @@ export function ownThread(routines: readonly Routine[], run: RoutineRun, runs: r
 
 /** Records the conversation the run ended up in: its own new one (named for the routine, not its first run's time), or the
  * one it adopted. A conversation joined some other way is not the routine's. */
-export function rememberThread(own: RoutineThreadPick & { routine?: Routine }, threadId: string, joined: string | null): void {
+export function rememberThread(own: RoutineThreadPick & { routine?: Routine }, threadId: string, joined: string | null, run: RoutineRun): void {
+  if (own.side) run.sideThread = true;
   if (own.remember && own.routine && (own.threadId ? own.threadId === threadId : joined === null)) own.routine.runThreadId = threadId;
 }
 
@@ -67,7 +71,8 @@ export function carryOutside<T extends { finishedAt: number }>(own: RoutineThrea
   return from?.threadId === own.threadId ? null : carry;
 }
 
-/** The conversation is marked as run `run`'s, replacing an earlier run of the same routine; one a person has taken over stays theirs. */
-export function takesOverFrom(current: string | undefined, run: Pick<RoutineRun, "id" | "routineId">, runs: readonly RoutineRun[]): boolean {
-  return current !== undefined && current !== run.id && runs.find((other) => other.id === current)?.routineId === run.routineId;
+/** The conversation is marked as run `run`'s, replacing an earlier run of the same routine, or one so old its record is gone
+ * (`owner` is undefined); a conversation a person has taken over has no mark and stays theirs. */
+export function takesOverFrom(current: string | undefined, run: Pick<RoutineRun, "id" | "routineId">, owner: Pick<RoutineRun, "routineId"> | null | undefined): boolean {
+  return current !== undefined && current !== run.id && (!owner || owner.routineId === run.routineId);
 }

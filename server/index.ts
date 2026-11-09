@@ -8710,7 +8710,7 @@ function syncRoutineRunToSource(run: RoutineRun): string | null {
   if (run.target === "bot" && run.threadId && run.threadId !== sourceThreadId) {
     const execution = store.taskByThread(run.botId, run.threadId);
     const freshExecution = execution && run.status === "running" && (!execution.routineRunId &&
-      store.messagesFor(run.threadId).length === 0 || takesOverFrom(execution.routineRunId, run, routines?.listRuns() ?? []));
+      store.messagesFor(run.threadId).length === 0 || takesOverFrom(execution.routineRunId, run, execution.routineRunId ? routines?.runById(execution.routineRunId) : undefined));
     if (execution && freshExecution) {
       store.patchTask(run.botId, run.threadId, { routineRunId: run.id, unread: false });
     } else if (execution?.routineRunId === run.id && execution.unread) {

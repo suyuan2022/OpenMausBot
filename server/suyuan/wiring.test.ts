@@ -122,11 +122,13 @@ describe("the fork's hooks into upstream files", () => {
     expect(routines).toContain("const own = ownThread(this.routines, run, this.runs, this.options.threadOpen), state = sameRoutineWorking ?");
     expect(routines).toContain("|| own.threadId || null;");
     expect(routines).toContain("carryOutside(own, run, this.runs, continuityCarry(run, this.routines, this.runs))");
-    expect(routines).toContain("rememberThread(own, task.threadId, joined);");
+    expect(routines).toContain("rememberThread(own, task.threadId, joined, run);");
+    expect(routines).toContain("runById(id: string): RoutineRun | null");
+    expect(routines).toContain("sideThread?: boolean;");
     const index = source("server/index.ts");
-    // The upstream e2e tests count a conversation per run: the launcher starts every server with the fork's switch off unless asked.
-    expect(source("scripts/control-omb.ts")).toContain('childEnv.OMB_ROUTINE_ONE_THREAD = parentEnv.OMB_ROUTINE_ONE_THREAD === "1" ? "1" : "0";');
+    // The upstream e2e tests count a conversation per run: vitest's launcher starts servers with the fork's switch off unless asked; a hand-launched instance runs the real setting.
+    expect(source("scripts/control-omb.ts")).toContain('childEnv.OMB_ROUTINE_ONE_THREAD = parentEnv.OMB_ROUTINE_ONE_THREAD ?? (process.env.VITEST ? "0" : "1");');
     expect(index).toContain("threadOpen: (botId, threadId) =>");
-    expect(index).toContain("takesOverFrom(execution.routineRunId, run, routines?.listRuns() ?? [])");
+    expect(index).toContain("takesOverFrom(execution.routineRunId, run, execution.routineRunId ? routines?.runById(execution.routineRunId) : undefined)");
   });
 });

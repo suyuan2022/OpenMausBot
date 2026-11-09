@@ -123,7 +123,7 @@ export interface RoutineRun extends RoutineLineCodes {
   webhookId?: string;
   deliveryId?: string;
   sourceThreadId?: string;
-  resultsThreadId?: string;
+  resultsThreadId?: string; sideThread?: boolean; // suyuan: opened beside a working run of the same routine, not the routine's own conversation
   threadId?: string;
   startedAt?: number;
   finishedAt?: number;
@@ -424,7 +424,7 @@ export class RoutineManager {
 
   wakeHold(horizonMs = WAKE_HORIZON_MS) { return wakeHoldOf(this.routines, this.runs, this.now(), horizonMs); }
   /** A Cloud home's sleep check (server/routine-due.ts). */
-  hasActiveRuns(): boolean { return activeRunsOf(this.runs, this.now()); }
+  hasActiveRuns(): boolean { return activeRunsOf(this.runs, this.now()); } runById(id: string): RoutineRun | null { const run = this.runs.find((one) => one.id === id); return run ? cloneRun(run) : null; } // suyuan
   nextDueAt(): number | null { return nextDueOf(this.routines, this.runs, this.now()); }
 
   listRuns(from?: number, to?: number): RoutineRun[] {
@@ -1143,7 +1143,7 @@ export class RoutineManager {
             : "Could not create a task for this run");
           continue;
         }
-        Object.assign(run, { threadId: task.threadId, startedAt, status: "running" } satisfies Partial<RoutineRun>); rememberThread(own, task.threadId, joined);
+        Object.assign(run, { threadId: task.threadId, startedAt, status: "running" } satisfies Partial<RoutineRun>); rememberThread(own, task.threadId, joined, run);
         try { this.save(); } catch (error) { Object.assign(run, { status: "queued", startedAt: undefined } satisfies Partial<RoutineRun>); throw error; }
         this.emitRun(run);
         try {

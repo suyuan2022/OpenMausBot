@@ -4,7 +4,9 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { ROUTINE_SUPERSEDED } from "../routine-execution.ts";
 import { RoutineManager } from "../routines.ts";
+import { takesOverFrom } from "./routine-thread.ts";
 
 const START = new Date(2026, 10, 10, 9, 0, 0).getTime();
 const MIN = 60_000;
@@ -104,13 +106,14 @@ describe("a routine keeps one conversation", () => {
     expect(h.started.at(-1)!.threadId).toBe("thread-1");
   });
 
-  it("a run cancelled while it waited leaves its conversation closed: the next run opens a new one and the routine remembers it", async () => {
+  it("a run whose wait the next scheduled run superseded leaves its conversation closed: the next run opens a new one and the routine remembers it", async () => {
     const h = harness();
     make(h);
     await runOnce(h, 41);
-    const runs = (h.manager as unknown as { runs: Array<{ status: string; waitingSince?: number }> }).runs;
+    const runs = (h.manager as unknown as { runs: Array<{ status: string; waitingSince?: number; error?: string }> }).runs;
     runs[0]!.status = "cancelled";
     runs[0]!.waitingSince = START;
+    runs[0]!.error = ROUTINE_SUPERSEDED;
     await runOnce(h, 82);
     expect(h.started.map((one) => one.threadId)).toEqual(["thread-1", "thread-2"]);
     expect(h.manager.listRoutines()[0]!.runThreadId).toBe("thread-2");
@@ -249,5 +252,52 @@ describe("a routine keeps one conversation", () => {
       expect(h.created, key).toHaveLength(2);
       vi.unstubAllEnvs();
     }
+  });
+
+  it("a run that waited for approval and was stopped by hand does not close the conversation", async () => {
+    const h = harness();
+    make(h);
+    await runOnce(h, 41);
+    const runs = (h.manager as unknown as { runs: Array<{ status: string; waitingSince?: number; error?: string }> }).runs;
+    runs[0]!.status = "cancelled";
+    runs[0]!.waitingSince = START;
+    runs[0]!.error = "Stopped by you";
+    await runOnce(h, 82);
+    expect(h.started.map((one) => one.threadId)).toEqual(["thread-1", "thread-1"]);
+  });
+
+  it("a webhook run opened beside a working one is not where the next run goes", async () => {
+    const h = harness();
+    hook(h, 1);
+    await h.manager.tick();
+    hook(h, 2);
+    await h.manager.tick();
+    expect(h.started.map((one) => one.threadId)).toEqual(["thread-1", "thread-2"]);
+    expect(h.manager.listRuns().filter((run) => run.sideThread).map((run) => run.threadId)).toEqual(["thread-2"]);
+    h.finish("thread-1");
+    h.finish("thread-2");
+    hook(h, 3);
+    await h.manager.tick();
+    expect(h.started.at(-1)!.threadId).toBe("thread-1");
+    expect(h.created).toHaveLength(2);
+  });
+
+  it("marks the conversation as the new run's when the run that held the mark has left the history", () => {
+    const run = { id: "now", routineId: "r1" };
+    expect(takesOverFrom("old", run, undefined)).toBe(true);
+    expect(takesOverFrom("old", run, null)).toBe(true);
+    expect(takesOverFrom("old", run, { routineId: "r1" })).toBe(true);
+    expect(takesOverFrom("old", run, { routineId: "other" })).toBe(false);
+    expect(takesOverFrom("now", run, undefined)).toBe(false);
+    // A person who wrote in the conversation cleared the mark: it stays theirs.
+    expect(takesOverFrom(undefined, run, undefined)).toBe(false);
+  });
+
+  it("finds a run by id for the host, and not once it is gone", async () => {
+    const h = harness();
+    make(h);
+    const run = await runOnce(h, 41);
+    expect(h.manager.runById(run.id)?.id).toBe(run.id);
+    expect(h.manager.runById("missing")).toBeNull();
   });
 });
