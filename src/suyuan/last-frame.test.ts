@@ -64,6 +64,21 @@ describe("captureFrame and showFrame", () => {
     expect(shown.getAttribute("aria-hidden")).toBe("true");
   });
 
+  it("leaves out the back button, and the room a room's header keeps for it, on a touch phone as the live page does", async () => {
+    const { captureFrame } = await fresh();
+    const root = document.getElementById("root")!;
+    const label = t("app.openBotList");
+    root.innerHTML = `<button aria-label="${label}"></button><div class="@container/roomhead px-5 py-3 pl-11 md:pl-5">买鞋</div>${CHAT}`;
+    const chat = root.querySelector<HTMLElement>(".scroller")!;
+    vi.stubGlobal("matchMedia", () => ({ matches: false }));
+    expect(captureFrame(root, chat, view(), 0, BUILD).html).toContain(`aria-label="${label}"`);
+    vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("(pointer: coarse)") }));
+    const { html } = captureFrame(root, chat, view(), 0, BUILD);
+    expect(html).not.toContain(`aria-label="${label}"`);
+    expect(html).toMatch(/pl-11 md:pl-5" style="padding-left: 1\.25rem;?"/);
+    expect(root.querySelector("button")).not.toBeNull();
+  });
+
   it("keeps only the chat rows within two screens of its end, the ones the copy can show", async () => {
     const { captureFrame } = await fresh();
     const root = document.getElementById("root")!;

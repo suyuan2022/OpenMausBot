@@ -71,7 +71,11 @@ describe("the fork's hooks into upstream files", () => {
   });
 
   it("the phone's bot list keeps the button and the drawer the left-edge swipe opens it by", () => {
-    expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("useEffect(() => installSwipeBack(), []);");
+    const hook = functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan");
+    expect(hook).toContain("useEffect(() => installSwipeBack(), []);");
+    expect(hook).toContain("useEffect(() => hideBackButton(backLabel), [backLabel]);");
+    expect(source("src/components/RoomHeader.tsx")).toContain('className="@container/roomhead px-5 py-3 pl-11 md:pl-5"');
+    expect(source("src/components/RoomHeader.tsx")).toContain('"@container/roomhead px-5 py-3",\n          "pl-11 md:pl-5",');
     const app = source("src/App.tsx");
     expect(app).toContain('aria-label={t("app.openBotList")}');
     expect(app).toContain("aria-expanded={drawerOpen}");

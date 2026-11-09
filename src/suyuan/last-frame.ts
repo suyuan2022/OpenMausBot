@@ -8,6 +8,7 @@
 // list, settings, a team map, an older stretch of a chat), the app keeps no frame.
 import { t } from "@/lib/i18n";
 import "./quiet-start.css";
+import { withoutBackButton } from "./swipe-back";
 
 const KEY = "suyuan:last-frame";
 /** Counted on the stored JSON. WebKit charges 2 bytes a character against about 5 MB per site, which upstream's drafts
@@ -103,6 +104,7 @@ export function captureFrame(root: HTMLElement, chat: HTMLElement, view: { width
   try {
     const template = cleanMarkup(root.ownerDocument, root.innerHTML);
     for (const row of template.content.querySelectorAll(`[${OUT_OF_SIGHT}]`)) row.remove();
+    withoutBackButton(template.content);
     const latest = t("chat.jumpToLatest");
     for (const button of template.content.querySelectorAll("button[title]")) {
       if (button.getAttribute("title") === latest) button.remove();
