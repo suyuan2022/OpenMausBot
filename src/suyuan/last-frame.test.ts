@@ -68,19 +68,23 @@ describe("captureFrame and showFrame", () => {
     const { captureFrame } = await fresh();
     const root = document.getElementById("root")!;
     // Each row is a `display: contents` wrapper, as in src/components/ChatView.tsx.
-    root.innerHTML = '<div class="scroller"><div role="log">'
-      + ["300", "599", "700", "1000"].map((bottom) => `<div class="contents"><p data-bottom="${bottom}">第 ${bottom} 行</p></div>`).join("")
+    // The scroller sits 100 px down the window, scrolled 500 px: a row ending 300 px into the chat ends at -100 on screen.
+    const rows = [300, 599, 700, 1000];
+    root.innerHTML = '<div class="scroller" data-top="100"><div role="log">'
+      + rows.map((end) => `<div class="contents"><p data-bottom="${end + 100 - 500}">第 ${end} 行</p></div>`).join("")
       + "</div></div>";
     vi.spyOn(Element.prototype, "getClientRects").mockImplementation(function (this: Element) {
       return (this.classList.contains("contents") ? [] : [{}]) as unknown as DOMRectList;
     });
     vi.spyOn(Element.prototype, "getBoundingClientRect").mockImplementation(function (this: Element) {
-      const bottom = Number(this.getAttribute("data-bottom") ?? 0);
-      return { top: 0, bottom, left: 0, right: 0, width: 0, height: 0, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
+      const top = Number(this.getAttribute("data-top") ?? 0), bottom = Number(this.getAttribute("data-bottom") ?? 0);
+      return { top, bottom, left: 0, right: 0, width: 0, height: 0, x: 0, y: 0, toJSON: () => ({}) } as DOMRect;
     });
     vi.spyOn(Element.prototype, "scrollHeight", "get").mockReturnValue(1000);
     vi.spyOn(HTMLElement.prototype, "clientHeight", "get").mockReturnValue(200);
-    const { html } = captureFrame(root, root.querySelector<HTMLElement>(".scroller")!, view(), 0, BUILD);
+    const scroller = root.querySelector<HTMLElement>(".scroller")!;
+    scroller.scrollTop = 500;
+    const { html } = captureFrame(root, scroller, view(), 0, BUILD);
     expect(html).not.toMatch(/第 300 行|第 599 行/);
     expect(html).toMatch(/第 700 行[\s\S]*第 1000 行/);
     expect(root.querySelector("[data-suyuan-out-of-sight]")).toBeNull();
@@ -167,14 +171,16 @@ describe("a start with a kept frame", () => {
   });
 
   it("keeps the frame's chat at its end while fonts and pictures make it taller, until it lifts", async () => {
-    const watching: { resized: () => void; disconnected: boolean }[] = [];
+    const watching: { resized: () => void; observed: Element[]; disconnected: boolean }[] = [];
     vi.stubGlobal("ResizeObserver", class {
-      entry = { resized: () => {}, disconnected: false };
+      entry = { resized: () => {}, observed: [] as Element[], disconnected: false };
       constructor(resized: () => void) {
         this.entry.resized = resized;
         watching.push(this.entry);
       }
-      observe() {}
+      observe(element: Element) {
+        this.entry.observed.push(element);
+      }
       disconnect() {
         this.entry.disconnected = true;
       }
@@ -184,6 +190,7 @@ describe("a start with a kept frame", () => {
     const { liftFrame } = await fresh();
     const chat = cover()!.querySelector<HTMLElement>(".scroller")!;
     expect(chat.scrollTop).toBe(500);
+    expect(watching[0].observed).toEqual([chat.querySelector('[role="log"]')]);
     height.mockReturnValue(800);
     watching[0].resized();
     expect(chat.scrollTop).toBe(800);
