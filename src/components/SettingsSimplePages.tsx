@@ -9,6 +9,7 @@ import { AnalyticsRow } from "./AnalyticsRow";
 import { UpdatesConsentRow } from "./UpdatesConsent";
 import { OpenAtLoginRow } from "./OpenAtLoginRow";
 import { DefaultBotSidebarRow } from "./DefaultBotControls";
+import { VoiceButtonRow } from "@/suyuan/VoiceButtonRow";
 import { TalkShortcutRow } from "./TalkShortcutRow";
 import { AttachmentStorageSettings } from "./AttachmentStorageSettings";
 import { DiagnosticsRow } from "./DiagnosticsRow";
@@ -88,6 +89,7 @@ export function SimpleGeneralPage({ has, peopleOpen, onLooks }: { has: Has; peop
             <OpenAtLoginRow simple />
             <DefaultBotSidebarRow simple />
             <TalkShortcutRow />
+            <VoiceButtonRow />
             <AttachmentStorageSettings />
             <AnalyticsRow simple />
           </SettingsRows>

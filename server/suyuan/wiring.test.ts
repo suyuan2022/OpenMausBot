@@ -123,5 +123,6 @@ describe("the fork's hooks into upstream files", () => {
     expect(composer).toContain("const callShown = voiceButton && (!simpleDock || (!hasContent && !stopInSlot));");
     expect(composer).toContain("callBotId={voiceButton && bot && !group ? bot.id : undefined}");
     expect(source("src/components/SettingsModal.tsx")).toContain("<TalkShortcutRow />\n            <VoiceButtonRow />");
+    expect(source("src/components/SettingsSimplePages.tsx")).toContain("<TalkShortcutRow />\n            <VoiceButtonRow />");
   });
 });
