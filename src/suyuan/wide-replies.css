@@ -1,5 +1,5 @@
-/* suyuan fork: on a phone a bot's reply runs to the right edge, less room for its two buttons (react and the ⋯ menu)
-   that a tap shows beside it. Upstream sizes a simple bubble for a mouse: at most 80% of the row and 82px short of it,
+/* suyuan fork: on a phone a bot's reply runs to the right edge, less a narrow column for its two buttons (react and
+   the ⋯ menu) that a tap shows beside it. Upstream sizes a simple bubble for a mouse: at most 80% of the row and 82px short of it,
    a table card at 88%, and beside each message keeps a time that only hover shows, invisible but taking its width. On a
    402px phone a reply stopped 136px short of the edge, and a room's, with four buttons, 160px. */
 @media (hover: none) and (pointer: coarse) {
@@ -8,10 +8,22 @@
     display: none;
   }
 
-  /* A bot's message (ChatView.tsx and GroupView.tsx align it start). Two 28px buttons, the 2px between them and the
-     6px gap to the bubble. */
+  /* A bot's message (ChatView.tsx and GroupView.tsx align it start) keeps a 28px column at the right edge, 4px from
+     the bubble, where its buttons stand one above the other: at the bottom of a reply taller than they are, centred
+     on a shorter one so they reach no more than 13px past it either way, inside the 16px between messages. Out of
+     the row's flow, they leave a short reply's height alone. */
   [data-message-row].items-start {
-    --suyuan-tray: 64px;
+    --suyuan-tray: 32px;
+    --suyuan-tray-height: 61px;
+  }
+  [data-message-row].items-start :has(> [data-testid="message-actions"]) {
+    position: relative;
+  }
+  [data-message-row].items-start [data-testid="message-actions"] {
+    position: absolute;
+    right: 0;
+    bottom: min(0px, calc((100% - var(--suyuan-tray-height)) / 2));
+    flex-direction: column;
   }
   /* A bubble, but not the wrapper of a reply split around tables: that one spans the row, and the buttons sit beside
      its first block (ReplyBlocks.tsx). */
