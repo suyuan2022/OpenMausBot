@@ -2,7 +2,7 @@
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { RoutineManager } from "../routines.ts";
 
@@ -140,5 +140,100 @@ describe("a routine keeps one conversation", () => {
     await h.manager.tick();
     expect(h.manager.listRoutines()[0]!.runThreadId).toBeUndefined();
     expect(h.created[0]!.title).toContain("Once ·");
+  });
+
+  const hook = (h: ReturnType<typeof harness>, n: number, extra: Record<string, unknown> = {}) => h.manager.enqueueWebhook({
+    webhookId: "hook-1", webhookName: "Crew chat", prompt: `event ${n}`, botId: "scout", runOn: "maus", deliveryId: `d${n}`, receivedAt: START + n, ...extra,
+  });
+
+  it("a webhook has no routine, yet its runs share one conversation named for it", async () => {
+    const h = harness();
+    hook(h, 1);
+    await h.manager.tick();
+    h.finish("thread-1");
+    hook(h, 2);
+    await h.manager.tick();
+    expect(h.created).toEqual([{ title: "Crew chat", threadId: "thread-1" }]);
+    expect(h.started.map((one) => one.threadId)).toEqual(["thread-1", "thread-1"]);
+  });
+
+  it("a connected-app event does the same", async () => {
+    const h = harness();
+    hook(h, 1, { eventSource: "app" });
+    await h.manager.tick();
+    h.finish("thread-1");
+    hook(h, 2, { eventSource: "app" });
+    await h.manager.tick();
+    expect(h.created).toHaveLength(1);
+  });
+
+  it("a webhook run waits while the last one is still running in the conversation", async () => {
+    const h = harness();
+    hook(h, 1);
+    await h.manager.tick();
+    hook(h, 2);
+    await h.manager.tick();
+    expect(h.started).toHaveLength(1);
+    h.finish("thread-1");
+    await h.manager.tick();
+    expect(h.started.map((one) => one.threadId)).toEqual(["thread-1", "thread-1"]);
+  });
+
+  it("a webhook run goes to a conversation of its own while the last one waits for an answer, and its conversation is gone once deleted", async () => {
+    const h = harness();
+    hook(h, 1);
+    await h.manager.tick();
+    (h.manager as unknown as { runs: Array<{ status: string }> }).runs[0]!.status = "waiting";
+    hook(h, 2);
+    await h.manager.tick();
+    expect(h.started.map((one) => one.threadId)).toEqual(["thread-1", "thread-2"]);
+    h.open.delete("thread-1");
+    h.open.delete("thread-2");
+    h.finish("thread-2");
+    hook(h, 3);
+    await h.manager.tick();
+    expect(h.started.at(-1)!.threadId).toBe("thread-3");
+  });
+
+  it("does not look for an earlier run's conversation once the routine's own is gone", async () => {
+    const h = harness();
+    const routine = make(h);
+    await runOnce(h, 41);
+    h.finish("thread-1");
+    // The routine's recorded conversation is deleted, while another conversation of an earlier run (opened while one waited) is still open.
+    h.open.add("side");
+    (h.manager as unknown as { runs: Array<{ threadId?: string; createdAt: number }> }).runs[0]!.threadId = "side";
+    (h.manager as unknown as { runs: Array<{ threadId?: string; createdAt: number }> }).runs[0]!.createdAt = START + 100 * MIN;
+    h.open.delete("thread-1");
+    await runOnce(h, 82);
+    expect(h.started.at(-1)!.threadId).toBe("thread-2");
+    expect(h.manager.listRoutines().find((one) => one.id === routine.id)!.runThreadId).toBe("thread-2");
+  });
+
+  it("still carries the previous report when that run sits in another conversation", async () => {
+    const h = harness();
+    make(h, { continuity: true });
+    const first = await runOnce(h, 41);
+    h.finish("thread-1");
+    const runs = (h.manager as unknown as { runs: Array<{ id: string; output?: string; threadId?: string }> }).runs;
+    const stored = runs.find((one) => one.id === first.id)!;
+    stored.output = "REPORT-ONE";
+    stored.threadId = "elsewhere"; // the report was written in a conversation this routine no longer writes to
+    await runOnce(h, 82);
+    expect(h.started[1]!.threadId).toBe("thread-1");
+    expect(h.started[1]!.prompt).toContain("REPORT-ONE");
+  });
+
+  it("leaves a Cloud server and the off switch on a conversation per run", async () => {
+    for (const [key, value] of [["OMB_CLOUD_ROLE", "home"], ["OMB_ROUTINE_ONE_THREAD", "0"]] as const) {
+      vi.stubEnv(key, value);
+      const h = harness();
+      make(h);
+      await runOnce(h, 41);
+      h.finish("thread-1");
+      await runOnce(h, 82);
+      expect(h.created, key).toHaveLength(2);
+      vi.unstubAllEnvs();
+    }
   });
 });

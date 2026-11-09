@@ -173,7 +173,9 @@ export function verificationServerEnvironment(parentEnv: NodeJS.ProcessEnv, data
   // One log line per browser call and preview frame.
   if (parentEnv.OMB_BROWSER_TIMING === "1") childEnv.OMB_BROWSER_TIMING = "1";
   // Warm summaries' minutes as seconds (server/warm-summary.ts), and the switch that turns them off.
-  for (const key of ["OMB_WARM_SUMMARY_TIME_SCALE", "OMB_WARM_SUMMARY", "OMB_ROUTINE_ONE_THREAD"]) if (parentEnv[key]) childEnv[key] = parentEnv[key];
+  for (const key of ["OMB_WARM_SUMMARY_TIME_SCALE", "OMB_WARM_SUMMARY"]) if (parentEnv[key]) childEnv[key] = parentEnv[key];
+  // suyuan: the upstream e2e tests count a conversation per routine run; the fork's own ask for one shared conversation with "1".
+  childEnv.OMB_ROUTINE_ONE_THREAD = parentEnv.OMB_ROUTINE_ONE_THREAD === "1" ? "1" : "0";
   // A loopback fake only: the key never reaches a real provider.
   const liveUrl = parentEnv.OMB_OPENAI_LIVE_URL?.trim() ?? "";
   if (/^http:\/\/127\.0\.0\.1:\d{1,5}$/.test(liveUrl)) {

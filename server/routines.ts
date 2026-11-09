@@ -34,7 +34,7 @@ import { loadInstalledPackage, loadRequestReceipts, loadRoutine, loadRun } from 
 import { applyHolds, holdCauses, type AppliedHolds } from "./routine-holds.ts";
 import { sanitizeInput } from "./routine-input.ts";
 import { applyCheckResult, routineLine, runLineFields, type RoutineLineCodes, type RoutineTroubleCode } from "./routine-lines.ts";
-import { checkHold, CHECK_BOOT_HOLD_MS, type CheckHold } from "./routine-check-pacing.ts"; import { continuesThread, ownThread, rememberThread } from "./suyuan/routine-thread.ts"; // suyuan fork
+import { checkHold, CHECK_BOOT_HOLD_MS, type CheckHold } from "./routine-check-pacing.ts"; import { carryOutside, ownThread, rememberThread } from "./suyuan/routine-thread.ts"; // suyuan fork
 import { resolveRoutineResultsThread, routineRunDefinition, type ResultsThreadAllocation } from "./routine-run-definition.ts";
 
 export type { RoutineContextAttachment, RoutineIntervalWindow, RoutineRunStatus, RoutineRunTrigger };
@@ -1170,7 +1170,7 @@ export class RoutineManager {
             await this.options.startTurn(
               run.botId,
               task.threadId,
-              composeExecutionPrompt({ id: run.routineId, name: run.routineName, trigger: triggerSource, runOn: run.runOn ?? "maus" }, prompt, run.attachments, continuesThread(own) ? null : continuityCarry(run, this.routines, this.runs), run.retried),
+              composeExecutionPrompt({ id: run.routineId, name: run.routineName, trigger: triggerSource, runOn: run.runOn ?? "maus" }, prompt, run.attachments, carryOutside(own, run, this.runs, continuityCarry(run, this.routines, this.runs)), run.retried),
               run.runOn ?? "maus",
               triggerSource,
               (message) => this.failThread(task.threadId, message, { cause: "refused" }),
