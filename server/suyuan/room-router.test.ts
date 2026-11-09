@@ -8,7 +8,7 @@ import { decideRoomResponder } from "../decider/room-routing.ts";
 import { roomRoutingInput } from "../host/room-routing-input.ts";
 import type { BotRecord, Message } from "../store.ts";
 import {
-  namedBot, ROOM_ROUTER_FILE, ROOM_ROUTER_SYSTEM, roomRouterPrompt, roomRouterSettings, roomRoutingReady, withRoomRouter, withRoomRouterStatus,
+  namedBot, ROOM_ROUTER_FILE, ROOM_ROUTER_SYSTEM, roomRouterPrompt, roomRouterSettings, roomRoutingReady, routedText, withRoomRouter, withRoomRouterStatus,
 } from "./room-router.ts";
 
 const SETTINGS = { baseUrl: "https://api.example.test/v1/", model: "deepseek-ai/DeepSeek-V4.1-Flash", apiKey: "sk-test" };
@@ -68,8 +68,15 @@ describe("roomRoutingReady and the app's status", () => {
     save(SETTINGS);
     expect(roomRoutingReady(cfg, dir)).toBe(true);
     expect(withRoomRouterStatus(status, cfg, dir)).toEqual({ enabled: true, jobs: { roomRouting: true } });
-    expect(roomRoutingReady({ decider: { jobs: { roomRouting: false } } } as AppConfig, dir)).toBe(false);
     expect(roomRoutingReady({ decider: { provider: "off" } } as AppConfig, dir)).toBe(false);
+    expect(roomRoutingReady({ decider: { enabled: false } } as AppConfig, dir)).toBe(false);
+  });
+
+  it("keeps Settings' room routing switch live after it is turned off, so it can be turned on again", () => {
+    save(SETTINGS);
+    const off = { decider: { jobs: { roomRouting: false } } } as AppConfig;
+    expect(roomRoutingReady(off, dir)).toBe(false);
+    expect(withRoomRouterStatus({ enabled: false, jobs: { roomRouting: false } }, off, dir)).toEqual({ enabled: true, jobs: { roomRouting: false } });
   });
 });
 
@@ -100,6 +107,18 @@ describe("the prompt", () => {
       ].join("\n"));
       expect((init!.headers as Record<string, string>).authorization).toBe("Bearer sk-test");
     });
+  });
+
+  it("carries the line a reply quotes, so a reply to a bot's message can go back to it", async () => {
+    const fetch = answering("shopping");
+    save(SETTINGS);
+    const quoted = line("4", "bot", "text", "得物这双 399，链接在这", "shop");
+    const reply = roomRoutingInput("买鞋", routedText("这个链接打不开", quoted), members, history, "夙愿");
+    expect(await decideRoomResponder(withRoomRouter(upstream(), () => cfg, dir, fetch), reply)).toMatchObject({ kind: "member", botId: "shop" });
+    expect(JSON.parse(String(fetch.mock.calls[0]![1]!.body)).messages[1].content)
+      .toContain("最新一条，夙愿说：（回复 shopping (bot) 的「得物这双 399，链接在这」）这个链接打不开");
+    expect(routedText("好的", line("5", "user", "text", "我先看看"))).toBe("（回复「我先看看」）好的");
+    expect(routedText("好的")).toBe("好的");
   });
 
   it("leaves out the chat when the room has none", () => {

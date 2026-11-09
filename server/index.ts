@@ -594,7 +594,7 @@ import { createBotSkillsRoutes } from "./routes/bot-skills.ts";
 import { createSkillShareRoutes } from "./routes/skill-share.ts";
 import { createTeamContextRoutes } from "./routes/team-context.ts";
 import { createDeciderRoutes } from "./routes/decider.ts"; import { createCloudSendRoutes } from "./routes/cloud-send.ts"; import { claudeCodeSkillInputs } from "./setup-import.ts"; import { createCloudConnectionsHost } from "./cloud-connections-host.ts";
-import { createUpdateCheckRoutes, serverUpdateChecker } from "./routes/update-check.ts"; import { createTimeZoneRoutes } from "./routes/time-zone.ts"; import { suyuanFrame } from "./suyuan/register.ts"; import { roomRoutingReady, withRoomRouter, withRoomRouterStatus } from "./suyuan/room-router.ts"; // suyuan fork
+import { createUpdateCheckRoutes, serverUpdateChecker } from "./routes/update-check.ts"; import { createTimeZoneRoutes } from "./routes/time-zone.ts"; import { suyuanFrame } from "./suyuan/register.ts"; import { roomRoutingReady, routedText, withRoomRouter, withRoomRouterStatus } from "./suyuan/room-router.ts"; // suyuan fork
 import { createBrowserSiteRoutes } from "./routes/browser-sites.ts";
 import { createInternalSignInRoutes } from "./routes/sign-in.ts";
 import { createInternalMcpRoutes } from "./routes/internal-mcp.ts";
@@ -10926,7 +10926,7 @@ function startGroupTurn(
     operation.requestMessageId = message.id;
   }
   const routing = autoRoute
-    ? decideRoomResponder(decider, roomRoutingInput(group.name, text, routableMembers, historyBeforeSend, userNameFor(group.threadId), options.sender), {
+    ? decideRoomResponder(decider, roomRoutingInput(group.name, routedText(text, replyTo), routableMembers, historyBeforeSend, userNameFor(group.threadId), options.sender), {
         signal: operation.cancellation.signal,
       })
     : null;

@@ -1,6 +1,6 @@
 // suyuan fork: the few lines in upstream files that plug the fork in. A daily merge of upstream that drops one of them
 // would silently switch a feature off, since every other test only exercises the fork's own files; this one goes red.
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
@@ -84,13 +84,16 @@ describe("the fork's hooks into upstream files", () => {
   it("rooms on Auto ask the fork's router who answers, and the app hears room routing is on", () => {
     const index = source("server/index.ts");
     expect(index).toContain("const decider = withRoomRouter(createDecider({ config: () => cfg, dataDir: DATA_DIR }), () => cfg);");
-    expect(index).toContain("decideRoomResponder(decider, roomRoutingInput(");
-    // Every "can rooms route?" question counts the router: a new upstream call to deciderReady would leave it out.
-    expect(index).not.toContain('deciderReady(cfg, "roomRouting")');
+    expect(index).toContain("decideRoomResponder(decider, roomRoutingInput(group.name, routedText(text, replyTo), ");
     expect(index.match(/roomRoutingReady\(cfg\)/g)).toHaveLength(3);
     expect(index).toContain("decider: withRoomRouterStatus(describeDecider(cfg), cfg),");
+    // Every "can rooms route?" question counts the router: an upstream deciderReady(…, "roomRouting") anywhere would not.
+    const asks = readdirSync(join(ROOT, "server"), { recursive: true, encoding: "utf8" })
+      .filter((file) => file.endsWith(".ts") && !file.endsWith(".test.ts") && !file.startsWith("suyuan"))
+      .filter((file) => /deciderReady\([^)]*"roomRouting"/.test(source(join("server", file))));
+    expect(asks).toEqual([]);
     expect(source("src/lib/group-routing.ts")).toContain("return Boolean(config?.decider?.enabled && config.decider.jobs.roomRouting);");
-    expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/room-router\.css";/m);
-    expect(source("src/components/RoomQueueList.tsx")).toContain('data-testid="routed-by"');
+    // The router answers as an OpenRouter-style backend, whose label (src/locales/zh.json) reads "自动挑选".
+    expect(source("src/components/RoomQueueList.tsx")).toContain('routedBy.provider === "openrouter" ? "room.routedBy.openrouter"');
   });
 });
