@@ -45,10 +45,13 @@ describe("the fork's hooks into upstream files", () => {
     expect(source("src/components/JumpToLatestButton.tsx")).toContain('title={t("chat.jumpToLatest")}');
   });
 
-  it("a reply's table card keeps the three hooks steady-tables.css finds its table by", () => {
+  it("a reply's table card keeps the hooks steady-tables.css finds its table by, and a width that ignores its content", () => {
     expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/steady-tables\.css";/m);
-    expect(source("src/components/ReplyBlocks.tsx")).toContain('<div key={index} data-reply-table className="my-2 w-full');
-    expect(source("src/components/ChatMarkdown.tsx")).toContain('<div className="chat-md min-w-0 [&>*+*]:mt-2">{markdown}</div>');
-    expect(source("src/components/RichTable.tsx")).toContain('<div hidden={open} className="chat-table">');
+    expect(source("src/components/ReplyBlocks.tsx")).toMatch(/data-reply-table className="[^"]*\bw-full\b/);
+    expect(source("src/components/RichTable.tsx")).toContain('className="chat-table"');
+    // A table sized by its card alone would collapse if the card shrank to its content.
+    for (const view of ["src/components/ChatView.tsx", "src/components/GroupView.tsx"]) {
+      expect(source(view)).toContain('tabled ? "w-full" : "w-fit"');
+    }
   });
 });
