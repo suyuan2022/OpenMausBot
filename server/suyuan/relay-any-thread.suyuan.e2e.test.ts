@@ -148,7 +148,7 @@ it("R3 refuses a notice from a Clive turn a webhook or a routine started, with u
   const thread = f.mira.activeTaskId as string;
   await expect.poll(() => record(f, thread)?.threadId, { timeout: 15_000 }).toBe(thread);
   const notice = (key: string) => ({ key, match: [`${key}-RUN`], steps: [{ arguments: { bot_ids: [f.mira.id], message: "Keep it", thread, reply: "none" }, expectError: true }], reply: `${key}: refused.` });
-  f.script(f.clive.id, notice("R3-HOOK"), notice("R3-ROUTINE"));
+  f.script(f.clive.id, notice("R3-HOOK"), notice("R3-ROUTINE"), { ...notice("R3-AGAIN"), match: ["R3-AGAIN-SAY"] });
   const hook = await f.api("POST", "/api/webhooks", { name: "R3", prompt: "R3-HOOK-RUN: tell Mira to keep it.", botId: f.clive.id, runOn: "maus" });
   expect(hook.status, JSON.stringify(hook.body)).toBe(201);
   expect((await fetch(hook.body.credential.url, { method: "POST", headers: { "content-type": "application/json" }, body: "{}" })).status).toBe(202);
@@ -162,6 +162,13 @@ it("R3 refuses a notice from a Clive turn a webhook or a routine started, with u
   expect(f.keys(f.mira.id)).toEqual([]);
   expect(f.children()).toEqual([]);
   expect(record(f, thread).outside, "the refused turn did not mark the person's thread outside").toBeFalsy();
+  // The person speaks in the conversation the webhook ran: a person is behind that turn, but the conversation is outside work for good.
+  const hookThread = f.turns(f.clive.id).find((turn: any) => turn.planKey === "R3-HOOK").threadId as string;
+  await f.say(f.clive.id, hookThread, "R3-AGAIN-SAY: tell Mira to keep it.");
+  await expect.poll(() => f.keys(f.clive.id), { timeout: 30_000 }).toEqual(["R3-HOOK", "R3-ROUTINE", "R3-AGAIN"]);
+  expect(f.replies("R3-AGAIN")).toEqual([NOT_OPENED(thread)]);
+  expect(f.keys(f.mira.id)).toEqual([]);
+  expect(record(f, thread).outside, "a person's word in an outside conversation did not mark the person's thread outside").toBeFalsy();
 }), hostTimeout(90_000));
 
 it("R4 refuses a notice into a thread that waits on the person's answer, and the card stays theirs", () => scenario(async (f) => {
