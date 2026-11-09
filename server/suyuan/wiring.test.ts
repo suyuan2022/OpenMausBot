@@ -85,6 +85,14 @@ describe("the fork's hooks into upstream files", () => {
     expect(sidebar).toContain('open ? "max-md:translate-x-0" : "max-md:-translate-x-full"');
   });
 
+  it("a tap on a bot's reply shows its buttons at the finger, and the phone's Inbox is a button beside the +", () => {
+    expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("useEffect(() => installTrayAtFinger(), []);");
+    const sidebar = source("src/components/Sidebar.tsx");
+    expect(sidebar).toMatch(/import \{ PhoneInboxButton \} from "@\/suyuan\/PhoneInboxButton";/);
+    expect(sidebar).toContain("{phone && <PhoneInboxButton onOpened={onClose} />}\n          {plusControl}");
+    expect(sidebar).toContain("{!q && !phone && <SidebarInboxRow ");
+  });
+
   it("rooms on Auto ask the fork's router who answers, and the app hears room routing is on", () => {
     const index = source("server/index.ts");
     expect(index).toContain("const decider = withRoomRouter(createDecider({ config: () => cfg, dataDir: DATA_DIR }), () => cfg);");
