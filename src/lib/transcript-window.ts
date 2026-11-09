@@ -1,3 +1,5 @@
+import { drawnTailStart } from "@/suyuan/drawn-window";
+
 export const TRANSCRIPT_WINDOW_SIZE = 120;
 
 export interface TranscriptWindow<T> {
@@ -18,7 +20,7 @@ export function tailWindowStart(total: number, size: number = TRANSCRIPT_WINDOW_
 }
 
 export function followWindowStart(messages: readonly { role?: string }[], start: number): number {
-  const tail = tailWindowStart(messages.length);
+  const tail = drawnTailStart(messages, TRANSCRIPT_WINDOW_SIZE);
   const oldest = Math.max(start, tail - TRANSCRIPT_WINDOW_SIZE);
   for (let index = messages.length - 1; index >= oldest; index--) {
     if (messages[index].role === "user") return Math.min(tail, index);

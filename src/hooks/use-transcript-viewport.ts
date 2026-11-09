@@ -14,14 +14,14 @@ import { BOTTOM_FOLLOW_THRESHOLD, shouldResumeBottomFollow, useBottomFollowResiz
 import { useFocusMessage } from "@/lib/focus-message";
 import {
   TRANSCRIPT_WINDOW_SIZE,
-  expandWindowStart,
   focusWindowRange,
   followWindowStart,
   resolveTranscriptWindow,
-  tailWindowStart,
 } from "@/lib/transcript-window";
 import { reducedMotion } from "@/lib/onboarding";
 import { useStore } from "@/state/store";
+import { drawnExpandStart, drawnTailStart } from "@/suyuan/drawn-window";
+import { useFillShortChat } from "@/suyuan/fill-short-chat";
 
 export const AUTO_EXPAND_TOP_THRESHOLD = 250;
 
@@ -54,7 +54,7 @@ export function useTranscriptViewport<T extends { id: string; role?: string }>({
   const touchY = useRef(0);
 
   const transcriptKey = `${ownerId}:${threadId}`;
-  const tailStart = tailWindowStart(messages.length);
+  const tailStart = drawnTailStart(messages, TRANSCRIPT_WINDOW_SIZE);
   const [transcriptWindow, setTranscriptWindow] = useState<{
     key: string;
     start: number;
@@ -142,7 +142,7 @@ export function useTranscriptViewport<T extends { id: string; role?: string }>({
 
   const showEarlier = () => {
     holdRowForPrepend();
-    const start = expandWindowStart(startIndex);
+    const start = drawnExpandStart(messages, startIndex, TRANSCRIPT_WINDOW_SIZE);
     setTranscriptWindow((w) => ({ ...w, start }));
   };
   const showLater = () => {
@@ -151,6 +151,7 @@ export function useTranscriptViewport<T extends { id: string; role?: string }>({
     setTranscriptWindow((w) => ({ ...w, end: nextEnd >= messages.length ? null : nextEnd }));
   };
   const olderPending = Boolean(state.loadingOlder[threadId]);
+  useFillShortChat(scrollRef, threadId, { shown: transcriptShown, following: follow, startIndex, hasMore, olderPending, count: messages.length });
   const loadOlder = () => {
     holdRowForPrepend();
     dispatch({ type: "loadOlderMessages", threadId });
@@ -165,14 +166,14 @@ export function useTranscriptViewport<T extends { id: string; role?: string }>({
     if (hiddenCount > 0) {
       expandingRef.current = true;
       holdRowForPrepend();
-      const start = expandWindowStart(startIndex);
+      const start = drawnExpandStart(messages, startIndex, TRANSCRIPT_WINDOW_SIZE);
       setTranscriptWindow((w) => ({ ...w, start }));
     } else if (hasMore && !olderPending) {
       expandingRef.current = true;
       holdRowForPrepend();
       dispatch({ type: "loadOlderMessages", threadId });
     }
-  }, [hiddenCount, startIndex, hasMore, olderPending, threadId, dispatch, transcriptKey]);
+  }, [hiddenCount, startIndex, messages, hasMore, olderPending, threadId, dispatch, transcriptKey]);
 
   useEffect(() => {
     const sentinel = topSentinelRef.current;

@@ -492,7 +492,8 @@ describe("transcript viewport", () => {
     scroller.clientHeight = 10_000;
     const view = mount({ messages: rows(50), hasMore: true });
     view.act(() => view.current.scrollHandlers.onWheel({ deltaY: -40 } as never));
-    expect(dispatched).toEqual([{ type: "loadOlderMessages", threadId: "thread" }]);
+    // suyuan fork: the first page comes on mount (src/suyuan/fill-short-chat.ts), the second from the wheel.
+    expect(dispatched).toEqual([{ type: "loadOlderMessages", threadId: "thread" }, { type: "loadOlderMessages", threadId: "thread" }]);
   });
 
   it("keeps following when arrow keys move through a menu or list", () => {
