@@ -302,7 +302,7 @@ export function FailedTurnRow({ tool, engine, onRetry, botId, threadId }: {
 export { MessageBoundary };
 
 /** Simple mode keeps a message's Reply and Copy in its "…" menu, beside the one reaction button. */
-function replyAndCopy(onReply: () => void, text: string): MessageMenuItem[] {
+export function replyAndCopy(onReply: () => void, text: string): MessageMenuItem[] {
   return [
     { key: "reply", icon: <Reply {...ACTION_ICON} />, label: t("chat.reply"), onSelect: onReply },
     ...(text.trim() ? [{ key: "copy", icon: <Copy {...ACTION_ICON} />, label: t("chat.copyMessage"), onSelect: () => { void copyText(text); } }] : []),
