@@ -8,6 +8,7 @@ import { chatAlone } from "./chat-alone";
 import { liftFrame, noteApp, noteAppGone } from "./last-frame";
 import "./phone-tables.css";
 import "./room-router.css";
+import "./phone-header.css";
 import "./steady-tables.css";
 import "./no-zoom.css";
 import { installNoZoom } from "./no-zoom";
