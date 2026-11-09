@@ -8791,6 +8791,8 @@
   "activity.tool.team.skillManage": "管理技能",
   "activity.tool.team.skillsList": "技能清單",
   "activity.tool.team.startThread": "開始對話",
+  "activity.tool.team.teamThreadRead": "讀取隊友對話",
+  "activity.tool.team.teamThreads": "隊友對話",
   "activity.tool.team.toolResultRead": "讀取工具結果",
   "activity.tool.team.unpublishPage": "取消發布頁面",
   "activity.tool.team.updateHtml": "更新 HTML",
