@@ -32,7 +32,7 @@
    `env -u CLAUDECODE claude -p "<审查任务>" --model opus --effort xhigh --allowedTools "Read,Grep,Glob,Bash(git:*),Bash(gh pr view:*),Bash(gh pr diff:*)"`
    任务里写明：只报夙愿实际用法下会出的问题，按影响排，最多 5 条。只改文案或几行样式的不用审。
    它提的意见由你判断改不改。改动大的，再让它审一次改过的部分，到此为止。照意见改到了手机上才能判断的部分，回第 3 步再装一次测试版。
-6. **CI 绿了就合并。** 用 Bash 后台跑 `gh pr checks <PR 号> --watch`，结束了再看结果，不在对话里反复查。下载 Electron 这类网络错误导致的失败，用 `gh run rerun <run id> --failed` 重跑一次。合并会触发自动流程 `.github/workflows/suyuan-release.yml`，打出名为 `suyuan-v<版本>` 的 release，附 npm 安装包。
+6. **CI 绿了就合并。** 用 Bash 后台跑 `gh pr checks <PR 号> --watch`，结束了再看结果，不在对话里反复查。下载 Electron 这类网络错误导致的失败，用 `gh run rerun <run id> --failed` 重跑一次。只挂在 Windows 任务上的失败不用查、不用重跑：夙愿不用 Windows，在 PR 里记一句就照样合并。只改一两行配置、文案或文档的，不等 CI。推了代码 CI 没启动（GitHub Actions 偶尔故障），用 `gh workflow run ci.yml -R suyuan2022/OpenMausBot --ref <分支>` 手动触发。合并会触发自动流程 `.github/workflows/suyuan-release.yml`，打出名为 `suyuan-v<版本>` 的 release，附 npm 安装包。
 7. **部署。** 在 MacBook 的这个仓库里跑 `scripts/suyuan/deploy-vm.sh`：用 gh 下载最新 release，拷到虚拟机，由 `deploy-vm-remote.sh` 装上并重启服务（虚拟机访问 GitHub 时通时断，所以由 MacBook 中转）。第 3 步装过的测试版由这个正式版换掉。脚本不会打断干活的 bot：有 bot 在忙就先等，最多等 10 分钟，等不到就什么都不装、直接退出。已经在跑这个版本时什么也不做。出问题就用 `--rollback` 换回上一个正式版（测试版不算上一版）。
 
 ## 虚拟机
