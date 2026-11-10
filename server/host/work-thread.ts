@@ -10,7 +10,9 @@ import { OUTSIDE_STAYS_HERE } from "./outside-lineage.ts";
 export function workThreadFor(store: Pick<Store, "workThread" | "taskByThread">, input: { botId: string; botName: string; fromBotId: string; fromThreadId: string;
   thread: string; notice: boolean; answering: { botId: string; threadId: string } | undefined; also: (task: TaskRecord) => boolean;
   /** Whether the sender's work may reach this thread at all; when it may not, it says so in its own words. */
-  reach: (task: TaskRecord) => boolean }): TaskRecord | undefined {
+  reach: (task: TaskRecord) => boolean;
+  /** suyuan fork: whether a one-way notice may go into a thread someone else opened (it throws to say why not). */
+  others?: (task: TaskRecord) => boolean }): TaskRecord | undefined {
   const { botId, thread, also, reach } = input;
   if (thread === "new") return undefined;
   if (thread === "standing") return store.workThread(botId, input.fromBotId, input.fromThreadId, false, (task) => also(task) && reach(task));
@@ -20,6 +22,7 @@ export function workThreadFor(store: Pick<Store, "workThread" | "taskByThread">,
   if (usable && task.openedBy?.botId === input.fromBotId && !task.openedBy.roomLane) return task;
   const handedWork = usable && input.answering?.botId === botId && input.answering.threadId === thread;
   if (handedWork && input.notice) return task;
+  if (usable && input.notice && !task.openedBy?.roomLane && input.others?.(task)) return task;
   if (handedWork) throw new Error(`"${thread}" handed you work: answer it there with reply "none", a one-way notice; it cannot be given new work`);
   throw new Error(`"${thread}" is not a thread you opened on ${input.botName}: use a threadId one of your coordinate_bots receipts gave, or one list_threads shows on them`);
 }

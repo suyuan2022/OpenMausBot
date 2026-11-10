@@ -8777,6 +8777,8 @@
   "activity.tool.team.skillManage": "Gerenciar habilidade",
   "activity.tool.team.skillsList": "Listar habilidades",
   "activity.tool.team.startThread": "Iniciar conversa",
+  "activity.tool.team.teamThreadRead": "Ler conversa da equipe",
+  "activity.tool.team.teamThreads": "Conversas da equipe",
   "activity.tool.team.toolResultRead": "Ler resultado de ferramenta",
   "activity.tool.team.unpublishPage": "Despublicar página",
   "activity.tool.team.updateHtml": "Atualizar HTML",

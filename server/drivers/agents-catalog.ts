@@ -6,6 +6,7 @@ import { agentToolAnnotations } from "../agent-tool-policy.ts";
 import { CHAT_CARD_TOOL_DEFINITIONS } from "./agents-chat-card-tools.ts";
 import { DEVS_TOOL_DEFINITIONS } from "./agents-devs-tools.ts";
 import { HELPER_TOOL_DEFINITIONS } from "./agents-helper-tools.ts";
+import { CHIEF_READ_TOOL_DEFINITIONS } from "../suyuan/chief-read-tools.ts";
 import { USAGE_LIMITS_TOOL_DEFINITION } from "./agents-usage-tool.ts";
 import { WAIT_TOOL_DEFINITIONS, WAIT_TOOL_NAMES } from "./agents-wait-tools.ts";
 import { COMPUTER_ASK_TOOL_DEFINITIONS, COMPUTER_ASK_TOOL_NAMES } from "./agents-computer-ask-tool.ts";
@@ -260,6 +261,7 @@ const TOOL_DEFINITIONS = [
     inputSchema: { type: "object", properties: {} },
   },
   USAGE_LIMITS_TOOL_DEFINITION,
+  ...CHIEF_READ_TOOL_DEFINITIONS,
   {
     name: "list_rooms",
     description:
@@ -885,6 +887,7 @@ export const SHARED_COMPUTER_TOOL_NAMES = new Set(["list_shared_computers", "sha
 const VOICE_TOOL_NAMES = new Set(["send_voice_note"]);
 const CHIEF_ONLY_TOOL_NAMES = new Set([
   "create_bot", "list_team_setup", "list_team_library", "propose_team_setup", "propose_bot_deletion", "manage_room", "retry_thread",
+  "team_threads", "team_thread_read",
 ]);
 const CHIEF_TARGET_TOOL_NAMES = new Set(["propose_profile", "propose_model"]);
 const WATCHER_TOOL_NAMES = new Set(["create_options_card"]);
