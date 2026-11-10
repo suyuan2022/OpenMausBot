@@ -37,6 +37,10 @@ describe("the fork's hooks into upstream files", () => {
     expect(loading).toContain('<div className="text-[14px]">{t(loading.text)}</div>');
   });
 
+  it("the composer drops its Stop button while there is text or an attachment to send, unless the field is disabled", () => {
+    expect(source("src/components/Composer.tsx")).toContain("{(simpleDock ? stoppable : busy) && !locked && (!hasContent || blocking || attachmentPending) && (");
+  });
+
   it("the chats keep the hooks the last-screen cover finds them by: the transcript log and the two buttons' wording", () => {
     for (const view of ["src/components/ChatView.tsx", "src/components/GroupView.tsx"]) {
       expect(source(view)).toContain('role="log"');
@@ -55,6 +59,17 @@ describe("the fork's hooks into upstream files", () => {
     }
   });
 
+  it("a table card keeps the hooks phone-tables.css reshapes it by", () => {
+    expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/phone-tables\.css";/m);
+    expect(source("src/suyuan/use-suyuan.ts")).toContain("useEffect(() => installTablePlate(), []);");
+    const table = source("src/components/RichTable.tsx");
+    expect(table).toContain("<div data-table-card className={TABLE_CARD}");
+    expect(table).toContain('className="table-plate ');
+    expect(table).toContain("touch:pt-11");
+    expect(table).toContain('sort?.column === index ? "opacity-100" : "opacity-0 group-hover/th:opacity-100');
+    expect(source("src/components/ReplyBlocks.tsx")).toContain("data-reply-table");
+  });
+
   it("a bot's message keeps the hooks wide-replies.css widens it by, and a room's shows the chat's two buttons", () => {
     expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/wide-replies\.css";/m);
     const time = '"self-end pb-1 text-[11px] tabular-nums text-ink-tertiary opacity-0 transition-opacity group-hover:opacity-100';
@@ -68,6 +83,18 @@ describe("the fork's hooks into upstream files", () => {
     expect(room).toContain(time);
     expect(room).toContain('menu={simple ? [...replyAndCopy(() => onReply(m), botText), ...botMenu] : botMenu}>');
     expect(source("src/components/ReplyBlocks.tsx")).toContain("data-reply-blocks");
+  });
+
+  it("the phone never pinch-zooms, and a stored picture is served with a long cache", () => {
+    // no-zoom.ts caps the scale on this tag at run time.
+    expect(source("index.html")).toContain('<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />');
+    expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/no-zoom\.css";/m);
+    expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("useEffect(() => installNoZoom(), []);");
+    expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("useEffect(() => installPreviewZoom(), []);");
+    // preview-zoom.ts finds the picture by these classes and roles.
+    expect(source("src/components/AttachmentPreview.tsx")).toContain('"block max-h-full max-w-full rounded-lg object-contain');
+    expect(source("src/components/AttachmentPreview.tsx")).toContain('aria-modal="true"');
+    expect(source("server/routes/threads.ts")).toContain('"cache-control": attachmentCacheControl(attachment.mime, viewerFor(auth).kind === "all" && !member && !deps.memberDefaultBot && !workspaceAccess),');
   });
 
   it("the phone's bot list keeps the button and the drawer the left-edge swipe opens it by", () => {
@@ -85,6 +112,29 @@ describe("the fork's hooks into upstream files", () => {
     expect(sidebar).toContain('open ? "max-md:translate-x-0" : "max-md:-translate-x-full"');
   });
 
+  it("a tap on a bot's reply shows its buttons at the finger, and the phone's Inbox is a button beside the +", () => {
+    expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("useEffect(() => installTrayAtFinger(), []);");
+    // The tap that would hide a reply's showing buttons first asks whether it moves them to another block.
+    const actions = source("src/components/MessageActions.tsx");
+    expect(actions).toContain("const moved = trayMoves(event);");
+    expect(actions).toContain("setTapped((value) => moved || !value);");
+    // tray-at-finger.ts tells a reply's blocks apart by these marks.
+    const blocks = source("src/components/ReplyBlocks.tsx");
+    expect(blocks).toContain("data-reply-blocks");
+    expect(blocks).toContain("<div key={index} data-reply-table ");
+    expect(blocks).toContain('<div key={index} data-chat-bubble="simple" ');
+    // phone-code.css hides a code block's pill until table-plate.ts marks the block, found by these two hooks.
+    expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/phone-code\.css";/m);
+    const code = source("src/components/CodeBlock.tsx");
+    expect(code).toContain('<div data-code-plate className="absolute end-1 top-1 ');
+    expect(code).toContain('className="chat-code-block group/code relative ');
+    const sidebar = source("src/components/Sidebar.tsx");
+    expect(sidebar).toMatch(/import \{ PhoneInboxButton \} from "@\/suyuan\/PhoneInboxButton";/);
+    // On the + button's line: the file's length is pinned (scripts/testing/file-size-ratchet.test.ts).
+    expect(sidebar).toContain("{phone && <PhoneInboxButton onOpened={onClose} />}{plusControl}");
+    expect(sidebar).toContain("{!q && !phone && <SidebarInboxRow ");
+  });
+
   it("rooms on Auto ask the fork's router who answers, and the app hears room routing is on", () => {
     const index = source("server/index.ts");
     expect(index).toContain("const decider = withRoomRouter(createDecider({ config: () => cfg, dataDir: DATA_DIR }), () => cfg);");
@@ -100,6 +150,16 @@ describe("the fork's hooks into upstream files", () => {
     // room-router.css rewords the line under a routed reply, found by its test id.
     expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/room-router\.css";/m);
     expect(source("src/components/RoomQueueList.tsx")).toContain('<div data-testid="routed-by" className="mt-1 px-1 text-[11px] text-ink-secondary">');
+  });
+
+  it("the phone list's avatar row is lifted by phone-header.css, found by the row's data attribute", () => {
+    expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/phone-header\.css";/m);
+    expect(source("src/components/Sidebar.tsx")).toContain('data-sidebar-top-row={corner ? "corner" : true}');
+    expect(source("src/suyuan/phone-header.css")).toContain('[data-sidebar-top-row="true"].max-md\\:h-16');
+    // The lift needs that row to be 64px high on a phone with its content centred.
+    const sidebar = source("src/components/Sidebar.tsx");
+    expect(sidebar).toContain('density !== "icons" && !simpleDesk && !lights && "h-12 max-md:h-16"');
+    expect(sidebar).toContain('data-sidebar-top-row={corner ? "corner" : true}\n        className={cn(\n          "flex items-center",');
   });
 
   it("the first-reply notice stays off: the fork sets the variable the rescue reads each time it arms", () => {
@@ -121,6 +181,20 @@ describe("the fork's hooks into upstream files", () => {
     expect(viewport.split("const start = drawnExpandStart(messages, startIndex, TRANSCRIPT_WINDOW_SIZE);")).toHaveLength(3);
     expect(viewport).toContain("useFillShortChat(scrollRef, threadId, { shown: transcriptShown, following: follow, startIndex, hasMore, olderPending, count: messages.length });");
     expect(functionBody(source("src/lib/transcript-window.ts"), "followWindowStart")).toContain("const tail = drawnTailStart(messages, TRANSCRIPT_WINDOW_SIZE);");
+  });
+
+  it("the composer's voice-call button and the + menu's call modes wait for the Settings switch", () => {
+    const composer = source("src/components/Composer.tsx");
+    expect(composer).toContain("const voiceButton = useVoiceButton() || calling;");
+    expect(composer).toContain("const callShown = voiceButton && (!simpleDock || (!hasContent && !stopInSlot));");
+    // With the button hidden, an empty composer on a phone or in Simple mode keeps a dimmed, disabled Send in the slot.
+    expect(composer).toContain("const sendIdle = !hasContent && !callShown && (singleRow ? !busy : simpleDock && !stopInSlot);");
+    expect(composer).toContain("{(hasContent || sendIdle) && !locked && (");
+    expect(composer).toContain('look={sendIdle ? { ...slot.button, className: cn(slot.button.className, "opacity-40") } : slot.button}');
+    expect(composer).toContain("disabled={attachmentPending || sendIdle} onSend");
+    expect(composer).toContain("callBotId={voiceButton && bot && !group ? bot.id : undefined}");
+    expect(source("src/components/SettingsModal.tsx")).toContain("<TalkShortcutRow />\n            <VoiceButtonRow />");
+    expect(source("src/components/SettingsSimplePages.tsx")).toContain("<TalkShortcutRow />\n            <VoiceButtonRow />");
   });
 
   it("the Chief's team_threads and team_thread_read are in the catalog, the call switch, the read-only list and the internal routes", () => {

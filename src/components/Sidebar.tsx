@@ -74,7 +74,7 @@ import { GlassBar, GlassScrollFrame, GlassScroller } from "./GlassScrollFrame";
 import { DesktopWorkspaceSwitcher, endCloudHowTo } from "./DesktopWorkspaceSwitcher"; import { PlaceTint } from "./PlaceTint"; import { ChromeRailToggle } from "./ChromeRailToggle";
 import { useCloudOwner } from "./CloudOwner";
 import { SidebarSectionHeader } from "./SidebarSectionHeader";
-import { NeedsYouButton, OwnerPickerHost, pickOwnerOf } from "./TeamOwner"; import { SidebarPeople } from "./SidebarPeople"; import { SidebarInboxRow } from "./SidebarInboxRow"; import { SidebarActiveThreads } from "./SidebarActiveThreads"; import { setAttentionPinned, useAttentionPinned } from "./inbox/attention-pinned"; import { useInboxSupport } from "@/state/inbox";
+import { NeedsYouButton, OwnerPickerHost, pickOwnerOf } from "./TeamOwner"; import { SidebarPeople } from "./SidebarPeople"; import { SidebarInboxRow } from "./SidebarInboxRow"; import { SidebarActiveThreads } from "./SidebarActiveThreads"; import { setAttentionPinned, useAttentionPinned } from "./inbox/attention-pinned"; import { useInboxSupport } from "@/state/inbox"; import { PhoneInboxButton } from "@/suyuan/PhoneInboxButton";
 import { showWhoReportsToWhom, TeamMenuItems } from "./SidebarTeamMenu";
 import { MENU_ITEM, MENU_SHEET } from "./menu-recipe";
 import { ELEVATED_CONTROL } from "./elevated";
@@ -1307,7 +1307,7 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
             <Search size={20} strokeWidth={1.5} />
           </button>}
           {advanced && inboxSupport === "no" && <SidebarActiveThreads entries={attention} icons={density === "icons"} phone={phone} dispatch={dispatch} />}
-          {plusControl}
+          {phone && <PhoneInboxButton onOpened={onClose} />}{plusControl}
         </div>}
       </div>
 
@@ -1326,7 +1326,7 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
           />
         </div>
       </div>}
-      {!q && <SidebarInboxRow icons={density === "icons"} large={!advanced} running={attentionHasRunningWork(attention)} onOpened={phone ? onClose : undefined} />}
+      {!q && !phone && <SidebarInboxRow icons={density === "icons"} large={!advanced} running={attentionHasRunningWork(attention)} onOpened={phone ? onClose : undefined} />}
       {universalPins && pinnedBots.length > 0 && !simpleDesk && (
         <div
           data-sidebar-universal-pins=""

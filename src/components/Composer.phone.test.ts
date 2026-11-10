@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Bot, Group } from "@/state/store";
 import { restoreComposerDraft } from "@/lib/drafts";
 import { setCallMode } from "@/lib/call-mode";
+import { setVoiceButton } from "@/suyuan/voice-button";
 
 const fixture = vi.hoisted(() => ({
   advanced: false,
@@ -72,6 +73,9 @@ beforeEach(() => {
   vi.stubGlobal("matchMedia", (query: string) => ({ matches: query.includes("max-width: 767.98px"), addEventListener() {}, removeEventListener() {} }));
   fixture.liveCall = null;
   setCallMode("turns");
+  const voiceStore = new Map<string, string>();
+  vi.stubGlobal("localStorage", { getItem: (key: string) => voiceStore.get(key) ?? null, setItem: (key: string, value: string) => voiceStore.set(key, value) });
+  setVoiceButton(true);
   fixture.call = null;
   fixture.groupCall = null;
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });

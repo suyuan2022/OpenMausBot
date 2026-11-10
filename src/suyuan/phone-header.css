@@ -1,0 +1,10 @@
+/* suyuan fork: on the phone's bot list the avatar and + row (Sidebar.tsx, data-sidebar-top-row) sat 12px under the
+   status bar's bottom edge (the #root safe-area padding). Bottom padding on the 64px row lifts what is centred in it
+   by half of it: 6px up, leaving 6px under the clock. The row keeps its height, so the list does not move. It styles
+   the row, not its buttons, so anything added beside the + lifts with them. Only a touch phone, and only the fixed 64px
+   row (max-md:h-16): a narrow desktop window has no clock to clear, and the icon strip's row has no fixed height. */
+@media (hover: none) and (pointer: coarse) and (max-width: 767.98px) {
+  [data-sidebar-top-row="true"].max-md\:h-16 {
+    padding-bottom: 12px;
+  }
+}

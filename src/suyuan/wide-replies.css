@@ -40,6 +40,11 @@
   [data-message-row].items-start [data-testid="message-actions"][data-shown] {
     z-index: 1;
   }
+  /* Its open menu sits above a table's corner buttons (z-20, RichTable.tsx), which otherwise cover the menu's top items:
+     the column's z-index is the layer everything inside it, the menu too, is drawn in. */
+  [data-message-row].items-start [data-testid="message-actions"]:has(> [role="menu"]) {
+    z-index: 30;
+  }
   /* A bubble, but not the wrapper of a reply split around tables: that one spans the row, and the buttons sit beside
      its first block (ReplyBlocks.tsx). */
   [data-message-row].items-start:has([data-chat-bubble="simple"]) [data-chat-bubble="simple"]:not(:has([data-reply-blocks])) {

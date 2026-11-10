@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Bot, Group } from "@/state/store";
 import { restoreComposerDraft } from "@/lib/drafts";
 import { setCallMode } from "@/lib/call-mode";
+import { setVoiceButton } from "@/suyuan/voice-button";
 import { userBubbleTone } from "@/lib/user-bubble-tone";
 import { BOT_BUTTON, botButtonTone } from "@/lib/bot-button";
 
@@ -91,6 +92,9 @@ beforeEach(() => {
   fixture.liveCall = null;
   fixture.config = undefined;
   setCallMode("turns");
+  const voiceStore = new Map<string, string>();
+  vi.stubGlobal("localStorage", { getItem: (key: string) => voiceStore.get(key) ?? null, setItem: (key: string, value: string) => voiceStore.set(key, value) });
+  setVoiceButton(true);
   fixture.call = null;
   fixture.groupCall = null;
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
@@ -196,7 +200,7 @@ describe("the Simple composer in a bot chat", () => {
     expectBotButton(sendButton(), "yellow");
   });
 
-  it("turns its round button into Stop while the bot works, and keeps a quiet Stop beside Send while you type", () => {
+  it("turns its round button into Stop while the bot works, and drops Stop while you type, so Send is the only button to press", () => {
     const busy = { ...bot, busy: true };
     render({ bot: busy });
     const slot = container.querySelector<HTMLButtonElement>('[data-composer-stop="slot"]')!;
@@ -208,8 +212,8 @@ describe("the Simple composer in a bot chat", () => {
 
     restoreComposerDraft(`bot:${bot.id}:${bot.threadId}`, { text: "and also this", attachments: [] });
     render({ bot: busy });
-    expect(container.querySelector('[data-composer-stop="beside"]')).not.toBeNull();
-    expect(container.querySelector('[data-composer-stop="slot"]')).toBeNull();
+    expect(container.querySelector('[data-composer-stop]')).toBeNull();
+    expect(container.querySelector('[aria-label="Stop this turn"]')).toBeNull();
   });
 
   it("shows the approval level as a chip only while this conversation overrides the bot, in the panel's words", () => {

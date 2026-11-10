@@ -4,6 +4,7 @@ import { popoverClosesOnKey, usePopoverDismiss } from "@/hooks/use-popover-dismi
 import { cn } from "@/lib/cn";
 import { useCopyFeedback } from "@/lib/copy-text";
 import { t } from "@/lib/i18n";
+import { trayMoves } from "@/suyuan/tray-at-finger";
 import { MENU_ITEM, MENU_SHEET } from "./menu-recipe";
 
 export const ACTION_ICON = { size: 17, strokeWidth: 1.5 } as const;
@@ -30,6 +31,22 @@ export const MESSAGE_ROW = "data-message-row";
 
 const INTERACTIVE = "a, button, input, textarea, select, summary, label, [role=button], [contenteditable=true]";
 const LONG_PRESS_MS = 450;
+/** A touch this soon after the page scrolled stops a fling: it is not a tap on the message under the finger. */
+const FLING_STOP_MS = 150;
+
+let lastScrollAt = -Infinity;
+/** Rows a long press showed while the finger is still down: a scroll makes that press the start of a drag. */
+const holding = new Set<() => void>();
+let watchingScroll = false;
+function watchScroll(): void {
+  if (watchingScroll) return;
+  watchingScroll = true;
+  document.addEventListener("scroll", () => {
+    lastScrollAt = performance.now();
+    for (const drop of holding) drop();
+    holding.clear();
+  }, { capture: true, passive: true });
+}
 
 function focusVisible(target: EventTarget | null): boolean {
   try {
@@ -82,16 +99,22 @@ export function MessageActions({
       setKeyboardFocus(false);
     };
     const inside = (target: EventTarget | null) => target instanceof Element && Boolean(rootRef.current?.contains(target));
+    watchScroll();
+    const drop = () => setTapped(false);
     const down = (event: PointerEvent) => {
       if (event.pointerType !== "touch" || inside(event.target)) return;
       if (press) clearTimeout(press.timer);
-      press = { x: event.clientX, y: event.clientY, at: Date.now(), timer: setTimeout(() => setTapped(true), LONG_PRESS_MS) };
+      press = null;
+      holding.delete(drop);
+      if (performance.now() - lastScrollAt < FLING_STOP_MS) return;
+      press = { x: event.clientX, y: event.clientY, at: Date.now(), timer: setTimeout(() => { setTapped(true); holding.add(drop); }, LONG_PRESS_MS) };
     };
     const move = (event: PointerEvent) => {
       if (!press || event.pointerType !== "touch") return;
       if (Math.hypot(event.clientX - press.x, event.clientY - press.y) > 10) {
         clearTimeout(press.timer);
         press = null;
+        if (holding.delete(drop)) drop();
       }
     };
     const cancel = () => {
@@ -101,11 +124,13 @@ export function MessageActions({
     const up = (event: PointerEvent) => {
       if (!press || event.pointerType !== "touch") return;
       clearTimeout(press.timer);
+      holding.delete(drop);
       const quick = Date.now() - press.at < LONG_PRESS_MS;
       press = null;
       if (!quick || (event.target instanceof Element && event.target.closest(INTERACTIVE))) return;
       if (window.getSelection()?.toString()) return;
-      setTapped((value) => !value);
+      const moved = trayMoves(event); // suyuan fork: on another block of the reply the buttons move there and stay
+      setTapped((value) => moved || !value);
     };
     row.addEventListener("pointerenter", enter);
     row.addEventListener("pointerleave", leave);
@@ -117,6 +142,7 @@ export function MessageActions({
     row.addEventListener("pointercancel", cancel);
     return () => {
       if (press) clearTimeout(press.timer);
+      holding.delete(drop);
       row.removeEventListener("pointerenter", enter);
       row.removeEventListener("pointerleave", leave);
       row.removeEventListener("focusin", focusIn);

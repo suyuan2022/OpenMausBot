@@ -67,6 +67,7 @@ import { composerPlaceholder, sendLabels, SIMPLE_COMPOSER, SIMPLE_CONTROL, slotC
 import { PendingApprovalActions, PendingApprovalPanel, pendingApprovals } from "./PendingApproval";
 import { CallButton } from "./CallView";
 import { GroupCallButton } from "./GroupCallView";
+import { useVoiceButton } from "@/suyuan/voice-button";
 import { ApprovalChip, ComposerPlusMenu, GoalToggle, TeachTaskButton } from "./ComposerPlusMenu";
 import { PhonePlus } from "./PhonePlus";
 import { useThreadApproval } from "./thread-approval";
@@ -504,7 +505,12 @@ export function Composer({
   const stoppable = busy || Boolean(!group && bot?.waitingForTeammates);
   // Simple mode's round button is the call, Send while there is text, and Stop while the bot works.
   const stopInSlot = simpleDock && stoppable && !locked && !hasContent && !calling;
-  const callShown = !simpleDock || (!hasContent && !stopInSlot);
+  // suyuan fork: hidden until Settings turns the voice button on; a running call keeps its hang-up button.
+  const voiceButton = useVoiceButton() || calling;
+  const callShown = voiceButton && (!simpleDock || (!hasContent && !stopInSlot));
+  // suyuan fork: with the voice button hidden nothing else fills an empty composer's slot, so Send waits there, dimmed.
+  // On a phone Stop takes the place while the bot works; in Simple mode on a wider screen the slot's own Stop does.
+  const sendIdle = !hasContent && !callShown && (singleRow ? !busy : simpleDock && !stopInSlot);
   const slot = slotColors(bot?.color, Boolean(group));
   // A one-to-one bot at work: Enter does the chosen follow-up and Ctrl/⌘ with it the other one. Rooms keep their own queue.
   const followUpFor = (alternate: boolean) => resolveFollowUp({ running: busy && !group && Boolean(bot), alternate, preferred: followUpDefault, canSteer }) ?? undefined;
@@ -769,7 +775,7 @@ export function Composer({
               goal={goal}
               teach={canLearn ? teachTask : undefined}
               approval={approvalChoice && modeBot && { name: modeBot.name, choice: approvalChoice }}
-              callBotId={bot && !group ? bot.id : undefined}
+              callBotId={voiceButton && bot && !group ? bot.id : undefined}
               place={modeBot && !remoteClient && advanced ? {
                 bot: modeBot,
                 task: composerTask,
@@ -922,7 +928,7 @@ export function Composer({
             )}
           />
           <div data-composer-actions className={cn("flex items-center", simpleDock ? "gap-2" : "gap-1", !singleRow && !simpleDock && "@max-[30rem]/composer:ml-auto", stacked && "ml-auto")}>
-          {(simpleDock ? stoppable : busy) && !locked && (
+          {(simpleDock ? stoppable : busy) && !locked && (!hasContent || blocking || attachmentPending) && (
           <button
             onClick={interruptTurn}
             aria-label={t("chat.stopTurn")}
@@ -957,9 +963,9 @@ export function Composer({
         )}
         {callShown && bot && !group && <CallButton bot={bot} placement="composer" fill={advanced || singleRow ? undefined : slot.fill} ink={slot.ink} inverse={singleRow} />}
         {callShown && group && !advanced && <GroupCallButton group={group} members={members ?? []} placement="composer" fill={slot.fill} ink={slot.ink} />}
-        {hasContent && !locked && (
-          <ComposerSendButton compact={simpleDock} waits={busy && !steersNow} label={sendNames.label} title={sendNames.title} look={slot.button}
-            disabled={attachmentPending} onSend={(alternate) => send(followUpFor(alternate))} onChoose={send}
+        {(hasContent || sendIdle) && !locked && (
+          <ComposerSendButton compact={simpleDock} waits={busy && !steersNow} label={sendNames.label} title={sendNames.title} look={sendIdle ? { ...slot.button, className: cn(slot.button.className, "opacity-40") } : slot.button}
+            disabled={attachmentPending || sendIdle} onSend={(alternate) => send(followUpFor(alternate))} onChoose={send}
             menu={followUpFor(false) && { choices: followUpChoices(followUpDefault, canSteer), name: busyName, sendKey: sendLabel, alternateKey: alternateSendLabel(sendKey) }} />
           )}
           </div>
