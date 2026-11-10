@@ -8,7 +8,7 @@ suyuan2022/OpenMausBot 是 [milind-soni/OpenMausBot](https://github.com/milind-s
 
 | 改动 | 为什么 | 改了哪些文件 | 还给原作者 |
 |---|---|---|---|
-| fork 的运维：合并前的检查（一个任务；原作者每个 PR 17 个任务的 `ci.yml` 在仓库的 Actions 设置里关着，文件不动）、合并后打安装包、虚拟机部署脚本、合并前装到手机上试的测试版，以及本文件和 `CLAUDE.md`；每天同步原作者更新的流程已停用 | 只给自己用的部署方式 | `.github/workflows/suyuan-*.yml`、`scripts/suyuan/`、`CLAUDE.md`、`FORK.md`，全是新文件 | 不还 |
+| fork 的运维：合并前的检查（一个任务；原作者每个 PR 17 个任务的 `ci.yml` 在仓库的 Actions 设置里关着，文件不动）、合并后打安装包、虚拟机部署脚本（装完服务起不来会自己装回上一版）、给手机试的测试版（`phone-test.sh`：隔离实例加临时隧道，不动正在用的 bot），以及本文件和 `CLAUDE.md`；每天同步原作者更新的流程已停用 | 只给自己用的部署方式 | `.github/workflows/suyuan-*.yml`、`scripts/suyuan/`、`CLAUDE.md`、`FORK.md`，全是新文件 | 不还 |
 | 更新提示指向这个 fork：查本仓库的 `suyuan-v*` release，npm 装法的更新命令换成部署脚本 | 原来提示 `npm install -g openmausbot@latest`，照做会把 fork 换回官方版 | `server/update-check.ts` 4 行，`server/update-check.test.ts` 1 行断言；新文件 `server/update-check.suyuan.test.ts` | 不还 |
 | 网页版推送（Web Push）：设置 → 通知里的「推送到这台设备」。bot 回完、提问、要审批时，App 关着或手机锁屏也弹通知，点开进那个对话；这台设备正开着那个对话时不推。开了推送的设备不再另弹页内通知；「完成时通知我」「通知音效」两个开关同样管推送 | 官方手机 App 闭源，推送绑在原作者的苹果账号上；主屏幕网页 App 从 iOS 16.4 起能收推送 | `server/index.ts` 改 2 行、不增行（这个文件不许变长，接入写在已有行末尾），`src/App.tsx` 2 行（和下一行共用），`src/components/NotificationSettingsRows.tsx` 2 行，`src/lib/notify.ts` 2 行；新文件 `server/suyuan/`、`src/suyuan/`、`public/suyuan-push-sw.js` | 可以还：先问原作者要不要 |
 | 重连不打扰：App 被系统杀掉后重开，先显示上次那个对话的画面（停在最底部，和 App 打开后一样），bot 数据加载完淡出、换成实时界面；离开时停在 bot 列表、设置这类 App 回不去的页面，或者是点推送通知打开的，就不显示；整屏的「正在连接你的机器人…」2 秒后还没连上才出现 | 主屏幕网页 App 在后台常被 iOS 杀掉，重开要经北京中转拉约 1 MB 的数据，这段时间整屏都是「正在连接」 | `src/main.tsx` 1 行；`src/App.tsx` 的 2 行接入调用 `src/suyuan/use-suyuan.ts`，推送也从这里接；新文件 `src/suyuan/last-frame.ts`、`src/suyuan/quiet-start.css` | 可以还：先问原作者要不要 |
