@@ -1,5 +1,5 @@
 // suyuan fork: the copy of a tool call that Gemini 4 writes into its reply under Antigravity is cut out of the text,
-// whole or still streaming in, and nothing else is.
+// and text that only talks about the mark is left whole.
 import { describe, expect, it } from "vitest";
 import { stripLeakedSystemHarnessMessages } from "../system-message-guard.ts";
 import { stripToolEcho } from "./tool-echo.ts";
@@ -17,29 +17,27 @@ describe("stripToolEcho", () => {
     expect(stripToolEcho(`先看日志。${ECHO}看完了，再跑一次。${ECHO}`)).toBe("先看日志。看完了，再跑一次。");
   });
 
-  it("cuts a copy that lists two calls, or none", () => {
+  it("cuts a copy whose command runs over several lines, one that lists two calls, and one that lists none", () => {
+    const lines = '工具调用_start:[{"name": "run_command", "args": {"CommandLine": "python3 -c \'\nimport json\nrows = [1, 2]\nprint(json.dumps(rows))\n\'"}}]工具调用_end';
+    expect(stripToolEcho(`我把前 41 步读过的文件提出来。${lines}`)).toBe("我把前 41 步读过的文件提出来。");
     const two = '工具调用_start:[{"name": "view_file", "args": {"AbsolutePath": "/a.md"}}, {"name": "view_file", "args": {"AbsolutePath": "/b[1].md"}}]工具调用_end';
     expect(stripToolEcho(`连去 MacBook 上找。${two}`)).toBe("连去 MacBook 上找。");
     expect(stripToolEcho("等它返回结果。工具调用_start:[]工具调用_end")).toBe("等它返回结果。");
   });
 
-  it("shows no part of a copy while the reply streams in, a character at a time", () => {
-    const whole = SAID + ECHO;
-    for (let end = 0; end <= whole.length; end += 1) {
-      const shown = stripToolEcho(whole.slice(0, end));
-      // Up to the mark's first four characters, which are a word of their own ("tool call"), may show for a moment.
-      expect(`${SAID}工具调用`.startsWith(shown), `after ${end} characters: ${shown.slice(-30)}`).toBe(true);
-    }
-    expect(stripToolEcho(whole)).toBe(SAID);
+  it("keeps a reply that explains the mark, with everything after it", () => {
+    const explained = "开头是 `工具调用_start:[{` ，结尾是 `}]` 再加 `工具调用_end`。\n\n## 怎么修\n\n在公共的过滤函数里把这段去掉。";
+    expect(stripToolEcho(explained)).toBe(explained);
+    const listed = "每条回复后面会跟一段 `工具调用_start:[{…}]工具调用_end`（这次调用的 JSON）。";
+    expect(stripToolEcho(listed)).toBe(listed);
   });
 
-  it("cuts a copy that never got its end mark, as when the turn was stopped", () => {
-    expect(stripToolEcho(`${SAID}工具调用_start:[{"name": "run_command", "args": {"CommandLine": "sleep 60`)).toBe(SAID);
+  it("keeps a code block that holds a copy with no end mark, and the words after the block", () => {
+    const report = "测试里有这一行：\n```ts\nexpect(stripToolEcho(`${SAID}工具调用_start:[{\"name\": \"run_command\", \"args\": {\"CommandLine\": \"sleep 60`)).toBe(SAID);\n```\n验证：全绿。";
+    expect(stripToolEcho(report)).toBe(report);
   });
 
-  it("keeps a sentence that only names the mark, and text with no mark", () => {
-    const named = "它在每条回复后面都写了一段「工具调用_start:[…]工具调用_end」，中间是这次调用的 JSON。";
-    expect(stripToolEcho(named)).toBe(named);
+  it("keeps text that has the words but not the mark", () => {
     const about = "这一轮要用工具时先说一句，工具调用之间不用再插话。";
     expect(stripToolEcho(about)).toBe(about);
     const plain = "两个定时都挂好了 👌";
