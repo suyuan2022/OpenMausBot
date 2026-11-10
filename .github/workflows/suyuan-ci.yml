@@ -55,17 +55,29 @@ jobs:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           persist-credentials: false
-          # The merge commit and its parents: the diff against the first parent is what the pull request touched.
-          fetch-depth: 2
+          # A pull request: the merge commit and its parents, and the diff against the first parent is what the pull
+          # request touched. Run by hand (gh workflow run): the whole history, to diff from where the branch left suyuan.
+          fetch-depth: ${{ github.event_name == 'pull_request' && 2 || 0 }}
       - uses: ./.github/actions/suyuan-setup
       - name: The fork's tests, and the test files this pull request touched
         env:
           # Four test files at once on the 4-CPU runner, as upstream's ci.yml runs them on Linux (scripts/ci-scope.mjs);
           # vite.config.ts runs one at a time when this is unset.
           OMB_VITEST_WORKERS: "4"
+          EVENT: ${{ github.event_name }}
         run: |
-          git diff --name-only --diff-filter=AM HEAD^1 HEAD -- '*.test.ts' '*.test.tsx' \
-            | xargs pnpm exec vitest run server/suyuan src/suyuan .suyuan.test. scripts/testing/file-size-ratchet.test.ts
+          if [ "$EVENT" = pull_request ]; then
+            base=HEAD^1
+          else
+            # Run by hand, HEAD is the branch tip: HEAD^1 would hold only its last commit.
+            git fetch --no-tags --quiet origin suyuan
+            base=$(git merge-base FETCH_HEAD HEAD)
+          fi
+          touched=$(git diff --name-only --diff-filter=AM "$base" HEAD -- '*.test.ts' '*.test.tsx')
+          echo "Test files touched since $(git rev-parse --short "$base"):"
+          echo "${touched:-(none)}"
+          # shellcheck disable=SC2086 # $touched is one path per word
+          pnpm exec vitest run server/suyuan src/suyuan .suyuan.test. scripts/testing/file-size-ratchet.test.ts $touched
 
   build:
     name: web build
