@@ -594,7 +594,7 @@ import { createBotSkillsRoutes } from "./routes/bot-skills.ts";
 import { createSkillShareRoutes } from "./routes/skill-share.ts";
 import { createTeamContextRoutes } from "./routes/team-context.ts";
 import { createDeciderRoutes } from "./routes/decider.ts"; import { createCloudSendRoutes } from "./routes/cloud-send.ts"; import { claudeCodeSkillInputs } from "./setup-import.ts"; import { createCloudConnectionsHost } from "./cloud-connections-host.ts";
-import { createUpdateCheckRoutes, serverUpdateChecker } from "./routes/update-check.ts"; import { createTimeZoneRoutes } from "./routes/time-zone.ts"; import { suyuanFrame } from "./suyuan/register.ts"; import { engineCompactsItself } from "./suyuan/native-compact.ts"; import { roomRoutingReady, routedText, withRoomRouter, withRoomRouterStatus } from "./suyuan/room-router.ts"; // suyuan fork
+import { createUpdateCheckRoutes, serverUpdateChecker } from "./routes/update-check.ts"; import { createTimeZoneRoutes } from "./routes/time-zone.ts"; import { relayGate } from "./suyuan/relay-gate.ts"; import { suyuanFrame } from "./suyuan/register.ts"; import { engineCompactsItself } from "./suyuan/native-compact.ts"; import { roomRoutingReady, routedText, withRoomRouter, withRoomRouterStatus } from "./suyuan/room-router.ts"; // suyuan fork
 import { createBrowserSiteRoutes } from "./routes/browser-sites.ts";
 import { createInternalSignInRoutes } from "./routes/sign-in.ts";
 import { createInternalMcpRoutes } from "./routes/internal-mcp.ts";
@@ -13807,7 +13807,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
             const forPerson = EXTERNAL || room || fresh || call.answers || mode !== "work" || call.thread === "standing" || !teammatePrompts.actsForPerson(internalSender, internalCapability.threadId) || !canManage(internalSender, recipient) || !threadReadableFrom(internalCapability.threadId)(call.thread) || !asksActingPerson(internalCapability.threadId, store.groupByThread(internalCapability.threadId) ? internalCapability.generation : undefined)(call.thread, recipient.id) ? undefined : await questionRouting.answerForPerson({ sender: internalSender, senderThreadId: address.threadId, target: recipient, threadId: call.thread, message: call.message });
             if (forPerson) { if (forPerson.outcome === "failed") refused.push(forPerson.detail); else answeredForPerson.add(forPerson); receipts.push(forPerson); continue; }
             const continued = room || fresh ? undefined : workThreadFor(store, { botId: target.botId, botName: recipient.name, fromBotId: internalSender.id, fromThreadId: address.threadId, thread: call.thread, notice: mode === "notify",
-              answering: coordinator.answersTo(internalCapability.roomHandoffId ?? generation), also: (task) => !CLOUD_TEAM || threadStarters.get(task.threadId) === opener, reach: (task) => outsideLineage.mayReach(address.threadId, task.threadId) });
+              answering: coordinator.answersTo(internalCapability.roomHandoffId ?? generation), also: (task) => !CLOUD_TEAM || threadStarters.get(task.threadId) === opener, reach: (task) => outsideLineage.mayReach(address.threadId, task.threadId), others: EXTERNAL ? undefined : relayGate({ personBehind: teammatePrompts.personBehind, outside: outsideLineage.handsNoLevel, readableFrom: threadReadableFrom, openPersonCard }, internalSender.id, internalCapability.threadId) });
             const relayed = EXTERNAL || (!call.answers && (room || fresh || mode === "consult")) ? undefined : await questionRouting.relay({ sender: internalSender, senderThreadId: address.threadId,
               senderNode: coordinator.node(internalCapability.roomHandoffId ?? generation), target: recipient, message: call.message, ...(call.answers ? { answers: call.answers } : {}), ...(continued ? { threadId: continued.threadId } : {}),
               ...(internalCapability.delegatedThisTurn ? { sentThisTurn: internalCapability.delegatedThisTurn } : {}) });
@@ -13824,7 +13824,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
               if (!task) throw new Error("The recipient no longer exists");
               target.threadId = task.threadId;
               if (!continued) createdThread = task.threadId;
-              delegatedLevel.apply(internalSender, internalCapability.threadId, internalCapability.roomHandoffId ?? generation, recipient, target.threadId);
+              if (!continued || continued.openedBy?.botId === internalSender.id) delegatedLevel.apply(internalSender, internalCapability.threadId, internalCapability.roomHandoffId ?? generation, recipient, target.threadId);
             }
             const routed = lane ? { botId: target.botId, threadId: lane.threadId } : target;
             outsideLineage.carry(address.threadId, routed.threadId);
