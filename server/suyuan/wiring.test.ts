@@ -238,4 +238,14 @@ describe("the fork's hooks into upstream files", () => {
     expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("useEffect(() => installTileMenu(), []);");
     expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/phone-tiles\.css";/m);
   });
+
+  it("a tool call written again as text is cut where replies are stored and where they are drawn", () => {
+    const guard = source("shared/system-message-guard.ts");
+    expect(guard).toMatch(/^import \{ stripToolEcho \} from "\.\/suyuan\/tool-echo\.ts";/m);
+    expect(functionBody(guard, "stripLeakedSystemHarnessMessages")).toContain('result = stripToolEcho(result.replace(ORPHANED_TAG_REGEX, ""));');
+    // The guard is the one place both ends pass a bot's text through: tool-echo.ts counts on these calls.
+    expect(source("server/drivers/acp/core.ts")).toContain("const text = stripLeakedSystemHarnessMessages(raw);");
+    expect(source("src/components/ChatView.tsx")).toContain("const text = user ? rawText : stripLeakedSystemHarnessMessages(rawText);");
+    expect(source("src/components/GroupView.tsx")).toContain('const rawText = user ? (m.text ?? "") : stripLeakedSystemHarnessMessages(m.text ?? "");');
+  });
 });
