@@ -4,7 +4,7 @@
 # is deploy-vm-remote.sh, run on the VM, whose output streams back here. It can wait up to 10 minutes for busy bots.
 #   deploy-vm.sh                 newest release
 #   deploy-vm.sh suyuan-v<x>     that release
-#   deploy-vm.sh path/to/x.tgz   a tarball built here, to try a change on the phone before it merges
+#   deploy-vm.sh path/to/x.tgz   that tarball
 #   deploy-vm.sh --rollback      whatever was installed before the last deploy
 #   --force                      restart even while a bot works, or reinstall the version already running
 set -euo pipefail
