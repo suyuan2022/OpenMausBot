@@ -1,10 +1,13 @@
 /** A table card's copy, download and expand buttons wait on a computer for the pointer to rest on the card. A touch
  * screen has no pointer to rest, so a tap on the card stands in for it: the buttons show, and hide again on a second
- * tap, or when a tap lands outside the card. phone-tables.css hides the buttons unless this mark is on.
+ * tap, or when a tap lands outside the card. phone-tables.css hides the buttons unless this mark is on. A code block's
+ * copy-and-more pill (CodeBlock.tsx) answers the same tap: phone-code.css hides it unless the mark is on.
  *
  * What counts as a tap is MessageActions.tsx's, so a card and the message around it answer the same touches: a quick
  * (under 450ms) touch that moved under 10px, not on a control, with no text selected. */
 export const PLATE_SHOWN = "data-suyuan-plate";
+/** What a tap shows the buttons of: a table card, a code block. */
+const CARD = "[data-table-card], .chat-code-block";
 
 // Copied from MessageActions.tsx, which keeps them private.
 const INTERACTIVE = "a, button, input, textarea, select, summary, label, [role=button], [contenteditable=true]";
@@ -26,8 +29,8 @@ export function installTablePlate(): () => void {
     press = null;
     if (!quick) return;
     const target = event.target instanceof Element ? event.target : null;
-    const card = target?.closest("[data-table-card]") ?? null;
-    document.querySelectorAll(`[data-table-card][${PLATE_SHOWN}]`).forEach((open) => { if (open !== card) open.removeAttribute(PLATE_SHOWN); });
+    const card = target?.closest(CARD) ?? null;
+    document.querySelectorAll(`[${PLATE_SHOWN}]`).forEach((open) => { if (open !== card) open.removeAttribute(PLATE_SHOWN); });
     if (!card || target!.closest(INTERACTIVE) || window.getSelection()?.toString()) return;
     card.toggleAttribute(PLATE_SHOWN);
   };

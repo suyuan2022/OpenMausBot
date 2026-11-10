@@ -1,0 +1,10 @@
+/* suyuan fork: a code block's copy-and-more pill (CodeBlock.tsx) waits on a computer for the pointer to rest on the
+   block. A touch screen has none, so upstream shows the pill always, floating over the end of the block's first line:
+   on a phone a one-line command reads cut short. Here it waits for a tap on the block, as a table card's buttons do
+   (table-plate.ts sets the mark), and hides on the next tap or a tap elsewhere. Its open menu keeps it shown. */
+@media (hover: none) and (pointer: coarse) {
+  .chat-code-block:not([data-suyuan-plate]) > [data-code-plate]:not(:focus-within):not(:has([aria-expanded="true"])) {
+    opacity: 0;
+    pointer-events: none;
+  }
+}

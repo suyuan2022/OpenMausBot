@@ -4,6 +4,7 @@ import { popoverClosesOnKey, usePopoverDismiss } from "@/hooks/use-popover-dismi
 import { cn } from "@/lib/cn";
 import { useCopyFeedback } from "@/lib/copy-text";
 import { t } from "@/lib/i18n";
+import { trayMoves } from "@/suyuan/tray-at-finger";
 import { MENU_ITEM, MENU_SHEET } from "./menu-recipe";
 
 export const ACTION_ICON = { size: 17, strokeWidth: 1.5 } as const;
@@ -128,7 +129,8 @@ export function MessageActions({
       press = null;
       if (!quick || (event.target instanceof Element && event.target.closest(INTERACTIVE))) return;
       if (window.getSelection()?.toString()) return;
-      setTapped((value) => !value);
+      const moved = trayMoves(event); // suyuan fork: on another block of the reply the buttons move there and stay
+      setTapped((value) => moved || !value);
     };
     row.addEventListener("pointerenter", enter);
     row.addEventListener("pointerleave", leave);

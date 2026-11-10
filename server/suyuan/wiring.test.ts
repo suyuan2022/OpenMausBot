@@ -114,9 +114,24 @@ describe("the fork's hooks into upstream files", () => {
 
   it("a tap on a bot's reply shows its buttons at the finger, and the phone's Inbox is a button beside the +", () => {
     expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("useEffect(() => installTrayAtFinger(), []);");
+    // The tap that would hide a reply's showing buttons first asks whether it moves them to another block.
+    const actions = source("src/components/MessageActions.tsx");
+    expect(actions).toContain("const moved = trayMoves(event);");
+    expect(actions).toContain("setTapped((value) => moved || !value);");
+    // tray-at-finger.ts tells a reply's blocks apart by these marks.
+    const blocks = source("src/components/ReplyBlocks.tsx");
+    expect(blocks).toContain("data-reply-blocks");
+    expect(blocks).toContain("<div key={index} data-reply-table ");
+    expect(blocks).toContain('<div key={index} data-chat-bubble="simple" ');
+    // phone-code.css hides a code block's pill until table-plate.ts marks the block, found by these two hooks.
+    expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/phone-code\.css";/m);
+    const code = source("src/components/CodeBlock.tsx");
+    expect(code).toContain('<div data-code-plate className="absolute end-1 top-1 ');
+    expect(code).toContain('className="chat-code-block group/code relative ');
     const sidebar = source("src/components/Sidebar.tsx");
     expect(sidebar).toMatch(/import \{ PhoneInboxButton \} from "@\/suyuan\/PhoneInboxButton";/);
-    expect(sidebar).toContain("{phone && <PhoneInboxButton onOpened={onClose} />}\n          {plusControl}");
+    // On the + button's line: the file's length is pinned (scripts/testing/file-size-ratchet.test.ts).
+    expect(sidebar).toContain("{phone && <PhoneInboxButton onOpened={onClose} />}{plusControl}");
     expect(sidebar).toContain("{!q && !phone && <SidebarInboxRow ");
   });
 

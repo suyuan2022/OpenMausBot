@@ -1307,8 +1307,7 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
             <Search size={20} strokeWidth={1.5} />
           </button>}
           {advanced && inboxSupport === "no" && <SidebarActiveThreads entries={attention} icons={density === "icons"} phone={phone} dispatch={dispatch} />}
-          {phone && <PhoneInboxButton onOpened={onClose} />}
-          {plusControl}
+          {phone && <PhoneInboxButton onOpened={onClose} />}{plusControl}
         </div>}
       </div>
 

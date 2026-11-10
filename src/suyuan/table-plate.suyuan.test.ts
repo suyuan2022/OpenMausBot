@@ -8,7 +8,8 @@ const shown = (n: number) => card(n).hasAttribute(PLATE_SHOWN);
 beforeEach(() => {
   vi.useFakeTimers();
   document.body.innerHTML = `<div data-table-card id="c1"><div class="table-plate"><button id="b1">copy</button></div><label id="l1">search</label><table><tr><th><button id="s1">sort</button></th></tr><tr><td id="t1">cell</td></tr></table></div>
-    <div data-table-card id="c2"><table><tr><td id="t2">cell</td></tr></table></div><p id="out">text</p>`;
+    <div data-table-card id="c2"><table><tr><td id="t2">cell</td></tr></table></div><p id="out">text</p>
+    <div class="chat-code-block" id="c3"><div data-code-plate><button id="b3">copy</button></div><pre id="pre3">ls</pre></div>`;
   stop = installTablePlate();
 });
 afterEach(() => { stop(); vi.useRealTimers(); vi.restoreAllMocks(); });
@@ -39,6 +40,14 @@ describe("tapping a table card stands in for resting the pointer on it", () => {
     tap("l1");
     expect(shown(1)).toBe(true);
   });
+  it("shows a code block's pill the same way, one at a time with the cards", () => {
+    tap("pre3"); expect(shown(3)).toBe(true);
+    tap("b3"); expect(shown(3)).toBe(true);
+    tap("t2"); expect(shown(3)).toBe(false); expect(shown(2)).toBe(true);
+    tap("pre3"); expect(shown(2)).toBe(false); expect(shown(3)).toBe(true);
+    tap("pre3"); expect(shown(3)).toBe(false);
+  });
+
   it("ignores a long press, a drag, and a mouse", () => {
     touch("pointerdown", "t1");
     vi.advanceTimersByTime(500);
