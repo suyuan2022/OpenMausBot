@@ -1,4 +1,5 @@
 import { StrictMode } from "react";
+import "./zz-no-such-file.css";
 import { createRoot } from "react-dom/client";
 import {
   previewBrowserSignIn, readSessionState, takeBrowserSignInFromLocation, takePairingCodeFromLocation, takeInvitedEmailFromLocation,
