@@ -122,6 +122,7 @@ describe("the fork's hooks into upstream files", () => {
     expect(routines).toContain("const own = ownThread(this.routines, run, this.runs, this.options.threadOpen), state = sameRoutineWorking ?");
     expect(routines).toContain("|| own.threadId || null;");
     expect(routines).toContain("carryOutside(own, run, this.runs, continuityCarry(run, this.routines, this.runs))");
+    expect(routines).toContain("freshRun(own, composeExecutionPrompt(");
     expect(routines).toContain("rememberThread(own, task.threadId, joined, run);");
     expect(routines).toContain("runById(id: string): RoutineRun | null");
     expect(routines).toContain("sideThread?: boolean;");

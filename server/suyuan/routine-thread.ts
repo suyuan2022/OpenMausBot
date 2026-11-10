@@ -71,6 +71,16 @@ export function carryOutside<T extends { finishedAt: number }>(own: RoutineThrea
   return from?.threadId === own.threadId ? null : carry;
 }
 
+/** Said to every run that writes into a conversation holding the routine's earlier runs. Without it the model reads an earlier
+ * failure or refusal there as this run's answer and skips the step (11/10, real Claude: a Bash step nobody approved, a sign-in with
+ * no browser, both not even tried on the next run), where upstream's fresh conversation per run tried again every time. */
+export const FRESH_RUN_NOTE = "[OpenMausBot: earlier runs of this automation are above in this conversation. They are history, not this run's result: do this run's work in full now, and try again any step that failed or was declined before, since things may have changed.]";
+
+/** The run's message, with the note when it goes into the routine's existing conversation; a new or side conversation has no history. */
+export function freshRun(own: RoutineThreadPick, message: string): string {
+  return own.threadId === undefined ? message : `${message}\n\n${FRESH_RUN_NOTE}`;
+}
+
 /** The conversation is marked as run `run`'s, replacing an earlier run of the same routine, or one so old its record is gone
  * (`owner` is undefined); a conversation a person has taken over has no mark and stays theirs. */
 export function takesOverFrom(current: string | undefined, run: Pick<RoutineRun, "id" | "routineId">, owner: Pick<RoutineRun, "routineId"> | null | undefined): boolean {

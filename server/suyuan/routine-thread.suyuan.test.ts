@@ -6,7 +6,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { ROUTINE_SUPERSEDED } from "../routine-execution.ts";
 import { RoutineManager } from "../routines.ts";
-import { takesOverFrom } from "./routine-thread.ts";
+import { FRESH_RUN_NOTE, takesOverFrom } from "./routine-thread.ts";
 
 const START = new Date(2026, 10, 10, 9, 0, 0).getTime();
 const MIN = 60_000;
@@ -151,6 +151,33 @@ describe("a routine keeps one conversation", () => {
     await runOnce(h, 82);
     expect(h.started[1]!.prompt).not.toContain("REPORT-ONE");
     expect(h.started[1]!.threadId).toBe("thread-1");
+  });
+
+  it("tells a run in the routine's conversation that the earlier runs there are history; a run in a new or side conversation is not told", async () => {
+    const h = harness();
+    make(h);
+    await runOnce(h, 41);
+    h.finish("thread-1");
+    await runOnce(h, 82);
+    expect(h.started.map((one) => one.prompt.includes(FRESH_RUN_NOTE))).toEqual([false, true]);
+    expect(h.started[1]!.prompt.startsWith('[Scheduled routine "Outfit" — do this now:]')).toBe(true);
+    expect(h.started[1]!.prompt.endsWith(FRESH_RUN_NOTE)).toBe(true);
+    // The second run is still working when the third comes due by hand: it gets a side conversation, with no history to read.
+    await h.manager.runNow(h.manager.listRoutines()[0]!.id);
+    await h.manager.tick();
+    expect(h.started.map((one) => one.threadId)).toEqual(["thread-1", "thread-1", "thread-2"]);
+    expect(h.started[2]!.prompt).not.toContain(FRESH_RUN_NOTE);
+  });
+
+  it("tells a webhook's second run the same, after the event it carries", async () => {
+    const h = harness();
+    hook(h, 1);
+    await h.manager.tick();
+    h.finish("thread-1");
+    hook(h, 2);
+    await h.manager.tick();
+    expect(h.started.map((one) => one.prompt.includes(FRESH_RUN_NOTE))).toEqual([false, true]);
+    expect(h.started[1]!.prompt.indexOf("event 2")).toBeLessThan(h.started[1]!.prompt.indexOf(FRESH_RUN_NOTE));
   });
 
   it("leaves one-shot routines on a conversation per run", async () => {

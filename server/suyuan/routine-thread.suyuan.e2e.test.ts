@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { pathToFileURL } from "node:url";
 import { expect, it } from "vitest";
 import { launchVerificationServer, runControlOmb } from "../../scripts/control-omb.ts";
+import { FRESH_RUN_NOTE } from "./routine-thread.ts";
 
 // The engine exits after each turn, so the next run in a conversation starts it again with --resume.
 const RESUMING = { ...process.env, OMB_ROUTINE_ONE_THREAD: "1", FAKE_CLAUDE_EXIT_AFTER_TURN: "1" };
@@ -42,6 +43,8 @@ it("runs a routine twice into one conversation, and opens a new one after that c
     // The earlier report is already in the resumed context, so it is not carried in a second time.
     expect(dump().argv).toContain("--resume");
     expect(JSON.stringify(dump().prompt)).not.toContain("<previous-run");
+    // It is told the earlier run above is history, so a step that failed there is tried again.
+    expect(JSON.stringify(dump().prompt)).toContain(JSON.stringify(FRESH_RUN_NOTE).slice(1, -1));
     // The conversation is marked as the second run's, and stays read.
     expect((await tasks()).find((task) => task.threadId === first.threadId)).toMatchObject({ routineRunId: second.id, unread: false });
     expect(await tasks()).toHaveLength(before + 1);
