@@ -125,7 +125,10 @@ export function createWarmSummaryHost(deps: WarmSummaryHostDeps) {
       if (!instance.adapter.cacheKeepWarm?.compact) return { way: "harness", soon: false };
       const at = deps.nativeCompactAt(target.instanceId);
       if (at === undefined || contextTokens === undefined || contextTokens < Math.min(WARM_SUMMARY_MIN_TOKENS, at / 2)) return null;
-      return { way: "native", soon: contextTokens >= at * NATIVE_SOON_FRACTION };
+      const soon = contextTokens >= at * NATIVE_SOON_FRACTION;
+      // Keep-warm pays to keep this context whole until the person is back; an idle summary would throw that away.
+      if (!soon && (deps.keepWarmUntil(target.threadId) ?? 0) > now()) return null;
+      return { way: "native", soon };
     },
     hold: ({ botId, threadId }) => {
       if (deps.busy(botId, threadId)) return { reason: "the bot is busy", retry: true };

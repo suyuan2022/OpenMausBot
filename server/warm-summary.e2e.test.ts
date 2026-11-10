@@ -117,8 +117,8 @@ it("a message sent while the summary it needs is being written waits for it rath
 it("a message sent during a summary the turn did not need is never held up by it", () => fixture({ FAKE_CLAUDE_CONTEXT_GROWTH: "100000:10000" }, async (f) => {
   for (const text of ["MSG-1 build the landing page", "MSG-2 make the title bold", "MSG-3 and the subtitle"]) await f.send(text);
   const session = f.task().resumeCursors.claude;
-  // 1/100 of 3 minutes: the summary starts after 1.8 s and runs for 6 s.
-  await sleep(3_000);
+  // 1/100 of 55 minutes (suyuan fork: the summary waits for the person to leave): it starts after 33 s and runs for 6 s.
+  await sleep(34_000);
   expect(f.compactDump()).not.toBeNull();
   const overtook = await f.send("MSG-4 what changed?");
   record({ case: "sent during a summary it did not need", nextReplyMs: overtook });

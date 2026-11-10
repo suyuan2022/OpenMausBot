@@ -104,7 +104,7 @@ describe("warm summary scheduling", () => {
     let busy = true;
     const { time, warm, runs } = setup({ hold: () => (busy ? { reason: "the bot is busy", retry: true } : null) });
     warm.turnCompleted(target, { ok: true, contextTokens: 150_000 });
-    await time.advance(WARM_SUMMARY_IDLE_MS + WARM_SUMMARY_RETRY_MS);
+    await time.advance(WARM_SUMMARY_IDLE_MS);
     expect(runs).toHaveLength(0);
     busy = false;
     await time.advance(WARM_SUMMARY_RETRY_MS);

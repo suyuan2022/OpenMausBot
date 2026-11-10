@@ -114,21 +114,17 @@ it("compacts durably, keeps corrections and starts a fresh native session withou
   expect((await f.messages()).some(m => m.id === record.id)).toBe(true);
 }), 90_000);
 
-it("automatically folds old exchanges while keeping the two latest and the incoming request", () => fixture(async f => {
+// suyuan fork: Claude Code compacts its own session, so a Claude conversation past the fold line is never folded or restarted.
+it("leaves a Claude conversation past the fold line to Claude Code's own compaction, on the same session", () => fixture(async f => {
   await f.api("/api/config", { context: { compactAt: 1 } }, "PATCH");
   await f.send("FIRST_EXCHANGE historical request");
   await f.send("SECOND_EXCHANGE keep verbatim");
   await f.send("THIRD_EXCHANGE correction -5 != 5");
   await f.send("INCOMING do not summarize this request");
-  const records = (await f.messages()).filter(m => m.kind === "compaction");
-  expect(records).toHaveLength(1);
-  expect(records[0].compaction.by).toBe("harness");
-  expect(records[0].compaction.summary).not.toContain("INCOMING");
-  const prompt = String(f.turns().at(-1).prompt.message.content);
-  expect(prompt).toContain("SECOND_EXCHANGE keep verbatim");
-  expect(prompt).toContain("THIRD_EXCHANGE correction -5 != 5");
-  expect(prompt).toContain("INCOMING do not summarize this request");
-  expect(f.turns().at(-1).resumed).toBe(false);
+  expect((await f.messages()).filter(m => m.kind === "compaction")).toHaveLength(0);
+  expect(String(f.turns().at(-1).prompt.message.content)).toContain("INCOMING do not summarize this request");
+  expect(f.turns().map(turn => turn.turnIndex)).toEqual([0, 1, 2, 3]);
+  expect(new Set(f.turns().map(turn => turn.pid)).size).toBe(1);
 }), 70_000);
 
 it("Stop cancels a stalled summary without writing a late record or starting an agent", () => fixture(async f => {
@@ -154,8 +150,8 @@ it("Stop cancels a stalled summary without writing a late record or starting an 
 }, true), 60_000);
 
 it.each([
-  { native: undefined, tokens: 190_000, compactions: 1 },
-  { native: "100000", tokens: 95_000, compactions: 1 },
+  { native: undefined, tokens: 190_000, compactions: 0 },
+  { native: "100000", tokens: 95_000, compactions: 0 },
   { native: "off", tokens: 190_000, compactions: 0 },
   { native: "auto", tokens: 190_000, compactions: 0 },
 ])("respects the selected account's native compaction setting ($native)", ({ native, tokens, compactions }) => fixture(async f => {

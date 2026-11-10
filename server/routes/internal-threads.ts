@@ -4,6 +4,7 @@ import { reachablePeers } from "../peer-roster.ts";
 import type { BotRecord, Store, TaskRecord } from "../store.ts";
 import { PASS, type RouteHandler } from "./table.ts";
 import { conversationLanguage, serverLine } from "../server-lines.ts";
+import { createChiefReadRoutes } from "../suyuan/chief-read-threads.ts";
 
 type ThreadState = "running" | "waiting-on-you" | "queued" | "idle" | "closed";
 
@@ -18,7 +19,7 @@ interface ThreadRow {
 
 /** Only dispatch inside the internal capability gate: `from` and `fromThreadId` come from the caller's capability. */
 export function createInternalThreadRoutes(deps: {
-  store: Pick<Store, "bot" | "bots" | "tasks" | "taskByThread" | "appendMessage" | "patchTask" | "setTaskClosedBy">;
+  store: Pick<Store, "bot" | "bots" | "tasks" | "taskByThread" | "appendMessage" | "patchTask" | "setTaskClosedBy" | "messagesTail" | "groupByThread">;
   coordinator: Pick<Coordinator, "awaitingAnswer" | "parkedDirect" | "activeDirect" | "active">;
   from: BotRecord;
   fromThreadId: string;
@@ -31,7 +32,8 @@ export function createInternalThreadRoutes(deps: {
   queuedReason(node: HandoffView, showTitle?: (threadId: string) => boolean): string;
 }): RouteHandler {
   const { store, coordinator, from, fromThreadId } = deps;
-  return async ({ res, path, method, json }) => {
+  const chiefRead = createChiefReadRoutes(deps);
+  const threads: RouteHandler = async ({ res, path, method, json }) => {
     // list_threads: the caller's own threads plus, on reachable peers, only threads it opened; a peer's other threads are its own business.
     if (method === "GET" && path === "/api/internal/threads") {
       if (!deps.ownsThread(from.id, fromThreadId)) {
@@ -112,4 +114,5 @@ export function createInternalThreadRoutes(deps: {
     store.setTaskClosedBy(owner.id, threadId, { botId: from.id, name: from.name, at: Date.now() });
     return json(res, 200, { closed: true, threadId, title: task.title, botName: owner.name });
   };
+  return async (ctx) => (await chiefRead(ctx)) === PASS ? threads(ctx) : undefined;
 }

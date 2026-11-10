@@ -109,11 +109,39 @@ describe("the fork's hooks into upstream files", () => {
     expect(rescue).toContain("const ms = firstReplyNoticeMs();\n    if (ms <= 0) return;");
   });
 
+  it("a Claude conversation is never folded by OpenMausBot on its own: Claude Code compacts it in its session", () => {
+    const index = source("server/index.ts");
+    expect(index).toContain('import { engineCompactsItself } from "./suyuan/native-compact.ts";');
+    expect(functionBody(index, "compactConversation")).toContain("(cfg.context?.autoCompact === false || engineCompactsItself(instance.driverKind))");
+  });
+
   it("a chat's window counts only drawn rows, and a chat too short to scroll pages older messages in", () => {
     const viewport = source("src/hooks/use-transcript-viewport.ts");
     expect(viewport).toContain("const tailStart = drawnTailStart(messages, TRANSCRIPT_WINDOW_SIZE);");
     expect(viewport.split("const start = drawnExpandStart(messages, startIndex, TRANSCRIPT_WINDOW_SIZE);")).toHaveLength(3);
     expect(viewport).toContain("useFillShortChat(scrollRef, threadId, { shown: transcriptShown, following: follow, startIndex, hasMore, olderPending, count: messages.length });");
     expect(functionBody(source("src/lib/transcript-window.ts"), "followWindowStart")).toContain("const tail = drawnTailStart(messages, TRANSCRIPT_WINDOW_SIZE);");
+  });
+
+  it("the Chief's team_threads and team_thread_read are in the catalog, the call switch, the read-only list and the internal routes", () => {
+    expect(source("server/drivers/agents-catalog.ts")).toContain("...CHIEF_READ_TOOL_DEFINITIONS,");
+    expect(source("server/drivers/agents-catalog.ts")).toContain('"team_threads", "team_thread_read",');
+    expect(source("server/drivers/agents-call.ts")).toContain("if (CHIEF_READ_TOOL_NAMES.has(name)) return callChiefReadTool(name, args, context);");
+    expect(source("server/agent-tool-policy.ts")).toContain('"team_threads",\n  "team_thread_read",');
+    // They ride list_threads's route, so they get its sender, its fence on shown threads and its capability check.
+    expect(source("server/routes/internal-threads.ts")).toContain("const chiefRead = createChiefReadRoutes(deps);");
+    // The store handed in must carry what the read needs: the tail of a thread, and whether the caller is in a room.
+    expect(source("server/routes/internal-threads.ts")).toContain('"messagesTail" | "groupByThread">');
+    expect(source("server/routes/internal-threads.ts")).toContain("return async (ctx) => (await chiefRead(ctx)) === PASS ? threads(ctx) : undefined;");
+    expect(source("server/index.ts")).toMatch(/createInternalThreadRoutes\(\{[^]*?shown: \(id\) => !proactive\.fence\.confines\(id\)/);
+    // A confined turn gets neither tool: outside-fence.ts does not list the routes.
+    expect(source("server/host/outside-fence.ts")).not.toContain("team-thread");
+  });
+
+  it("coordinate_bots lets a notice into a thread someone else opened only through the relay gate, and hands no level down into one", () => {
+    expect(source("server/host/work-thread.ts")).toContain("if (usable && input.notice && !task.openedBy?.roomLane && input.others?.(task)) return task;");
+    const index = source("server/index.ts");
+    expect(index).toContain("others: EXTERNAL ? undefined : relayGate({ personBehind: teammatePrompts.personBehind, outside: outsideLineage.handsNoLevel, readableFrom: threadReadableFrom, openPersonCard }, internalSender.id, internalCapability.threadId)");
+    expect(index).toContain("if (!continued || continued.openedBy?.botId === internalSender.id) delegatedLevel.apply(internalSender, internalCapability.threadId, internalCapability.roomHandoffId ?? generation, recipient, target.threadId);");
   });
 });
