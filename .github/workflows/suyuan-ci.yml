@@ -73,7 +73,8 @@ jobs:
             git fetch --no-tags --quiet origin suyuan
             base=$(git merge-base FETCH_HEAD HEAD)
           fi
-          touched=$(git diff --name-only --diff-filter=AM "$base" HEAD -- '*.test.ts' '*.test.tsx')
+          # Every change but a deletion (d): a renamed test file (R) runs under its new name.
+          touched=$(git diff --name-only --diff-filter=d "$base" HEAD -- '*.test.ts' '*.test.tsx')
           echo "Test files touched since $(git rev-parse --short "$base"):"
           echo "${touched:-(none)}"
           # shellcheck disable=SC2086 # $touched is one path per word
