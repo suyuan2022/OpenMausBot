@@ -509,7 +509,8 @@ export function Composer({
   const voiceButton = useVoiceButton() || calling;
   const callShown = voiceButton && (!simpleDock || (!hasContent && !stopInSlot));
   // suyuan fork: with the voice button hidden nothing else fills an empty composer's slot, so Send waits there, dimmed.
-  const sendIdle = simpleDock && !hasContent && !callShown && !stopInSlot;
+  // On a phone Stop takes the place while the bot works; in Simple mode on a wider screen the slot's own Stop does.
+  const sendIdle = !hasContent && !callShown && (singleRow ? !busy : simpleDock && !stopInSlot);
   const slot = slotColors(bot?.color, Boolean(group));
   // A one-to-one bot at work: Enter does the chosen follow-up and Ctrl/⌘ with it the other one. Rooms keep their own queue.
   const followUpFor = (alternate: boolean) => resolveFollowUp({ running: busy && !group && Boolean(bot), alternate, preferred: followUpDefault, canSteer }) ?? undefined;
