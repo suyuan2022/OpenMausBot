@@ -1,5 +1,6 @@
 # Every push to suyuan becomes a GitHub release "suyuan-v<upstream version>-suyuan.<run>" carrying the npm tarball
-# that scripts/suyuan/deploy-vm.sh installs. Same assembly as npm-package.yml, minus the npm publish.
+# that scripts/suyuan/deploy-vm.sh installs. Same assembly as npm-package.yml, minus the npm publish. Run by hand on any
+# other branch it builds and proves the package without publishing it.
 name: suyuan · release
 
 on:
@@ -10,23 +11,17 @@ on:
 permissions:
   contents: write
 
-concurrency:
-  group: suyuan-release
-  cancel-in-progress: false
-
 jobs:
   pack:
     runs-on: ubuntu-latest
     timeout-minutes: 30
+    # One release at a time, in merge order. Only this job queues: the cache job below never holds up the next release.
+    concurrency:
+      group: suyuan-release
+      cancel-in-progress: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: pnpm/action-setup@ff378ebe6b225b0680b81c1ad4498ae0d1d3a5e3 # v6.0.10
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
-      - run: pnpm install --frozen-lockfile
-        env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
+      - uses: ./.github/actions/suyuan-setup
       - name: Stamp the fork version
         run: |
           node -e '
@@ -35,7 +30,20 @@ jobs:
             p.version = `${p.version.replace(/-.*$/, "")}-suyuan.${process.env.GITHUB_RUN_NUMBER}`;
             fs.writeFileSync("package.json", JSON.stringify(p, null, 2) + "\n");
           '
-      - run: pnpm build:server && pnpm exec vite build && node scripts/build-npm-package.mjs
+      # pnpm build:server writes only dist-server and vite only dist, so the two run at once.
+      - name: Build the server and the web app side by side
+        run: |
+          set -uo pipefail
+          pnpm build:server >"$RUNNER_TEMP/server.log" 2>&1 &
+          server=$!
+          pnpm exec vite build >"$RUNNER_TEMP/web.log" 2>&1 &
+          web=$!
+          wait "$server"; server_exit=$?
+          wait "$web"; web_exit=$?
+          cat "$RUNNER_TEMP/server.log" "$RUNNER_TEMP/web.log"
+          echo "build:server: exit $server_exit · vite build: exit $web_exit"
+          [ "$server_exit" -eq 0 ] && [ "$web_exit" -eq 0 ]
+      - run: node scripts/build-npm-package.mjs
       - name: Pack and prove it starts
         run: |
           set -euo pipefail
@@ -44,6 +52,7 @@ jobs:
           mkdir -p /tmp/omb-smoke && tar -xzf "$tgz" -C /tmp/omb-smoke
           node /tmp/omb-smoke/package/cli.js --version
       - name: Publish the release
+        if: github.ref == 'refs/heads/suyuan'
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -53,3 +62,32 @@ jobs:
             --target "$GITHUB_SHA" --latest \
             --title "suyuan $version" \
             --notes "$(git log -1 --pretty='%h %s')"
+
+  # The typecheck state of this commit, for the next pull request's CI: a pull request reads the caches saved on suyuan,
+  # never those of another pull request. Same steps as the types job of suyuan-ci.yml. A type error that only the merge
+  # made (two pull requests that each passed) turns this run red after the release is out.
+  types-cache:
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    timeout-minutes: 15
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/suyuan-setup
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.cache/suyuan-tsc
+          key: suyuan-tsc-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json') }}-${{ github.sha }}
+          restore-keys: suyuan-tsc-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json') }}-
+      - id: types
+        run: scripts/suyuan/ci-typecheck.sh
+      - if: ${{ !cancelled() && (steps.types.outcome == 'success' || steps.types.outcome == 'failure') }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.cache/suyuan-tsc
+          key: suyuan-tsc-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json') }}-${{ github.sha }}

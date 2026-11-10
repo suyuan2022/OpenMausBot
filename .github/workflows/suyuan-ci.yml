@@ -1,8 +1,9 @@
-# The fork's whole CI: one job on a pull request into suyuan. Upstream's ci.yml starts 17 jobs on every pull request and
-# is switched off in this repository's Actions settings (gh workflow disable ci.yml), not edited, so a merge from
-# upstream never conflicts here. This job checks what a one-person fork needs before a merge: the types, the lint, the
-# fork's own tests with whatever test files the pull request touched, and the web build. After the merge
-# suyuan-release.yml builds the server and the package and proves the package starts.
+# The fork's whole CI, on a pull request into suyuan. Upstream's ci.yml starts 17 jobs on every pull request and is
+# switched off in this repository's Actions settings (gh workflow disable ci.yml), not edited, so a merge from upstream
+# never conflicts here. Three jobs side by side check what a one-person fork needs before a merge: the types and the lint,
+# the fork's own tests with whatever test files the pull request touched, and the web build. After the merge
+# suyuan-release.yml builds the server and the package, proves the package starts, and leaves the typecheck state of
+# suyuan in the cache this workflow reads.
 name: suyuan · ci
 
 on:
@@ -18,8 +19,45 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  check:
-    runs-on: ubuntu-latest
+  types:
+    name: types and lint (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/suyuan-setup
+      # tsc's incremental state (scripts/suyuan/ci-typecheck.sh). A pull request reads what this pull request's earlier
+      # runs saved, then what suyuan-release.yml saved on suyuan, never another pull request's. The state carries a
+      # content hash per file, so any earlier state is a correct starting point; a new lockfile or tsconfig starts over.
+      - uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.cache/suyuan-tsc
+          key: suyuan-tsc-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json') }}-${{ github.sha }}
+          restore-keys: suyuan-tsc-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json') }}-
+      - id: types
+        run: scripts/suyuan/ci-typecheck.sh
+      # Whenever the typecheck ran, pass or fail, so one red run still shows both.
+      - if: ${{ !cancelled() && (steps.types.outcome == 'success' || steps.types.outcome == 'failure') }}
+        run: pnpm lint
+      - if: ${{ !cancelled() && (steps.types.outcome == 'success' || steps.types.outcome == 'failure') }}
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: node_modules/.cache/suyuan-tsc
+          key: suyuan-tsc-${{ runner.os }}-${{ runner.arch }}-${{ hashFiles('pnpm-lock.yaml', 'tsconfig*.json') }}-${{ github.sha }}
+
+  test:
+    name: tests (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -27,18 +65,27 @@ jobs:
           persist-credentials: false
           # The merge commit and its parents: the diff against the first parent is what the pull request touched.
           fetch-depth: 2
-      - uses: pnpm/action-setup@ff378ebe6b225b0680b81c1ad4498ae0d1d3a5e3 # v6.0.10
-      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
-        with:
-          node-version: 24
-          cache: pnpm
-      - run: pnpm install --frozen-lockfile
-        env:
-          ELECTRON_SKIP_BINARY_DOWNLOAD: "1"
-      - run: pnpm typecheck
-      - run: pnpm lint
+      - uses: ./.github/actions/suyuan-setup
       - name: The fork's tests, and the test files this pull request touched
+        env:
+          # Four test files at once on the 4-CPU runner, as upstream's ci.yml runs them on Linux (scripts/ci-scope.mjs);
+          # vite.config.ts runs one at a time when this is unset.
+          OMB_VITEST_WORKERS: "4"
         run: |
           git diff --name-only --diff-filter=AM HEAD^1 HEAD -- '*.test.ts' '*.test.tsx' \
             | xargs pnpm exec vitest run server/suyuan src/suyuan .suyuan.test. scripts/testing/file-size-ratchet.test.ts
+
+  build:
+    name: web build (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - uses: ./.github/actions/suyuan-setup
       - run: pnpm exec vite build
