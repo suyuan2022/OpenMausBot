@@ -122,4 +122,19 @@ describe("the fork's hooks into upstream files", () => {
     expect(viewport).toContain("useFillShortChat(scrollRef, threadId, { shown: transcriptShown, following: follow, startIndex, hasMore, olderPending, count: messages.length });");
     expect(functionBody(source("src/lib/transcript-window.ts"), "followWindowStart")).toContain("const tail = drawnTailStart(messages, TRANSCRIPT_WINDOW_SIZE);");
   });
+
+  it("the Chief's team_threads and team_thread_read are in the catalog, the call switch, the read-only list and the internal routes", () => {
+    expect(source("server/drivers/agents-catalog.ts")).toContain("...CHIEF_READ_TOOL_DEFINITIONS,");
+    expect(source("server/drivers/agents-catalog.ts")).toContain('"team_threads", "team_thread_read",');
+    expect(source("server/drivers/agents-call.ts")).toContain("if (CHIEF_READ_TOOL_NAMES.has(name)) return callChiefReadTool(name, args, context);");
+    expect(source("server/agent-tool-policy.ts")).toContain('"team_threads",\n  "team_thread_read",');
+    // They ride list_threads's route, so they get its sender, its fence on shown threads and its capability check.
+    expect(source("server/routes/internal-threads.ts")).toContain("const chiefRead = createChiefReadRoutes(deps);");
+    // The store handed in must carry what the read needs: the tail of a thread, and whether the caller is in a room.
+    expect(source("server/routes/internal-threads.ts")).toContain('"messagesTail" | "groupByThread">');
+    expect(source("server/routes/internal-threads.ts")).toContain("return async (ctx) => (await chiefRead(ctx)) === PASS ? threads(ctx) : undefined;");
+    expect(source("server/index.ts")).toMatch(/createInternalThreadRoutes\(\{[^]*?shown: \(id\) => !proactive\.fence\.confines\(id\)/);
+    // A confined turn gets neither tool: outside-fence.ts does not list the routes.
+    expect(source("server/host/outside-fence.ts")).not.toContain("team-thread");
+  });
 });
