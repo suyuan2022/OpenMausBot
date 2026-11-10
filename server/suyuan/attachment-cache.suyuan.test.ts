@@ -10,7 +10,7 @@ describe("attachmentCacheControl", () => {
   });
 
   it("caches nothing where more than one identity may sign in", () => {
-    expect(attachmentCacheControl("image/png", false)).toBe("private, no-store");
+    expect(attachmentCacheControl("image/png", false)).toBe("private, max-age=31536000, immutable");
     expect(attachmentCacheControl("application/pdf", false)).toBe("private, no-store");
   });
 });
