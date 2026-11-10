@@ -3,7 +3,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { TaskRecord } from "../store.ts";
-import { relayGate, type RelayGateDeps, WAITS_ON_PERSON } from "./relay-gate.ts";
+import { OWN_THREADS_ONLY, relayGate, type RelayGateDeps, WAITS_ON_PERSON } from "./relay-gate.ts";
 
 const task = { threadId: "target" } as TaskRecord;
 const gate = (over: Partial<RelayGateDeps> = {}) => relayGate({
@@ -22,16 +22,16 @@ describe("relayGate", () => {
     expect(seen).toEqual(["behind chief source", "outside source", "reads source target", "card target"]);
   });
 
-  it("refuses when nobody is behind the turn (a webhook, a routine)", () => {
-    expect(gate({ personBehind: () => false })).toBe(false);
+  it("says why when nobody is behind the turn (a webhook, a routine)", () => {
+    expect(() => gate({ personBehind: () => false })).toThrow(OWN_THREADS_ONLY);
   });
 
   it("refuses when the source cannot read the target (fenced, bot API)", () => {
     expect(gate({ readableFrom: () => () => false })).toBe(false);
   });
 
-  it("refuses when the source conversation carries the outside mark", () => {
-    expect(gate({ outside: () => true })).toBe(false);
+  it("says why when the source conversation carries the outside mark", () => {
+    expect(() => gate({ outside: () => true })).toThrow(OWN_THREADS_ONLY);
   });
 
   it("says why when the target waits on the person's answer", () => {
