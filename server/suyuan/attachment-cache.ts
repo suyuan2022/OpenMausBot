@@ -6,5 +6,6 @@
 // identity, so the route passes `oneIdentity` false for a member of a shared workspace (someone who sees only some bots),
 // a Team Cloud, a team member's session or an enterprise workspace, and those keep upstream's "private, no-store".
 export function attachmentCacheControl(mime: string, oneIdentity: boolean): string {
+  debugger;
   return oneIdentity && mime.startsWith("image/") ? "private, max-age=31536000, immutable" : "private, no-store";
 }
