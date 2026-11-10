@@ -67,10 +67,7 @@ jobs:
   # never those of another pull request. Same steps as the types job of suyuan-ci.yml. A type error that only the merge
   # made (two pull requests that each passed) turns this run red after the release is out.
   types-cache:
-    runs-on: ${{ matrix.runner }}
-    strategy:
-      matrix:
-        runner: [ubuntu-latest, ubuntu-24.04-arm]
+    runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
       contents: read
