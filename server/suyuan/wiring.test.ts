@@ -166,6 +166,11 @@ describe("the fork's hooks into upstream files", () => {
     const composer = source("src/components/Composer.tsx");
     expect(composer).toContain("const voiceButton = useVoiceButton() || calling;");
     expect(composer).toContain("const callShown = voiceButton && (!simpleDock || (!hasContent && !stopInSlot));");
+    // With the button hidden, an empty composer in Simple mode keeps a dimmed, disabled Send in the slot.
+    expect(composer).toContain("const sendIdle = simpleDock && !hasContent && !callShown && !stopInSlot;");
+    expect(composer).toContain("{(hasContent || sendIdle) && !locked && (");
+    expect(composer).toContain('look={sendIdle ? { ...slot.button, className: cn(slot.button.className, "opacity-40") } : slot.button}');
+    expect(composer).toContain("disabled={attachmentPending || sendIdle} onSend");
     expect(composer).toContain("callBotId={voiceButton && bot && !group ? bot.id : undefined}");
     expect(source("src/components/SettingsModal.tsx")).toContain("<TalkShortcutRow />\n            <VoiceButtonRow />");
     expect(source("src/components/SettingsSimplePages.tsx")).toContain("<TalkShortcutRow />\n            <VoiceButtonRow />");
