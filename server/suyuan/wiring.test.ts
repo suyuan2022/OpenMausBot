@@ -238,4 +238,11 @@ describe("the fork's hooks into upstream files", () => {
     expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("useEffect(() => installTileMenu(), []);");
     expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/phone-tiles\.css";/m);
   });
+
+  it("the fork can add to the sections that ride outside the system prompt, and the split still reads that set", () => {
+    const prompt = source("server/system-prompt.ts");
+    expect(prompt).toContain("export const VOLATILE_SECTIONS = new Set([");
+    expect(functionBody(prompt, "buildSystemPrompt")).toContain("VOLATILE_SECTIONS.has(section.id) === volatile");
+    expect(source("server/suyuan/register.ts")).toMatch(/^import "\.\/steady-prompt\.ts";/m);
+  });
 });
