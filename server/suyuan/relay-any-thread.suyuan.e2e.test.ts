@@ -9,7 +9,7 @@ import { expect, it } from "vitest";
 import { launchVerificationServer, runControlOmb } from "../../scripts/control-omb.ts";
 import { hostTimeout } from "../testing/host-timeout.ts";
 import { ownTurnText } from "../testing/room-handoff-agent.ts";
-import { WAITS_ON_PERSON } from "./relay-gate.ts";
+import { OWN_THREADS_ONLY, WAITS_ON_PERSON } from "./relay-gate.ts";
 
 
 type Row = Record<string, any>;
@@ -144,7 +144,7 @@ it("R2 leaves the person's thread at its own approval level and always-allow lis
   expect((await f.messages(thread)).filter((message: any) => / — handed on by /.test(message.tool?.name ?? ""))).toEqual([]);
 }), hostTimeout(90_000));
 
-it("R3 refuses a notice from a Clive turn a webhook or a routine started, with upstream's words, and leaves the thread unmarked", () => scenario(async (f) => {
+it("R3 refuses a notice from a Clive turn a webhook or a routine started, saying why, and leaves the thread unmarked", () => scenario(async (f) => {
   const thread = f.mira.activeTaskId as string;
   await expect.poll(() => record(f, thread)?.threadId, { timeout: 15_000 }).toBe(thread);
   const notice = (key: string) => ({ key, match: [`${key}-RUN`], steps: [{ arguments: { bot_ids: [f.mira.id], message: "Keep it", thread, reply: "none" }, expectError: true }], reply: `${key}: refused.` });
@@ -157,8 +157,8 @@ it("R3 refuses a notice from a Clive turn a webhook or a routine started, with u
   expect(routine.status, JSON.stringify(routine.body)).toBe(201);
   expect((await f.api("POST", `/api/routines/${routine.body.routine.id}/run`)).status).toBe(201);
   await expect.poll(() => f.keys(f.clive.id), { timeout: 30_000 }).toEqual(["R3-HOOK", "R3-ROUTINE"]);
-  expect(f.replies("R3-HOOK")).toEqual([NOT_OPENED(thread)]);
-  expect(f.replies("R3-ROUTINE")).toEqual([NOT_OPENED(thread)]);
+  expect(f.replies("R3-HOOK")).toEqual([OWN_THREADS_ONLY]);
+  expect(f.replies("R3-ROUTINE")).toEqual([OWN_THREADS_ONLY]);
   expect(f.keys(f.mira.id)).toEqual([]);
   expect(f.children()).toEqual([]);
   expect(record(f, thread).outside, "the refused turn did not mark the person's thread outside").toBeFalsy();
@@ -166,7 +166,7 @@ it("R3 refuses a notice from a Clive turn a webhook or a routine started, with u
   const hookThread = f.turns(f.clive.id).find((turn: any) => turn.planKey === "R3-HOOK").threadId as string;
   await f.say(f.clive.id, hookThread, "R3-AGAIN-SAY: tell Mira to keep it.");
   await expect.poll(() => f.keys(f.clive.id), { timeout: 30_000 }).toEqual(["R3-HOOK", "R3-ROUTINE", "R3-AGAIN"]);
-  expect(f.replies("R3-AGAIN")).toEqual([NOT_OPENED(thread)]);
+  expect(f.replies("R3-AGAIN")).toEqual([OWN_THREADS_ONLY]);
   expect(f.keys(f.mira.id)).toEqual([]);
   expect(record(f, thread).outside, "a person's word in an outside conversation did not mark the person's thread outside").toBeFalsy();
 }), hostTimeout(90_000));

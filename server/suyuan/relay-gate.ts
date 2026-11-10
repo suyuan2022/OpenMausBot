@@ -6,6 +6,7 @@
 import type { TaskRecord } from "../store.ts";
 
 export const WAITS_ON_PERSON = "That thread is waiting on the person's answer, so it takes no message from a teammate now. Leave it to them, or tell them what is waiting.";
+export const OWN_THREADS_ONLY = "From this conversation a one-way notice goes only into threads you opened: a routine or webhook started this turn, or this conversation handled outside content. Say in your reply what should be passed on instead.";
 
 export interface RelayGateDeps {
   personBehind(botId: string, threadId: string): boolean;
@@ -16,7 +17,8 @@ export interface RelayGateDeps {
 }
 
 export const relayGate = (deps: RelayGateDeps, fromBotId: string, fromThreadId: string) => (task: TaskRecord): boolean => {
-  if (!deps.personBehind(fromBotId, fromThreadId) || deps.outside(fromThreadId) || !deps.readableFrom(fromThreadId)(task.threadId)) return false;
+  if (!deps.personBehind(fromBotId, fromThreadId) || deps.outside(fromThreadId)) throw new Error(OWN_THREADS_ONLY);
+  if (!deps.readableFrom(fromThreadId)(task.threadId)) return false;
   if (deps.openPersonCard(task.threadId)) throw new Error(WAITS_ON_PERSON);
   return true;
 };
