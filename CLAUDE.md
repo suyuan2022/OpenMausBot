@@ -32,7 +32,9 @@
    `env -u CLAUDECODE claude -p "<审查任务>" --model opus --effort xhigh --allowedTools "Read,Grep,Glob,Bash(git:*),Bash(gh pr view:*),Bash(gh pr diff:*)"`
    任务里写明：只报夙愿实际用法下会出的问题，按影响排，最多 5 条。只改文案或几行样式的不用审。
    它提的意见由你判断改不改。改动大的，再让它审一次改过的部分，到此为止。照意见改到了手机上才能判断的部分，回第 3 步再装一次测试版。
-6. **CI 绿了就合并。** 用 Bash 后台跑 `gh pr checks <PR 号> --watch`，结束了再看结果，不在对话里反复查。下载 Electron 这类网络错误导致的失败，用 `gh run rerun <run id> --failed` 重跑一次。只挂在 Windows 任务上的失败不用查、不用重跑：夙愿不用 Windows，在 PR 里记一句就照样合并。只改一两行配置、文案或文档的，不等 CI。推了代码 CI 没启动（GitHub Actions 偶尔故障），用 `gh workflow run ci.yml -R suyuan2022/OpenMausBot --ref <分支>` 手动触发。合并会触发自动流程 `.github/workflows/suyuan-release.yml`，打出名为 `suyuan-v<版本>` 的 release，附 npm 安装包。
+6. **CI 绿了就合并、部署。** 夙愿要的改动、他在手机上确认过的改动，走到这一步直接合并、接着做第 7 步，做完告诉他装上了哪个版本。他没提过、是你自己想加的改动，停在 PR，告诉他改了什么，他说行再合并。
+   CI 只有一个任务（`.github/workflows/suyuan-ci.yml`，几分钟）：类型检查、lint、这个 fork 自己的测试加上这个 PR 改到的测试文件、前端构建。原作者那套每个 PR 17 个任务的 `ci.yml` 在仓库的 Actions 设置里关着。原作者的全量测试 CI 不跑，所以改到原作者的文件时，推之前在本机跑那个文件对应的测试：`pnpm exec vitest run <文件路径去掉扩展名>`。
+   用 Bash 后台跑 `gh pr checks <PR 号> --watch`，结束了再看结果。只改一两行配置、文案或文档的，不等 CI。推了代码 CI 没启动（GitHub Actions 偶尔故障），用 `gh workflow run suyuan-ci.yml -R suyuan2022/OpenMausBot --ref <分支>` 手动触发。合并会触发自动流程 `.github/workflows/suyuan-release.yml`，打出名为 `suyuan-v<版本>` 的 release，附 npm 安装包。
 7. **部署。** 在 MacBook 的这个仓库里跑 `scripts/suyuan/deploy-vm.sh`：用 gh 下载最新 release，拷到虚拟机，由 `deploy-vm-remote.sh` 装上并重启服务（虚拟机访问 GitHub 时通时断，所以由 MacBook 中转）。第 3 步装过的测试版由这个正式版换掉。脚本不会打断干活的 bot：有 bot 在忙就先等，最多等 10 分钟，等不到就什么都不装、直接退出。已经在跑这个版本时什么也不做。出问题就用 `--rollback` 换回上一个正式版（测试版不算上一版）。
 
 ## 虚拟机
@@ -48,7 +50,6 @@ bot「Maus 工程师」跑在 `lizhi-vm` 的 OpenMausBot 服务里，仓库在�
 
 - 上面写「在 MacBook 上跑」「`ssh lizhi-vm`」的，在这里直接在本机跑。
 - 装测试版、部署正式版都用 `scripts/suyuan/deploy-self.sh`，参数和 `deploy-vm.sh` 一样，只是没有 `--force`。重启服务会把你自己也重启，所以它在后台等所有 bot 都空闲才装，你自己也算在内：它一跑完，你就告诉夙愿「在等空闲，装完会重启」，然后结束这一轮。服务重启后夙愿再找你时，先读 `~/.openmausbot-releases/deploy.log` 的末尾，确认装上了。
-- 装测试版、部署正式版会重启夙愿正在用的服务，合并 PR 会改动部署分支 `suyuan`：这三件事每次都要他在当次对话里明确同意。
 - 这台机器上同时跑着夙愿的真实 bot。隔离实例只用 `scripts/control-omb.ts launch` 起的临时实例，不碰 8799 端口。Chrome 和 lcu 也是共用的：测试时用 lcu 新开标签页，测完关掉自己开的，别的标签页不碰。跑全量测试、打包这类吃 CPU 的活之前看一眼 `uptime`，负载高就等一等。
 - 虚拟机连 GitHub 时通时断：`gh`、`git push` 失败就隔几分钟再试，试几次还不行就告诉夙愿。
 - 夙愿在手机上读你的回复：结论放最前面，写短。PR 和文档动笔前读 `~/.claude/guides/写给谁看.md`。
