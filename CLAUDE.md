@@ -38,8 +38,8 @@
    `env -u CLAUDECODE claude -p "<审查任务>" --model opus --effort xhigh --allowedTools "Read,Grep,Glob,Bash(git:*),Bash(gh pr view:*),Bash(gh pr diff:*)"`
    任务里写明：只报夙愿实际用法下会出的问题，按影响排，最多 5 条。它提的意见由你判断改不改。照意见改得多的，再让它审一次改过的部分，到此为止。
 6. **CI 绿了就合并。** 夙愿要的改动走到这一步直接合并、接着做第 7 步。他没提过、是你自己想加的改动，停在 PR，告诉他改了什么，他说行再合并。
-   CI 只有一个任务（`.github/workflows/suyuan-ci.yml`，约 3 分钟）：类型检查、lint、这个 fork 自己的测试加上这个 PR 改到的测试文件、前端构建。原作者那套每个 PR 17 个任务的 `ci.yml` 在仓库的 Actions 设置里关着。原作者的全量测试 CI 不跑，所以改到原作者的文件时，推之前在本机跑那个文件对应的测试：`pnpm exec vitest run <文件路径去掉扩展名>`。
-   用 Bash 后台跑 `gh pr checks <PR 号> --watch`，结束了再看结果。只改一两行配置、文案或文档的，不等 CI。推了代码 CI 没启动（GitHub Actions 偶尔故障），用 `gh workflow run suyuan-ci.yml -R suyuan2022/OpenMausBot --ref <分支>` 手动触发。合并会触发自动流程 `.github/workflows/suyuan-release.yml`，打出名为 `suyuan-v<版本>` 的 release，附 npm 安装包。
+   CI 是 `.github/workflows/suyuan-ci.yml` 里同时跑的三个任务，约 1 分钟：类型检查加 lint、这个 fork 自己的测试加上这个 PR 改到的测试文件、前端构建。类型检查从 `suyuan` 上次合并后存下的结果接着查，只重查改到的和受牵连的文件，报出的错误和从头查一样。原作者那套每个 PR 17 个任务的 `ci.yml` 在仓库的 Actions 设置里关着。原作者的全量测试 CI 不跑，所以改到原作者的文件时，推之前在本机跑那个文件对应的测试：`pnpm exec vitest run <文件路径去掉扩展名>`。
+   用 Bash 后台跑 `gh pr checks <PR 号> --watch --interval 3`（不带 `--interval` 时每 10 秒才查一次），结束了再看结果。只改一两行配置、文案或文档的，不等 CI。推了代码 CI 没启动（GitHub Actions 偶尔故障），用 `gh workflow run suyuan-ci.yml -R suyuan2022/OpenMausBot --ref <分支>` 手动触发。合并会触发自动流程 `.github/workflows/suyuan-release.yml`，打出名为 `suyuan-v<版本>` 的 release，附 npm 安装包；同一次运行里的 `types-cache` 任务把合并后的类型检查结果存下来，留给下一个 PR。`types-cache` 红了、release 照样发出来了，说明两个各自通过的 PR 合在一起出了类型错误，要接着修。
 7. **部署，查正式版，告诉他。** 在 MacBook 的这个仓库里跑 `scripts/suyuan/deploy-vm.sh`：用 gh 下载最新 release，拷到虚拟机，由 `deploy-vm-remote.sh` 装上并重启服务（虚拟机访问 GitHub 时通时断，所以由 MacBook 中转）。每次部署都要重启 9 个 bot 共用的这个服务，所以一批改动只部署一次。脚本不会打断干活的 bot：有 bot 在忙就先等，最多等 10 分钟，等不到就什么都不装、直接退出。同一时间只跑一个部署，撞上了后到的以退出码 4 结束，过一会儿重跑。已经在跑这个版本时什么也不做。装完两分钟服务还没起来，脚本自己装回之前那版，再以失败退出。
    动 `config.json` 或数据格式的，部署前先备份成 `<文件名>.bak-<日期>-<原因>`：`--rollback` 只换程序，不换回数据。
    装完查正式版：`openmausbot --version` 是新版本，`http://127.0.0.1:8799/` 应答，`bots.json` 里的 bot 和部署前一样多，`~/.openmausbot/logs/service.log` 重启后没有报错。
