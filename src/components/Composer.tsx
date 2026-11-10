@@ -508,6 +508,8 @@ export function Composer({
   // suyuan fork: hidden until Settings turns the voice button on; a running call keeps its hang-up button.
   const voiceButton = useVoiceButton() || calling;
   const callShown = voiceButton && (!simpleDock || (!hasContent && !stopInSlot));
+  // suyuan fork: with the voice button hidden nothing else fills an empty composer's slot, so Send waits there, dimmed.
+  const sendIdle = simpleDock && !hasContent && !callShown && !stopInSlot;
   const slot = slotColors(bot?.color, Boolean(group));
   // A one-to-one bot at work: Enter does the chosen follow-up and Ctrl/⌘ with it the other one. Rooms keep their own queue.
   const followUpFor = (alternate: boolean) => resolveFollowUp({ running: busy && !group && Boolean(bot), alternate, preferred: followUpDefault, canSteer }) ?? undefined;
@@ -960,9 +962,9 @@ export function Composer({
         )}
         {callShown && bot && !group && <CallButton bot={bot} placement="composer" fill={advanced || singleRow ? undefined : slot.fill} ink={slot.ink} inverse={singleRow} />}
         {callShown && group && !advanced && <GroupCallButton group={group} members={members ?? []} placement="composer" fill={slot.fill} ink={slot.ink} />}
-        {hasContent && !locked && (
-          <ComposerSendButton compact={simpleDock} waits={busy && !steersNow} label={sendNames.label} title={sendNames.title} look={slot.button}
-            disabled={attachmentPending} onSend={(alternate) => send(followUpFor(alternate))} onChoose={send}
+        {(hasContent || sendIdle) && !locked && (
+          <ComposerSendButton compact={simpleDock} waits={busy && !steersNow} label={sendNames.label} title={sendNames.title} look={sendIdle ? { ...slot.button, className: cn(slot.button.className, "opacity-40") } : slot.button}
+            disabled={attachmentPending || sendIdle} onSend={(alternate) => send(followUpFor(alternate))} onChoose={send}
             menu={followUpFor(false) && { choices: followUpChoices(followUpDefault, canSteer), name: busyName, sendKey: sendLabel, alternateKey: alternateSendLabel(sendKey) }} />
           )}
           </div>
