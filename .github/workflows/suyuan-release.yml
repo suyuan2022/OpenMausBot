@@ -16,8 +16,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 30
     # One release at a time, in merge order. Only this job queues: the cache job below never holds up the next release.
+    # Per branch, so a trial run on another branch never takes the place of a release waiting its turn (a group holds
+    # one running and one pending; a newcomer cancels the pending one).
     concurrency:
-      group: suyuan-release
+      group: suyuan-release-${{ github.ref }}
       cancel-in-progress: false
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -33,7 +35,8 @@ jobs:
       # pnpm build:server writes only dist-server and vite only dist, so the two run at once.
       - name: Build the server and the web app side by side
         run: |
-          set -uo pipefail
+          # The step's shell is bash -e: without +e a failed build would end it before both logs are printed.
+          set +e -uo pipefail
           pnpm build:server >"$RUNNER_TEMP/server.log" 2>&1 &
           server=$!
           pnpm exec vite build >"$RUNNER_TEMP/web.log" 2>&1 &
