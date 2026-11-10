@@ -1,0 +1,18 @@
+/* suyuan fork: a phone in Simple mode leads its home with the desk's tiles (Sidebar.tsx, `tiled`). On the desk a tile
+   that is not the open bot's has the sidebar's own colour and shows no card; the phone's home has the app's colour,
+   where that tile stood out as a grey card beside the open one. A long press opens a tile's menu (tile-menu.ts), so
+   iOS's own long-press callout and text selection stay off the tile, and on for the field that renames it. */
+@media (hover: none) and (pointer: coarse) and (max-width: 40rem) {
+  [data-sidebar-tile] {
+    -webkit-touch-callout: none;
+    -webkit-user-select: none;
+    user-select: none;
+  }
+  [data-sidebar-tile] input {
+    -webkit-user-select: text;
+    user-select: text;
+  }
+  [data-sidebar-tile]:not([aria-current="page"]) {
+    --tile: var(--color-app);
+  }
+}

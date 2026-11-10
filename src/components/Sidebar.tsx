@@ -987,7 +987,7 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
   const storedDensity = useSidebarDensity();
   const density = collapseToIcons ? "icons" : storedDensity;
   const simple = !advanced && density !== "icons";
-  const simpleDesk = simple && !phone;
+  const simpleDesk = simple && !phone, tiled = simple; // suyuan fork: a phone in Simple mode leads with the desk's tiles too
   const rail = !advanced && density === "icons";
   const sidePanelOpen = state.computerOpen || state.inspectorOpen;
   const sizing = useSidebarWidth({ simple: !advanced, sidePanelOpen, sidebarRef });
@@ -1102,7 +1102,7 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
   const visibleGroups = state.groups.filter((g) => !q || g.name.toLowerCase().includes(q) || g.tasks?.some((task) => task.title.toLowerCase().includes(q)));
   const viewerEmail = useViewerEmail();
   const parts = partitionSidebarBots(botDrag.preview(matchingBots), { universalPins, viewerEmail, welcoming: useWelcomingBot() });
-  const saved = simpleDesk ? withPrimaryTile(parts, myDefaultBot(state.bots, viewerEmail)?.id) : { ...parts, primary: null };
+  const saved = tiled ? withPrimaryTile(parts, myDefaultBot(state.bots, viewerEmail)?.id) : { ...parts, primary: null };
   // Shown order only: drag and Alt+Up/Down keep working on the saved order, so a reorder never stores this one.
   const { primary, unsectionedChief, pinnedBots, sectionChiefs, sectionedBots, unsectionedBots } = { ...saved, ...activeBotsFirst(saved, (bot) => {
     const { waiting, working } = sidebarBotStatus(bot, state.pendingQueued);
@@ -1122,7 +1122,7 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
   }
   const drops = botDrag.arrange({ enabled: sections.interactive && !phone, main: saved.unsectionedBots, sectioned: saved.sectionedBots, departments: sectionNames, bots: state.bots, taken: departmentNames(state) });
   const naturalSectionIds = [
-    ...(pinnedBots.length > 0 && !universalPins && !simpleDesk ? [PINNED_SECTION_ID] : []),
+    ...(pinnedBots.length > 0 && !universalPins && !tiled ? [PINNED_SECTION_ID] : []),
     ...(unsectionedRooms.length > 0 ? [CHANNELS_SECTION_ID] : []),
     ...(botChats.length > 0 ? [BOT_CHATS_SECTION_ID] : []),
     ...(unsectionedBots.length > 0 || drops.slot ? [BOTS_SECTION_ID] : []),
@@ -1130,8 +1130,8 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
   ];
   const layout = sections.arrange(naturalSectionIds);
   const sectionIds = layout.sectionIds;
-  const showPinnedCircleThreads = !simpleDesk && pinnedCircleThreadListVisible(pinnedCircles, density, pinnedBots.length);
-  const tiles = simpleDesk && (primary !== null || pinnedBots.length > 0);
+  const showPinnedCircleThreads = !tiled && pinnedCircleThreadListVisible(pinnedCircles, density, pinnedBots.length);
+  const tiles = tiled && (primary !== null || pinnedBots.length > 0);
   const { interactive: layoutInteractive, collapsed: sectionCollapsed, toggle: toggleSection } = sections;
   const archivedBots = state.bots.filter((bot) => bot.hidden && !bot.movedTo);
   const archivedEntry = remoteClient ? undefined : { count: archivedBots.length, open: () => setArchivedBotsOpen(true) };
@@ -1327,7 +1327,7 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
         </div>
       </div>}
       {!q && !phone && <SidebarInboxRow icons={density === "icons"} large={!advanced} running={attentionHasRunningWork(attention)} onOpened={phone ? onClose : undefined} />}
-      {universalPins && pinnedBots.length > 0 && !simpleDesk && (
+      {universalPins && pinnedBots.length > 0 && !tiled && (
         <div
           data-sidebar-universal-pins=""
           // vh, not %: a percentage has no height to resolve against inside the glass head.
