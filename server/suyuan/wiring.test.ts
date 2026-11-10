@@ -218,4 +218,24 @@ describe("the fork's hooks into upstream files", () => {
     expect(index).toContain("others: EXTERNAL ? undefined : relayGate({ personBehind: teammatePrompts.personBehind, outside: outsideLineage.handsNoLevel, readableFrom: threadReadableFrom, openPersonCard }, internalSender.id, internalCapability.threadId)");
     expect(index).toContain("if (!continued || continued.openedBy?.botId === internalSender.id) delegatedLevel.apply(internalSender, internalCapability.threadId, internalCapability.roomHandoffId ?? generation, recipient, target.threadId);");
   });
+
+  it("a phone in Simple mode leads its home with the desk's tiles, and a long press opens a tile's menu", () => {
+    const sidebar = source("src/components/Sidebar.tsx");
+    // One name for "this home has tiles", on the line that defines simpleDesk: the file's length is pinned.
+    expect(sidebar).toContain("const simpleDesk = simple && !phone, tiled = simple; //");
+    expect(sidebar).toContain("const saved = tiled ? withPrimaryTile(parts, ");
+    expect(sidebar).toContain("...(pinnedBots.length > 0 && !universalPins && !tiled ? [PINNED_SECTION_ID] : []),");
+    expect(sidebar).toContain("const showPinnedCircleThreads = !tiled && pinnedCircleThreadListVisible(");
+    expect(sidebar).toContain("const tiles = tiled && (primary !== null || pinnedBots.length > 0);");
+    expect(sidebar).toContain("{universalPins && pinnedBots.length > 0 && !tiled && (");
+    expect(sidebar).toContain("{tiles && <SidebarTileGrid primary={primary} pinned={pinnedBots} row={botRow} corner={corner} />}");
+    // tile-menu.ts and phone-tiles.css find a tile, its menu, its colour and the open bot's tile by these.
+    const tile = source("src/components/SidebarTiles.tsx");
+    expect(tile).toContain('data-sidebar-tile={primary ? "primary" : "pinned"}');
+    expect(tile).toContain("onContextMenu={(event) => openBotContextMenu(onMenu, bot.id, event)}");
+    expect(tile).toContain('aria-current={selected && !renaming ? "page" : undefined}');
+    expect(tile).toContain("bg-[var(--tile)]");
+    expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("useEffect(() => installTileMenu(), []);");
+    expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/phone-tiles\.css";/m);
+  });
 });
