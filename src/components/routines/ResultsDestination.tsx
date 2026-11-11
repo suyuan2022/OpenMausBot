@@ -2,6 +2,7 @@ import { useId } from "react";
 import { t } from "@/lib/i18n";
 import type { Bot } from "@/state/store";
 import { Select } from "../Select";
+import { listedThreads } from "@/suyuan/home";
 
 export function ResultsDestination({ bot, value, allowCurrent = false, onChange }: {
   bot?: Bot;
@@ -10,7 +11,7 @@ export function ResultsDestination({ bot, value, allowCurrent = false, onChange 
   onChange: (threadId: string | null | undefined) => void;
 }) {
   const id = useId();
-  const tasks = (bot?.tasks ?? []).filter((task) => !task.routineRunId);
+  const tasks = listedThreads(bot, (bot?.tasks ?? []).filter((task) => !task.routineRunId)); // suyuan fork
   const selectedMissing = typeof value === "string" && !tasks.some((task) => task.threadId === value);
   const groups = [...(bot?.projects ?? []), { id: "", name: t("folder.none") }];
   return <div className="min-w-0 space-y-1.5">

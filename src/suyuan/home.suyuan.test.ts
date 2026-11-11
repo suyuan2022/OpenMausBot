@@ -1,11 +1,12 @@
-// suyuan fork: with the thread list hidden, a bot's row, dot, count and click see its home and what waits on the person.
+// suyuan fork: with the thread list hidden, a bot's row, dot, count and click see its home and what waits on the person,
+// a background run is read and not written in, and the app offers no other conversation.
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { botShowsUnread, botUnreadCount } from "@/lib/bot-unread";
 import { sidebarBotActivityTasks, sidebarBotStatus, threadsWaitingOnPerson } from "@/components/SidebarBotActivity";
 import { markedThread, openBotRow } from "@/state/thread-navigation";
 import type { Bot } from "@/state/store";
-import { foreground, homeOf, noteThreadsShown, readsBackgroundRun, threadsShownNow } from "./home";
+import { foreground, homeOf, listedThreads, noteThreadsShown, oneConversation, readsBackgroundRun, threadsShownNow } from "./home";
 import { busyInOwnChats } from "./own-work";
 
 type Thread = NonNullable<Bot["tasks"]>[number];
@@ -28,29 +29,32 @@ describe("which threads a bot shows for", () => {
   const run = thread("run", { routineRunId: "r1", busy: true });
 
   it("keeps the home, what waits on the person, and scheduled runs; drops work and replies in background runs", () => {
-    expect(ids(foreground(lizhi([working, replied, approval, asking, run]), false).tasks)).toEqual(["home", "approval", "asking", "run"]);
+    expect(ids(foreground(lizhi([working, replied, approval, asking, run])).tasks)).toEqual(["home", "approval", "asking", "run"]);
   });
 
-  it("leaves the bot alone with the thread list shown, without a home, or when the home is not among its threads", () => {
+  it("leaves the bot alone without a home, or when the home is not among its threads", () => {
     const bot = lizhi([working, replied]);
-    expect(foreground(bot, true)).toBe(bot);
     const homeless = { ...bot, mainThreadId: undefined }, gone = { ...bot, mainThreadId: "elsewhere" };
-    expect(foreground(homeless, false)).toBe(homeless);
-    expect(foreground(gone, false)).toBe(gone);
-    expect(homeOf(gone, false)).toBeUndefined();
+    expect(foreground(homeless)).toBe(homeless);
+    expect(foreground(gone)).toBe(gone);
+    expect(homeOf(gone)).toBeUndefined();
   });
 
   it("hands back the same bot when nothing is left out, so a memoised row does not redraw", () => {
     const bot = lizhi([approval]);
-    expect(foreground(bot, false)).toBe(bot);
+    expect(foreground(bot)).toBe(bot);
   });
 
   it("stays off until the app says the thread list is hidden, so a test that never mounts the app sees upstream", () => {
     noteThreadsShown(true);
     expect(threadsShownNow()).toBe(true);
     const bot = lizhi([working, replied]);
+    expect(foreground(bot)).toBe(bot);
     expect(botShowsUnread(bot)).toBe(true);
+    expect(busyInOwnChats(bot)).toBe(true);
     expect(ids(sidebarBotActivityTasks(bot, {}))).toEqual(["work", "reply"]);
+    expect(markedThread(bot, false)).toBe("reply");
+    expect(readsBackgroundRun({ ...bot, threadId: "work" })).toBe(false);
   });
 });
 
@@ -67,12 +71,15 @@ describe("a background run, in simple mode", () => {
     expect(threadsWaitingOnPerson(bot, {})).toEqual([]);
   });
 
-  it("does not take the click on the bot", () => {
+  it("does not take the click on the bot, and a click from inside it goes home", () => {
     const bot = lizhi([working, replied]);
     expect(markedThread(bot, false)).toBeNull();
     const dispatch = vi.fn();
     openBotRow(dispatch, bot, false, false);
     expect(dispatch.mock.calls.map(([action]) => action)).toEqual([{ type: "select", id: "lizhi" }]);
+    dispatch.mockClear();
+    openBotRow(dispatch, { ...bot, threadId: "work" }, false, true);
+    expect(dispatch.mock.calls.map(([action]) => action)).toEqual([{ type: "switchTask", botId: "lizhi", threadId: "home" }]);
   });
 
   it("still shows and takes the click once it waits on an approval or an answer", () => {
@@ -93,33 +100,38 @@ describe("a background run, in simple mode", () => {
   });
 
   it("is read, not written in: any thread on screen that is not the home", () => {
-    expect(readsBackgroundRun(lizhi([working]), false)).toBe(false);
-    expect(readsBackgroundRun(lizhi([working], { threadId: "work" }), false)).toBe(true);
-    expect(readsBackgroundRun(lizhi([thread("run", { routineRunId: "r1" })], { threadId: "run" }), false)).toBe(true);
-    expect(readsBackgroundRun(lizhi([working], { threadId: "work" }), true)).toBe(false);
-    expect(readsBackgroundRun(lizhi([working], { threadId: "work", mainThreadId: undefined }), false)).toBe(false);
+    expect(readsBackgroundRun(lizhi([working]))).toBe(false);
+    expect(readsBackgroundRun(lizhi([thread("work")], { threadId: "work" }))).toBe(true);
+    expect(readsBackgroundRun(lizhi([thread("run", { routineRunId: "r1" })], { threadId: "run" }))).toBe(true);
+    expect(readsBackgroundRun(lizhi([thread("work")], { threadId: "work", mainThreadId: undefined }))).toBe(false);
   });
 
   it("keeps its composer while it waits on the person: that is where an approval is given and an answer typed", () => {
     const asking = thread("work", { busy: true, activity: "waiting-on-you" });
-    expect(readsBackgroundRun(lizhi([asking], { threadId: "work" }), false)).toBe(false);
-    expect(readsBackgroundRun(lizhi([thread("work", { openAsks: 1 })], { threadId: "work" }), false)).toBe(false);
+    expect(readsBackgroundRun(lizhi([asking], { threadId: "work" }))).toBe(false);
+    expect(readsBackgroundRun(lizhi([thread("work", { openAsks: 1 })], { threadId: "work" }))).toBe(false);
     // A question left by a turn that has ended: the thread is idle, the open card is the only sign.
     const idle = lizhi([thread("work")], { threadId: "work" });
     const card = (more: Record<string, unknown> = {}) => [{ kind: "text" }, { kind: "options", card: { requestId: "needs-input-1", ...more } }];
-    expect(readsBackgroundRun(idle, false, card())).toBe(false);
-    for (const settled of [{ answered: "answer" }, { dismissed: true }, { expired: true }]) expect(readsBackgroundRun(idle, false, card(settled))).toBe(true);
-    expect(readsBackgroundRun(idle, false, [{ kind: "options", card: {} }])).toBe(true);
+    expect(readsBackgroundRun(idle, card())).toBe(false);
+    for (const settled of [{ answered: "answer" }, { dismissed: true }, { expired: true }]) expect(readsBackgroundRun(idle, card(settled))).toBe(true);
+    expect(readsBackgroundRun(idle, [{ kind: "options", card: {} }])).toBe(true);
   });
 });
 
-describe("with the thread list shown", () => {
-  it("every thread counts, as upstream has it", () => {
+describe("one conversation per bot and room", () => {
+  it("is on with the thread list hidden and off with it shown", () => {
+    expect(oneConversation()).toBe(true);
     noteThreadsShown(true);
-    const bot = lizhi([thread("work", { busy: true }), thread("reply", { unread: true })]);
-    expect(botShowsUnread(bot)).toBe(true);
-    expect(busyInOwnChats(bot)).toBe(true);
-    expect(ids(sidebarBotActivityTasks(bot, {}))).toEqual(["work", "reply"]);
-    expect(markedThread(bot, true)).toBe("reply");
+    expect(oneConversation()).toBe(false);
+  });
+
+  it("lists the home alone where a thread is picked, and every thread with the list shown or for a bot without a home", () => {
+    const bot = lizhi([thread("work"), thread("reply")]);
+    expect(ids(listedThreads(bot, bot.tasks!))).toEqual(["home"]);
+    expect(ids(listedThreads({ ...bot, mainThreadId: undefined }, bot.tasks!))).toEqual(["home", "work", "reply"]);
+    expect(ids(listedThreads(undefined, bot.tasks!))).toEqual(["home", "work", "reply"]);
+    noteThreadsShown(true);
+    expect(ids(listedThreads(bot, bot.tasks!))).toEqual(["home", "work", "reply"]);
   });
 });

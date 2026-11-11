@@ -87,8 +87,7 @@ describe("the sidebar tiles", () => {
 
 describe("a tile with a dot", () => {
   it("lands on the thread the dot is about: a tile has no row under it to reach it from", () => {
-    // suyuan fork: a thread beside the home takes the click only while it waits on the person (src/suyuan/home.ts); upstream's thread here was merely unread.
-    const withWork = bot({ threadId: "main", mainThreadId: "main", unread: true, tasks: [{ threadId: "main", title: "Main", createdAt: 1 }, { threadId: "work", title: "@Scout · work", createdAt: 2, unread: true, activity: "waiting-on-you" }] });
+    const withWork = bot({ threadId: "main", mainThreadId: "main", unread: true, tasks: [{ threadId: "main", title: "Main", createdAt: 1 }, { threadId: "work", title: "@Scout · work", createdAt: 2, unread: true }] });
     let tree: ReactNode;
     function Capture() { tree = tile({ ...props(withWork), primary: true }); return tree; }
     renderToStaticMarkup(createElement(Capture));

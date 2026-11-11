@@ -8,10 +8,10 @@ import { isArchived, orderedSidebarThreads, orderedThreadList, threadRecency, th
 import type { SidebarDensity } from "@/lib/sidebar-preferences";
 import { localizedTaskTitle } from "@/lib/task-title";
 import { busyInOwnChats } from "@/suyuan/own-work";
-import { foreground, threadsShownNow } from "@/suyuan/home";
+import { foreground } from "@/suyuan/home";
 
 export function sidebarBotActivityTasks(bot: Bot, queued: Record<string, unknown[]>, archivedApprovals = false): Array<Task & { queued: boolean }> {
-  const tasks = foreground(bot, threadsShownNow()).tasks ?? [{
+  const tasks = foreground(bot).tasks ?? [{
     threadId: bot.threadId, title: t("task.newShort"), createdAt: 0,
     busy: bot.busy, activity: bot.activity, unread: bot.unread,
     waitingForTeammates: bot.waitingForTeammates,

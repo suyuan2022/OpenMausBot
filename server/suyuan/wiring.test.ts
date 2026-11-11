@@ -262,13 +262,22 @@ describe("the fork's hooks into upstream files", () => {
     // The app: the shell says whether the thread list is hidden; then the click on a bot, its rows and status, its dot and
     // count, and the composer of a background run follow the home.
     expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("noteThreadsShown(useShowThreads());");
-    expect(functionBody(source("src/state/thread-navigation.ts"), "markedThread")).toContain("(foreground(bot, threadsShown).tasks ?? [])");
-    expect(functionBody(source("src/components/SidebarBotActivity.tsx"), "sidebarBotActivityTasks")).toContain("const tasks = foreground(bot, threadsShownNow()).tasks ?? [{");
-    expect(functionBody(source("src/lib/bot-unread.ts"), "botShowsUnread")).toContain("return foreground(bot, threadsShownNow()).tasks!.some(");
+    expect(functionBody(source("src/state/thread-navigation.ts"), "markedThread")).toContain("(foreground(bot).tasks ?? [])");
+    expect(functionBody(source("src/components/SidebarBotActivity.tsx"), "sidebarBotActivityTasks")).toContain("const tasks = foreground(bot).tasks ?? [{");
+    expect(functionBody(source("src/lib/bot-unread.ts"), "botShowsUnread")).toContain("return foreground(bot).tasks!.some(");
     const chat = source("src/components/ChatView.tsx");
-    expect(chat).toContain('const background = readsBackgroundRun(profile, showThreads, bot.messages), canWrite = useCanWriteIn(bot.threadId, background ? "view" : bot.yourAccess);');
+    expect(chat).toContain('const background = readsBackgroundRun(profile, bot.messages), canWrite = useCanWriteIn(bot.threadId, background ? "view" : bot.yourAccess);');
     expect(chat).toContain("background ? <BackgroundRunBar onHome={() => openBot(dispatch, profile, false)} /> : <NewConversationInstead");
-    // With the list hidden the menu cannot move the home.
-    expect(source("src/components/SidebarBotMenu.tsx")).toContain("const setMain = !showThreads /* suyuan fork: the home is fixed */ || remoteClient");
+    // No other conversation is offered: a bot's and a room's ⋯ menu list no threads and start none, the bot's menu has no
+    // thread items (Set as main thread among them, so the home stays where it is), the bot panel lists no conversations,
+    // the new-thread shortcut does nothing, and a routine's results can go to the home alone.
+    for (const menu of ["src/components/ChatMoreMenu.tsx", "src/components/RoomMoreMenu.tsx"]) {
+      expect(source(menu)).toMatch(/const threads = showThreads \|\| oneConversation\(\) \? \[\] : orderedThreadList\(/);
+      expect(source(menu)).toContain('...(showThreads || oneConversation() ? [] : [{\n      key: "new-thread",');
+    }
+    expect(source("src/components/SidebarBotMenu.tsx")).toContain('const threads = oneConversation() ? [] : [divider("threads"), newThread, viewThreads, setMain];');
+    expect(source("src/components/bot-panel/DetailsTab.tsx")).toContain("{threadsShownNow() && <BotConversations bot={bot} />}");
+    expect(source("src/App.tsx")).toContain('if (!e.repeat && selected && selected.yourAccess !== "view" && threadsShownNow()) dispatch({ type: "newTask", botId: selected.id });');
+    expect(source("src/components/routines/ResultsDestination.tsx")).toContain("const tasks = listedThreads(bot, (bot?.tasks ?? []).filter((task) => !task.routineRunId));");
   });
 });

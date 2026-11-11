@@ -2510,7 +2510,7 @@
   "chat.usage.context": "上下文 {tokens}",
   "chat.usage.contextOfWindow": "上下文 {tokens}（占 {window} 的 {percent}%）",
   "chat.usage.contextShort": "已用 {value} 上下文",
-  "chat.usage.contextNudge": "对话很长：模型每次收到消息都会重新读取全部内容。新对话一开始内容较少。",
+  "chat.usage.contextNudge": "对话很长：模型每次收到消息都会重新读取全部内容。要聊另一件事，可以新建一个群聊。",
   "chat.usage.newNote": "「添加」是指模型先前未看过的文本；其余内容是每回合都会从缓存重新读取的上下文",
   "chat.usage.in": "输入 {tokens}",
   "chat.usage.inCached": "输入 {tokens}（缓存 {cached}）",

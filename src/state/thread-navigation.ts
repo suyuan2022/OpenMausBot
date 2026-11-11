@@ -62,7 +62,7 @@ const markRank = (task: RowThread): number | null => {
 export function markedThread(bot: Pick<NotificationThreadOwner, "threadId" | "mainThreadId" | "tasks">, threadsShown: boolean): string | null {
   const home = botOpensTo(bot, threadsShown);
   const stamp = (task: RowThread) => task.updatedAt ?? task.createdAt ?? 0;
-  const marked = (foreground(bot, threadsShown).tasks ?? []).flatMap((task) => { const rank = markRank(task); return rank === null ? [] : [{ task, rank }]; })
+  const marked = (foreground(bot).tasks ?? []).flatMap((task) => { const rank = markRank(task); return rank === null ? [] : [{ task, rank }]; })
     .sort((a, b) => a.rank - b.rank || Number(b.task.threadId === home) - Number(a.task.threadId === home) || stamp(b.task) - stamp(a.task));
   return marked[0]?.task.threadId ?? null;
 }

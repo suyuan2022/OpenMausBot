@@ -18,6 +18,7 @@ import { groupUsageSummary } from "./GroupUsageChip";
 import { ShortcutHint } from "./ShortcutHint";
 import { SidebarPopoverMenu, type SidebarMenuItem } from "./SidebarPopoverMenu";
 import { orderedThreadList } from "./SidebarThreadRow";
+import { oneConversation } from "@/suyuan/home";
 
 function turnLimitLabel(minutes: number): string {
   if (minutes === 60) return t("room.panel.hour");
@@ -34,7 +35,7 @@ function useRoomMoreItems(group: Group): { items: SidebarMenuItem[]; on: boolean
   const messages = group.messages;
   const hasMessages = messages.length > 0;
   const transcript = () => formatTranscriptMarkdown({ title: group.name, messages, isGroup: true });
-  const threads = showThreads ? [] : orderedThreadList(group.tasks ?? []);
+  const threads = showThreads || oneConversation() ? [] : orderedThreadList(group.tasks ?? []); // suyuan fork
   const usage = groupUsageSummary(group.usage);
   const items: SidebarMenuItem[] = [
     {
@@ -45,7 +46,7 @@ function useRoomMoreItems(group: Group): { items: SidebarMenuItem[]; on: boolean
       trailing: <ShortcutHint id="find-conversation" />,
       onSelect: () => requestChatFind(group.threadId),
     },
-    ...(showThreads ? [] : [{
+    ...(showThreads || oneConversation() ? [] : [{
       key: "new-thread",
       heading: t("task.list"),
       separatorBefore: true,
