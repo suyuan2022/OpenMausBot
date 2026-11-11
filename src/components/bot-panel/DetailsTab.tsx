@@ -11,6 +11,7 @@ import { BotConversations } from "./Conversations";
 import type { SimplePageId } from "./page-registry";
 import { TryAsking } from "./TryAsking";
 import { Card, NavRow, RowIcon, rowCls, RowText } from "./rows";
+import { threadsShownNow } from "@/suyuan/home";
 
 type Derived = ReturnType<typeof useBotSettingsDerived>;
 
@@ -60,7 +61,7 @@ export function DetailsTab({ bot, derived, onOpen }: {
         </div>
       </Card>
 
-      <BotConversations bot={bot} />
+      {threadsShownNow() && <BotConversations bot={bot} />}
 
       {derived.botRoutines.length === 0 ? (
         <div data-panel-empty="routines" className="px-3 py-7 text-center text-[13px] leading-[18px] text-ink-tertiary">

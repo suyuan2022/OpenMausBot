@@ -73,6 +73,7 @@ import { useChiefStepOpen } from "@/lib/default-bot";
 import { useSessionEnded } from "@/lib/session-ended";
 import { PairPage } from "./pair/PairPage";
 import { WebPanelPage } from "@/components/WebPanelPage";
+import { threadsShownNow } from "@/suyuan/home";
 
 function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
   const { state, dispatch } = useStore();
@@ -189,7 +190,7 @@ function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
         e.preventDefault();
         if (e.shiftKey) {
           const selected = state.bots.find((bot) => bot.id === state.selectedId && !bot.hidden);
-          if (!e.repeat && selected && selected.yourAccess !== "view") dispatch({ type: "newTask", botId: selected.id });
+          if (!e.repeat && selected && selected.yourAccess !== "view" && threadsShownNow()) dispatch({ type: "newTask", botId: selected.id }); // suyuan fork: no new conversation where the list is hidden
         } else {
           dispatch({ type: "newBot" });
         }
