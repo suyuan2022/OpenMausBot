@@ -36,7 +36,7 @@ suyuan2022/OpenMausBot 是 [milind-soni/OpenMausBot](https://github.com/milind-s
 | 切换对话只拉最新 80 条（上游）：切进一个对话或群里的对话时请求最新 80 条，原来是 200 条；往上滚照旧按 200 条一页拉更早的 | 长对话带着大段工具输入时 200 条能到约 3 MB，经北京中转要等好几秒 | 上游提交 `fad2d0733` 原样拿来：`src/state/store.tsx` 3 行，测试 `src/state/chat-switch-page.test.ts`、`src/state/room-navigation.test.ts` | 来自上游：下次整体合上游后删掉这一行 |
 | Claude Code 不认 `--autocompact` 时不再每轮失败（上游）：某个版本的 Claude Code 启动时报 `unknown option '--autocompact'`，服务端记下这个版本，之后不再给它这个参数，这一轮去掉参数在原处重来；装回这个版本也不会再加上 | 2.1.129 这类版本 `--help` 里列着 `--autocompact` 却拒收，原来每一轮都启动失败 | 上游 PR #5048（`d4bf62972^1..d4bf62972^2` 的 9 个提交，其中 2 个是空的重跑 CI 提交，没拿）原样拿来：`server/drivers/claude.ts`、`server/drivers/claude.test.ts`、`server/testing/fake-claude-cli.ts` | 来自上游：下次整体合上游后删掉这一行 |
 | `coordinate_bots` 的工具说明跟上「递话放开」：说明里写明单向通知（`reply: "none"`）也能递进夙愿或别的 bot 开的对话，不只是自己开的；定时任务、webhook 起的这一轮，或来源对话带外来标记时被拒，报错直接说是这个原因、让它在回复里说要转达什么，不再说「这不是你开的对话」 | 所有 bot 都读这份说明；原来写着只能指定自己开的对话，bot 照着说明就不会去递；被拒时的报错和说明对不上，bot 会以为编号错了、另开一条对话 | `server/drivers/agents-catalog.ts` 1 行，工具清单金样 `server/drivers/agents-catalog-goldens/` 4 个文件重新生成（体积多约 100 字节，在原作者 2% 的预算内，`BUDGET_BASELINE` 没动）；`server/suyuan/relay-gate.ts` 的拒绝原因和它的两份用例 | 跟「递话放开」一起还 |
-| 一个 bot 一个家（第一步，完整规则见「待做」里同名一节）：简洁模式下，每个 bot 有一条固定的对话（家），别的对话是后台运行。后台运行有未读、在干活时，bot 那行不亮红点、不显示工作中、下面不出子行、不计入 App 图标数字，点 bot 进的是家；它正等夙愿批准或回答时照常亮、照常带他进去。进到后台运行里（从派活消息下的小标签），输入框换成一行「后台对话，只能看」和「返回你的聊天」；它等批准或回答期间保留输入框，批准卡就画在那里。服务端：家是夙愿选定的那条，没选过就在不由 bot 开的对话里按原作者的规则挑；bot 关不掉家（`close_thread` 拒绝，派活干完的自动关也跳过）；点名往家里派要回报的活被拒，沿用的工作对话已成了家就另开一条，单向通知照收。简洁模式的 bot 菜单里不再有「设为主对话」。高级模式不变 | 点 bot 会被带进「有未读」或「在干活」的对话，常常是别的 bot 派活开的那条，夙愿在里面接着聊，它就成了主对话：11 个 bot 里 5 个是这么来的 | `server/index.ts` 改 4 行、不增行，`server/host/work-thread.ts` 6 行，`server/routes/internal-threads.ts` 2 行，`src/components/ChatView.tsx` 改 3 行、不增行，`src/state/thread-navigation.ts`、`src/components/SidebarBotActivity.tsx` 各 2 行，`src/lib/bot-unread.ts` 3 行，`src/components/SidebarBotMenu.tsx` 1 行；原作者用例 `src/state/thread-navigation.test.ts` 改 4 条、`src/components/SidebarTiles.test.ts` 改 1 条的数据（都是断言「点 bot 进有未读或在干活的对话」）；新文件 `server/suyuan/home.ts`、`src/suyuan/home.ts`、`src/suyuan/BackgroundRunBar.tsx` 和三份用例，`src/suyuan/own-work.ts`、`src/suyuan/use-suyuan.ts` 接入 | 不还：原作者有意让多条对话并存 |
+| 一个 bot 一个家（前两步，完整规则见「待做」里同名一节）：简洁模式下，每个 bot 有一条固定的对话（家），别的对话是后台运行。后台运行有未读、在干活时，bot 那行不亮红点、不显示工作中、下面不出子行、不计入 App 图标数字，点 bot 进的是家；它正等夙愿批准或回答时照常亮、照常带他进去。进到后台运行里（从派活消息下的小标签），输入框换成一行「后台对话，只能看」和「返回你的聊天」；它等批准或回答期间保留输入框，批准卡就画在那里。服务端：家是夙愿选定的那条，没选过就在不由 bot 开的对话里按原作者的规则挑；bot 关不掉家（`close_thread` 拒绝，派活干完的自动关也跳过）；点名往家里派要回报的活被拒，沿用的工作对话已成了家就另开一条，单向通知照收。简洁模式里不再提供别的对话：对话页和群的「⋯」菜单没有「新对话」和「切换对话」，bot 的菜单没有「新对话」「查看对话」「设为主对话」，bot 面板没有对话列表，Cmd/Ctrl+Shift+N 不新建对话，定时任务的结果去向只能选家；对话太长时的提示改成「要聊另一件事，可以新建一个群聊」。这些判断由 App 外壳每次渲染时告诉 fork 的模块「对话列表是否隐藏」才生效，所以原作者的用例一条没改。高级模式不变 | 点 bot 会被带进「有未读」或「在干活」的对话，常常是别的 bot 派活开的那条，夙愿在里面接着聊，它就成了主对话：11 个 bot 里 5 个是这么来的 | `server/index.ts` 改 4 行、不增行，`server/host/work-thread.ts` 6 行，`server/routes/internal-threads.ts` 2 行，`src/components/ChatView.tsx` 改 3 行、不增行，`src/state/thread-navigation.ts`、`src/components/SidebarBotActivity.tsx`、`src/components/SidebarBotMenu.tsx`、`src/App.tsx`、`src/components/bot-panel/DetailsTab.tsx`、`src/components/routines/ResultsDestination.tsx` 各 2 行，`src/lib/bot-unread.ts`、`src/components/ChatMoreMenu.tsx`、`src/components/RoomMoreMenu.tsx` 各 3 行，`src/locales/zh.json` 1 句；新文件 `server/suyuan/home.ts`、`src/suyuan/home.ts`、`src/suyuan/BackgroundRunBar.tsx` 和三份用例，`src/suyuan/own-work.ts`、`src/suyuan/use-suyuan.ts` 接入 | 不还：原作者有意让多条对话并存 |
 
 ## 待做
 
@@ -52,7 +52,7 @@ suyuan2022/OpenMausBot 是 [milind-soni/OpenMausBot](https://github.com/milind-s
 
 ### 一个 bot 只有一条和夙愿的对话
 
-排在上面七条之前做，分三步。第一步做完了，在上面的清单里；还剩第二、三步。
+排在上面七条之前做，分三步。前两步做完了，在上面的清单里；还剩第三步。
 
 **做成什么样。** 每个 bot 有一条固定的对话，下面叫它的「家」：夙愿和这个 bot 说话只在这里。bot 身上别的对话都算后台运行，包括别的 bot 派活开的、定时任务每次跑的、bot 自己另开的。后台运行不进任何列表、不亮红点，点 bot 不会被带进去；夙愿能进去看，不能在里面说话。
 
@@ -74,9 +74,6 @@ suyuan2022/OpenMausBot 是 [milind-soni/OpenMausBot](https://github.com/milind-s
 
 **不改的。** bot 之间派活的机制；电脑上的 Claude 找 bot 的方式（走一次性定时任务，本来就是后台运行）；bot 自己另开的对话，结果暂时不带回家。
 
-**还剩两步。**
-
-1. 列表里只留家，去掉「新对话」入口。
-2. 改写「最近工作」那一行和写给 bot 看的工具说明。它和 PR #29（系统提示词里每回合会变的内容不再让缓存失效）改同一段，叠在它上面做。
+**还剩一步。** 改写「最近工作」那一行和写给 bot 看的工具说明。它和 PR #29（系统提示词里每回合会变的内容不再让缓存失效）改同一段，叠在它上面做。
 
 **上线时改两处真实数据，改前备份。** 给现有 11 个 bot 设家（夙愿逐个定过）；打开群聊记忆。
