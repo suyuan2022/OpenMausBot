@@ -48,3 +48,28 @@ describe("workThreadFor, notices into threads someone else opened", () => {
     expect(fromChief("by-chief", true, never)?.threadId).toBe("by-chief");
   });
 });
+
+describe("workThreadFor, a teammate's home", () => {
+  // Chief once opened "by-chief" on Maus; the person kept talking there and it is now Maus's home.
+  const home = (candidate: TaskRecord) => candidate.threadId === "by-chief";
+  const send = (thread: string, notice: boolean, standing?: TaskRecord) => workThreadFor(
+    { ...store, workThread: ((_bot: string, _from: string, _fromThread: string, _lane?: boolean, also: (candidate: TaskRecord) => boolean = () => true) => (standing && also(standing) ? standing : undefined)) as never },
+    { botId: "maus", botName: "Maus", fromBotId: "chief", fromThreadId: "chief-chat", thread, notice, answering: undefined, also: () => true, reach: () => true, others: () => true, home });
+
+  it("refuses new work named into the home, and says so instead of upstream's not-yours", () => {
+    expect(() => send("by-chief", false)).toThrow(/Maus's main conversation with the person/);
+    expect(() => send("by-person", false)).toThrow(NOT_OPENED);
+  });
+
+  it("still takes a one-way notice there", () => {
+    expect(send("by-chief", true)?.threadId).toBe("by-chief");
+  });
+
+  it("opens a fresh work thread when the standing one has become the home, and keeps it for a notice", () => {
+    const standing = tasks.find((candidate) => candidate.threadId === "by-chief")!;
+    expect(send("standing", false, standing)).toBeUndefined();
+    expect(send("standing", true, standing)?.threadId).toBe("by-chief");
+    const other = task("other-work", by("chief", "Chief", "chief-chat"));
+    expect(send("standing", false, other)?.threadId).toBe("other-work");
+  });
+});

@@ -2,9 +2,11 @@
 import { useEffect, useLayoutEffect } from "react";
 import { t } from "@/lib/i18n";
 import { useRoomPanel } from "@/lib/room-panel";
+import { useShowThreads } from "@/lib/thread-preferences";
 import { useInboxPanel } from "@/state/inbox";
 import type { Action, AppState } from "@/state/store";
 import { chatAlone } from "./chat-alone";
+import { noteThreadsShown } from "./home";
 import { liftFrame, noteApp, noteAppGone } from "./last-frame";
 import "./phone-code.css";
 import "./phone-tables.css";
@@ -26,6 +28,8 @@ import "./wide-replies.css";
 const SETTLE_MS = 150;
 
 export function useSuyuan(state: AppState, dispatch: (action: Action) => void): void {
+  // During render, not in an effect: the sidebar and the chat render right after and read it (./home.ts).
+  noteThreadsShown(useShowThreads());
   useWebPush(state, dispatch);
   const loaded = state.hydrated === true;
   const alone = chatAlone(state, { inboxOpen: useInboxPanel().open, roomOpen: useRoomPanel() !== null });

@@ -5,6 +5,7 @@ import type { BotRecord, Store, TaskRecord } from "../store.ts";
 import { PASS, type RouteHandler } from "./table.ts";
 import { conversationLanguage, serverLine } from "../server-lines.ts";
 import { createChiefReadRoutes } from "../suyuan/chief-read-threads.ts";
+import { homeStaysOpen, isHome } from "../suyuan/home.ts";
 
 type ThreadState = "running" | "waiting-on-you" | "queued" | "idle" | "closed";
 
@@ -95,6 +96,7 @@ export function createInternalThreadRoutes(deps: {
       return json(res, 403, { error: "that thread is not yours to close — only the bot that opened it, its own bot, or (for a thread a bot opened) a Chief of Staff can" });
     }
     if (threadId === fromThreadId) return json(res, 400, { error: "you cannot close the thread you are speaking in — finish your turn instead" });
+    if (isHome(store, owner.id, threadId)) return json(res, 409, { error: homeStaysOpen(owner.name) });
     if (coordinator.awaitingAnswer(threadId)) {
       return json(res, 409, { error: `#${task.title} is waiting on the person's answer to its question — it continues once they reply there, so leave it open` });
     }

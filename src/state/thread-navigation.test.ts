@@ -13,16 +13,18 @@ const opened = (bot: ReturnType<typeof chief>, threadsShown: boolean, onScreen =
 afterEach(() => setTeamChats(null));
 
 describe("what a bot's row or tile is marked for", () => {
+  // suyuan fork: with threads hidden only the bot's home and what waits on the person are marked (src/suyuan/home.ts), so
+  // the threads beside the main one are marked here with threads shown, where upstream's order still holds.
   it("is what waits on the person first, then an unread reply, then work under way", () => {
     const working = { threadId: "work", busy: true }, unread = { threadId: "reply", unread: true }, waiting = { threadId: "ask", activity: "waiting-on-you" };
-    expect(markedThread(chief([working]), false)).toBe("work");
-    expect(markedThread(chief([working, unread]), false)).toBe("reply");
+    expect(markedThread(chief([working]), true)).toBe("work");
+    expect(markedThread(chief([working, unread]), true)).toBe("reply");
     expect(markedThread(chief([working, unread, waiting]), false)).toBe("ask");
   });
 
   it("is the newest of equals, unless the thread the bot opens to is one of them", () => {
     const older = { threadId: "older", unread: true, updatedAt: 5 }, newer = { threadId: "newer", unread: true, updatedAt: 9 };
-    expect(markedThread(chief([older, newer]), false)).toBe("newer");
+    expect(markedThread(chief([older, newer]), true)).toBe("newer");
     expect(markedThread({ ...chief([older, newer]), tasks: [{ threadId: "main", unread: true, createdAt: 1 }, older, newer] }, false)).toBe("main");
   });
 
@@ -41,17 +43,20 @@ describe("what a bot's row or tile is marked for", () => {
 describe("a click on a bot's row or tile", () => {
   const work = { threadId: "work", unread: true };
 
+  // suyuan fork: with threads hidden a thread beside the home takes the click only while it waits on the person.
   it("lands on the thread the dot is about, by the switch alone so the thread left behind stays unread", () => {
-    expect(opened(chief([work]), false)).toEqual([{ type: "switchTask", botId: "cos", threadId: "work" }]);
+    expect(opened(chief([{ ...work, activity: "waiting-on-you" }]), false)).toEqual([{ type: "switchTask", botId: "cos", threadId: "work" }]);
+    expect(opened(chief([work]), false)).toEqual([{ type: "select", id: "cos" }]);
   });
 
   it("selects first while threads are shown, as every thread opener does there", () => {
     expect(opened(chief([work]), true)).toEqual([{ type: "select", id: "cos" }, { type: "switchTask", botId: "cos", threadId: "work" }]);
   });
 
-  it("lands on a thread a teammate's work is running in, and a second click comes back to the main chat", () => {
+  // suyuan fork: upstream lands on the running thread first; here work in a background run does not take the click.
+  it("stays in the main chat while a teammate's work is running in another thread, and comes back to it from there", () => {
     const running = { threadId: "work", busy: true };
-    expect(opened(chief([running]), false)).toEqual([{ type: "switchTask", botId: "cos", threadId: "work" }]);
+    expect(opened(chief([running]), false)).toEqual([{ type: "select", id: "cos" }]);
     expect(opened(chief([running], "work"), false, true)).toEqual([{ type: "switchTask", botId: "cos", threadId: "main" }]);
   });
 

@@ -248,4 +248,27 @@ describe("the fork's hooks into upstream files", () => {
     expect(source("src/components/ChatView.tsx")).toContain("const text = user ? rawText : stripLeakedSystemHarnessMessages(rawText);");
     expect(source("src/components/GroupView.tsx")).toContain('const rawText = user ? (m.text ?? "") : stripLeakedSystemHarnessMessages(m.text ?? "");');
   });
+
+  it("a bot has one home: the server names it, no bot closes it or works in it, and the app shows a bot for its home alone", () => {
+    const index = source("server/index.ts");
+    // The home is what clients get as mainThreadId; a Team Cloud keeps upstream's rule.
+    expect(functionBody(index, "botMainThread")).toContain("return (CLOUD_TEAM ? mainThread : homeThread)(mainThreadTasks(botId), store.bot(botId)?.threadId, store.bot(botId)?.mainThreadChoice);");
+    expect(index).toContain("home: (task) => isHome(store, target.botId, task.threadId) });");
+    expect(index).toContain('childTask?.openedBy?.kind === "work" && childTask.openedBy.botId === parent.botId && !isHome(store, child.botId, child.threadId)) {');
+    const work = source("server/host/work-thread.ts");
+    expect(work).toContain("(task) => also(task) && reach(task) && !(input.home?.(task) && !input.notice));");
+    expect(work).toContain("&& !task.openedBy.roomLane && !input.notice && input.home?.(task)) throw new Error(homeTakesNoWork(input.botName));");
+    expect(source("server/routes/internal-threads.ts")).toContain("if (isHome(store, owner.id, threadId)) return json(res, 409, { error: homeStaysOpen(owner.name) });");
+    // The app: the shell says whether the thread list is hidden; then the click on a bot, its rows and status, its dot and
+    // count, and the composer of a background run follow the home.
+    expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("noteThreadsShown(useShowThreads());");
+    expect(functionBody(source("src/state/thread-navigation.ts"), "markedThread")).toContain("(foreground(bot, threadsShown).tasks ?? [])");
+    expect(functionBody(source("src/components/SidebarBotActivity.tsx"), "sidebarBotActivityTasks")).toContain("const tasks = foreground(bot, threadsShownNow()).tasks ?? [{");
+    expect(functionBody(source("src/lib/bot-unread.ts"), "botShowsUnread")).toContain("return foreground(bot, threadsShownNow()).tasks!.some(");
+    const chat = source("src/components/ChatView.tsx");
+    expect(chat).toContain('const background = readsBackgroundRun(profile, showThreads), canWrite = useCanWriteIn(bot.threadId, background ? "view" : bot.yourAccess);');
+    expect(chat).toContain("background ? <BackgroundRunBar onHome={() => openBot(dispatch, profile, false)} /> : <NewConversationInstead");
+    // With the list hidden the menu cannot move the home.
+    expect(source("src/components/SidebarBotMenu.tsx")).toContain("const setMain = !showThreads /* suyuan fork: the home is fixed */ || remoteClient");
+  });
 });

@@ -1,5 +1,6 @@
 import type { Store, TaskRecord } from "../store.ts";
 import { OUTSIDE_STAYS_HERE } from "./outside-lineage.ts";
+import { homeTakesNoWork } from "../suyuan/home.ts";
 
 /** Where coordinate_bots sends to a teammate outside a room, by its `thread`: "standing" is the sender conversation's one
  * work thread with that teammate (undefined until it is opened), "new" opens one (undefined), and any other value is the id
@@ -12,13 +13,16 @@ export function workThreadFor(store: Pick<Store, "workThread" | "taskByThread">,
   /** Whether the sender's work may reach this thread at all; when it may not, it says so in its own words. */
   reach: (task: TaskRecord) => boolean;
   /** suyuan fork: whether a one-way notice may go into a thread someone else opened (it throws to say why not). */
-  others?: (task: TaskRecord) => boolean }): TaskRecord | undefined {
+  others?: (task: TaskRecord) => boolean;
+  /** suyuan fork: whether the thread is the teammate's home, its one conversation with the person. */
+  home?: (task: TaskRecord) => boolean }): TaskRecord | undefined {
   const { botId, thread, also, reach } = input;
   if (thread === "new") return undefined;
-  if (thread === "standing") return store.workThread(botId, input.fromBotId, input.fromThreadId, false, (task) => also(task) && reach(task));
+  if (thread === "standing") return store.workThread(botId, input.fromBotId, input.fromThreadId, false, (task) => also(task) && reach(task) && !(input.home?.(task) && !input.notice));
   const task = store.taskByThread(botId, thread);
   if (task && !reach(task)) throw new Error(OUTSIDE_STAYS_HERE);
   const usable = task !== undefined && task.archivedAt === undefined && also(task);
+  if (usable && task.openedBy?.botId === input.fromBotId && !task.openedBy.roomLane && !input.notice && input.home?.(task)) throw new Error(homeTakesNoWork(input.botName));
   if (usable && task.openedBy?.botId === input.fromBotId && !task.openedBy.roomLane) return task;
   const handedWork = usable && input.answering?.botId === botId && input.answering.threadId === thread;
   if (handedWork && input.notice) return task;
