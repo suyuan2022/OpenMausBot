@@ -99,6 +99,18 @@ describe("a background run, in simple mode", () => {
     expect(readsBackgroundRun(lizhi([working], { threadId: "work" }), true)).toBe(false);
     expect(readsBackgroundRun(lizhi([working], { threadId: "work", mainThreadId: undefined }), false)).toBe(false);
   });
+
+  it("keeps its composer while it waits on the person: that is where an approval is given and an answer typed", () => {
+    const asking = thread("work", { busy: true, activity: "waiting-on-you" });
+    expect(readsBackgroundRun(lizhi([asking], { threadId: "work" }), false)).toBe(false);
+    expect(readsBackgroundRun(lizhi([thread("work", { openAsks: 1 })], { threadId: "work" }), false)).toBe(false);
+    // A question left by a turn that has ended: the thread is idle, the open card is the only sign.
+    const idle = lizhi([thread("work")], { threadId: "work" });
+    const card = (more: Record<string, unknown> = {}) => [{ kind: "text" }, { kind: "options", card: { requestId: "needs-input-1", ...more } }];
+    expect(readsBackgroundRun(idle, false, card())).toBe(false);
+    for (const settled of [{ answered: "answer" }, { dismissed: true }, { expired: true }]) expect(readsBackgroundRun(idle, false, card(settled))).toBe(true);
+    expect(readsBackgroundRun(idle, false, [{ kind: "options", card: {} }])).toBe(true);
+  });
 });
 
 describe("with the thread list shown", () => {

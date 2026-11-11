@@ -266,7 +266,7 @@ describe("the fork's hooks into upstream files", () => {
     expect(functionBody(source("src/components/SidebarBotActivity.tsx"), "sidebarBotActivityTasks")).toContain("const tasks = foreground(bot, threadsShownNow()).tasks ?? [{");
     expect(functionBody(source("src/lib/bot-unread.ts"), "botShowsUnread")).toContain("return foreground(bot, threadsShownNow()).tasks!.some(");
     const chat = source("src/components/ChatView.tsx");
-    expect(chat).toContain('const background = readsBackgroundRun(profile, showThreads), canWrite = useCanWriteIn(bot.threadId, background ? "view" : bot.yourAccess);');
+    expect(chat).toContain('const background = readsBackgroundRun(profile, showThreads, bot.messages), canWrite = useCanWriteIn(bot.threadId, background ? "view" : bot.yourAccess);');
     expect(chat).toContain("background ? <BackgroundRunBar onHome={() => openBot(dispatch, profile, false)} /> : <NewConversationInstead");
     // With the list hidden the menu cannot move the home.
     expect(source("src/components/SidebarBotMenu.tsx")).toContain("const setMain = !showThreads /* suyuan fork: the home is fixed */ || remoteClient");

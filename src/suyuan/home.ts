@@ -38,8 +38,17 @@ export function foreground<B extends Owner>(bot: B, threadsShown: boolean): B {
   return kept.length === bot.tasks.length ? bot : { ...bot, tasks: kept };
 }
 
-/** Whether the thread on screen is a background run: the person reads it and writes at home. */
-export function readsBackgroundRun(bot: Owner, threadsShown: boolean): boolean {
+type Card = { requestId?: string; answered?: unknown; dismissed?: unknown; expired?: unknown };
+
+/** A card in the thread that still waits on the person: an approval, or a question. */
+const openCard = (message: { kind?: string; card?: Card | null }) =>
+  message.kind === "options" && Boolean(message.card?.requestId) && !message.card?.answered && !message.card?.dismissed && !message.card?.expired;
+
+/** Whether the thread on screen is a background run the person only reads: they write at home. While the run waits on
+ * them it keeps its composer, which is where an approval is given and an answer typed; `messages` are the thread's. */
+export function readsBackgroundRun(bot: Owner, threadsShown: boolean, messages: ReadonlyArray<{ kind?: string; card?: Card | null }> = []): boolean {
   const home = homeOf(bot, threadsShown);
-  return home !== undefined && bot.threadId !== home;
+  if (home === undefined || bot.threadId === home) return false;
+  const onScreen = bot.tasks?.find((task) => task.threadId === bot.threadId);
+  return !(onScreen && waitsOnPerson(onScreen)) && !messages.some(openCard);
 }

@@ -825,7 +825,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   const phone = useMediaQuery(PHONE_LAYOUT);
   const phoneMenu = phone && !remoteClient;
   const simpleHead = !advanced && !remoteClient;
-  const background = readsBackgroundRun(profile, showThreads), canWrite = useCanWriteIn(bot.threadId, background ? "view" : bot.yourAccess); // suyuan fork
+  const background = readsBackgroundRun(profile, showThreads, bot.messages), canWrite = useCanWriteIn(bot.threadId, background ? "view" : bot.yourAccess); // suyuan fork
 
   const computerStarting = computerStartLine(state.computerStarts[bot.id], bot.name); useScreensWhile(Boolean(computerStarting));
   const mascotMotion = state.mascotMotion?.botId === bot.id ? state.mascotMotion : null;
