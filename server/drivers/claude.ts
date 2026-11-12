@@ -61,6 +61,7 @@ import { BACKGROUND_CALL_TIMEOUT_MS, backgroundCallArgs, spawnBackgroundCall } f
 import { permissionLaunchCwd, shellRequest } from "./permission-command.ts"; import { readToolPaths } from "../own-file-reads.ts";
 import { SPAWNED_PROXIES } from "../proxy-paths.ts"; import { OWN_APPS_SERVER } from "../../shared/own-apps.ts";
 import { extractMcpImages } from "../mcp-tool-images.ts"; import { claudeToolDraft } from "./tool-progress.ts";
+import { volatileHookEntries } from "../suyuan/compact-volatile.ts"; // suyuan fork
 import {
   ASK_USER_QUESTION_TOOL,
   ASK_USER_TOOL,
@@ -420,7 +421,7 @@ export function claudeHookSettings(helperPath: string, platform: NodeJS.Platform
     ? { type: "command", command: process.execPath, args: [helperPath], timeout: 5 }
     : { type: "command", command: [process.execPath, helperPath].map(path => `'${path.replace(/'/g, "'\\''")}'`).join(" "), timeout: 5 };
   const entry = [{ matcher: "", hooks: [hook] }];
-  return { PostToolUse: entry, PostToolUseFailure: entry, PreCompact: entry, SessionStart: entry, Stop: entry };
+  return { PostToolUse: entry, PostToolUseFailure: entry, PreCompact: entry, SessionStart: [...entry, ...volatileHookEntries(hook)], Stop: entry };
 }
 
 export function permissionSocketPath(threadId: string, botId?: string) {

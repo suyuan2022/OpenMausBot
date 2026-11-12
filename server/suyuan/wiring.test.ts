@@ -280,4 +280,28 @@ describe("the fork's hooks into upstream files", () => {
     expect(source("src/App.tsx")).toContain('if (!e.repeat && selected && selected.yourAccess !== "view" && threadsShownNow()) dispatch({ type: "newTask", botId: selected.id });');
     expect(source("src/components/routines/ResultsDestination.tsx")).toContain("const tasks = listedThreads(bot, (bot?.tasks ?? []).filter((task) => !task.routineRunId));");
   });
+
+  it("the fork can add to the sections that ride outside the system prompt, and the split still reads that set", () => {
+    const prompt = source("server/system-prompt.ts");
+    expect(prompt).toContain("export const VOLATILE_SECTIONS = new Set([");
+    expect(functionBody(prompt, "buildSystemPrompt")).toContain("VOLATILE_SECTIONS.has(section.id) === volatile");
+    expect(source("server/suyuan/register.ts")).toMatch(/^import "\.\/steady-prompt\.ts";/m);
+  });
+
+  it("after a compaction the running turn's volatile half goes back to Claude on hooks of its own", () => {
+    const index = source("server/index.ts");
+    expect(index).toContain('import { noteTurnVolatile, volatileHookReply } from "./suyuan/compact-volatile.ts";');
+    // Each turn notes its half under the generation its hooks bearer carries.
+    expect(index).toContain("integrations.hooks = hooksIntegration(bot.id, threadId, dispatchClaimId);");
+    expect(index).toContain("noteTurnVolatile(threadId, dispatchClaimId, prompt.volatile);");
+    expect(index).toContain("integrations.hooks = hooksIntegration(bot.id, threadId, internalGeneration);");
+    expect(index).toContain("noteTurnVolatile(threadId, internalGeneration, roomSystem.volatile);");
+    expect(index).toContain("return json(res, 200, volatileHookReply(body, internalCapability, () => internalCapabilityIsActive(internalCapability)) ?? ingestEngineHook(internalCapability, body));");
+    const claude = source("server/drivers/claude.ts");
+    expect(claude).toMatch(/^import \{ volatileHookEntries \} from "\.\.\/suyuan\/compact-volatile\.ts";/m);
+    expect(functionBody(claude, "claudeHookSettings")).toContain("SessionStart: [...entry, ...volatileHookEntries(hook)]");
+    expect(source("server/hooks/omb-hook.ts")).toContain("body: JSON.stringify({ event, payload, ...(process.argv[2] ? { slot: process.argv[2] } : {}) }),");
+    // Why it is needed: the driver forgets the half at a compaction and only the next turn re-sends it.
+    expect(claude).toContain("session.volatile = null; // only the system prompt survives a compaction");
+  });
 });
