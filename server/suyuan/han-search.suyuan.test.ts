@@ -115,6 +115,16 @@ describe("auto-recall with Chinese", () => {
     insertMessage("work", line("shirt", "这件T恤是纯棉的，洗了不会缩"));
     const hits = ids(recallMessages("11/12那天的T恤", ["work"], 12, undefined, "any"));
     expect(hits).toEqual(["shirt"]);
+    expect(recallTerms("iPhone 17 的评测")).toEqual(["iphone", "17", "评测"]);
+    expect(recallTerms("上次去的那家酒吧叫什么，这么做的目的")).toEqual(expect.arrayContaining(["酒吧", "目的"]));
+  });
+
+  it("gives a passage repeated word for word one place, the best-ranked copy", () => {
+    insertMessage("home", line("home-copy", "今天的收工卡：iOS 微信登录已经上线"));
+    insertMessage("run", line("ask", composeExecutionPrompt({ id: "r", name: "收工卡", trigger: "schedule", runOn: "maus" }, "写收工卡", undefined), { role: "user" }));
+    insertMessage("run", line("run-copy", "今天的收工卡：iOS 微信登录已经上线"));
+    expect(ids(recallMessages("收工卡写了什么", ["home", "run"], 12, undefined, "any"))).toEqual(["home-copy"]);
+    expect(ids(recallMessages("收工卡", ["home", "run"]))).toEqual(["home-copy", "run-copy"]);
   });
 
   it("recalls the original line from another conversation for a sentence in plain Chinese", () => {
@@ -133,6 +143,11 @@ describe("auto-recall with Chinese", () => {
     expect(enoughMatches(query, "[冬装] 和[羽绒服]都加进购物车了")).toBe(true);
     // Time words and "remind" are filler, as upstream drops "remind": four words left, so one is enough.
     expect(enoughMatches("明天早上提醒我给妈妈打电话，问问她体检结果", "体检报告出来了")).toBe(true);
+    insertMessage("work", line("times", "周五晚上开会，昨天晚上加班"));
+    insertMessage("work", line("place", "那家日料店人均三百，有停车场"));
+    expect(ids(recallMessages("昨天晚上说的那个日料店，周五晚上提醒我订位，顺便问问停车场和人均", ["work"], 12, undefined, "any"))).toEqual(["place"]);
+    // English words match as whole words, so one inside another is still two: pr and prompt.
+    expect(enoughMatches("这个pr的prompt改完了吗，还有日志截图和报错原文", "pr 里的 prompt")).toBe(true);
   });
 });
 

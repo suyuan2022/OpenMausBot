@@ -22,10 +22,11 @@ const ZH_STOP = new Set(
     "大概 好像 一样 上次 刚才 刚刚 我要 我在 我还 说的 做的 的是 不对 不行 就行 行吗 好了 好吧 可以吗 对吧 是吗 以为 嗯嗯 噢噢 哈哈 " +
     "问题 意思 情况 原因 办法 方式 地方 部分 整个 另一 过去 继续 开始 进行 使用 出现 看到 提到 了解 发现 处理 提醒 问问 到了 会不会 " +
     "今天 明天 昨天 早上 晚上 上午 下午 中午 等会 一会儿 待会 那天 这天 当时 那时 那件 这件 那条 这条 那次 这次 " +
-    "我看 是有 给我一个 弄好 具体 主要 不少 回去 正常 前面 后面 最后").split(" "),
+    "今晚 明早 昨晚 前天 后天 每天 周末 几点 下个月 上个月 周一 周二 周三 周四 周五 周六 周日 今天早上 今天晚上 明天早上 明天晚上 " +
+    "昨天早上 昨天晚上 顺便 我去 我看 是有 给我一个 弄好 具体 主要 不少 回去 正常 前面 后面 最后 买的 用的 写的 发的 找的 看的 弄的 改的").split(" "),
 );
-/** A two-character word ending in a particle says no more than its first character: 改了, 洗了, 说的, 对吧. */
-const PARTICLE_END = /^\p{Script=Han}[了的吗呢吧啊]$/u;
+/** A two-character word ending in 了 or 吗 says no more than its first character: 改了, 洗了, 行吗. */
+const PARTICLE_END = /^\p{Script=Han}[了吗]$/u;
 
 /** One-character segments that join nothing: "磁/吸" makes 磁吸 and "手机/壳" makes 手机壳, "你/看" and "的/事" make nothing. */
 const ZH_GLUE = new Set("的了吗呢吧啊呀哦嗯嘛么着过得地你我他她它们这那哪啥谁是有没不别在和与跟及或也都就才又再还很太更最已刚先把被给让叫对从向往为于以而但并如若会能要想去来说看用点弄做干帮试查找写发改聊个些一两几下上里中后前等好多少");
@@ -34,7 +35,7 @@ const segmenter = new Intl.Segmenter("zh", { granularity: "word" });
 const RECALL_TERMS = 16;
 /** A clause this long also stands as one term, so a passage that repeats it word for word ranks first. */
 const CLAUSE_CHARS = 4;
-/** In Chinese a number sits right against the characters around it, so one or two digits would match every count and date. */
+/** A number written against Chinese characters, one or two digits, would match every count and date: 3个, 11月. */
 const SHORT_NUMBER = /^\d{1,2}$/;
 
 interface HanTerms {
@@ -47,7 +48,7 @@ function hanTerms(query: string): HanTerms {
   const words: string[] = [];
   const clauses: string[] = [];
   const keep = (term: string) => {
-    if (!SHORT_NUMBER.test(term) && !words.includes(term)) words.push(term);
+    if (!words.includes(term)) words.push(term);
   };
   const add = (term: string) => {
     if (term.length >= 2 && !ZH_STOP.has(term) && !PARTICLE_END.test(term)) keep(term);
@@ -77,7 +78,7 @@ function hanTerms(query: string): HanTerms {
         }
         flush();
         word = "";
-        for (const term of upstreamTerms(part)) keep(term);
+        for (const term of upstreamTerms(part)) if (!SHORT_NUMBER.test(term)) keep(term);
         continue;
       }
       for (const { segment } of segmenter.segment(part)) {
@@ -205,7 +206,7 @@ export function hanEnoughMatches(query: string, passage: string, min: number): b
   const parent = words.map((_, i) => i);
   const root = (i: number): number => (parent[i] === i ? i : (parent[i] = root(parent[i]!)));
   words.forEach((a, i) => words.forEach((b, j) => {
-    if (j > i && (a.includes(b) || b.includes(a))) parent[root(j)] = root(i);
+    if (j > i && hasHan(a) && hasHan(b) && (a.includes(b) || b.includes(a))) parent[root(j)] = root(i);
   }));
   if (new Set(words.map((_, i) => root(i))).size < min) return true;
   const held = new Set<number>();
@@ -311,20 +312,24 @@ export function hanRecallMessages(db: DatabaseSync, query: string, threadIds: re
     .map((row, i) => ({ row, found: found[i]!, score: score[i]! }))
     .filter((hit) => hit.score >= 0)
     .sort((a, b) => Number(a.row.kind === "digest") - Number(b.row.kind === "digest") || a.row.run - b.row.run || b.score - a.score || b.row.at - a.row.at)
-    .slice(0, limit)
-    .map(({ row, found }) => {
+    .reduce<RecallHit[]>((hits, { row, found }) => {
+      if (hits.length >= limit) return hits;
+      const text = snippet(row.text, found);
+      // Auto-recall has four places: a passage shown once (a report copied home, a webhook's set-up text) does not take two.
+      if (mode === "any" && hits.some((hit) => hit.snippet === text)) return hits;
       const peer = row.peer_name ?? peerProvenanceAuthor(row.text.slice(0, PEER_NOTE_HEAD_CHARS));
-      return {
+      hits.push({
         threadId: row.thread_id,
         messageId: row.id,
         at: row.at,
         role: row.role,
         ...(row.kind === "digest" ? { kind: "digest" as const } : {}),
-        snippet: snippet(row.text, found),
+        snippet: text,
         ...(row.from_name ? { from: row.from_name } : {}),
         ...(peer ? { peer } : {}),
-      };
-    });
+      });
+      return hits;
+    }, []);
 }
 
 // ---- Memory files ------------------------------------------------------------------------------------------------------
