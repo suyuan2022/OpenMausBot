@@ -19,14 +19,14 @@ describe("sections that change between turns stay out of the stable half", () =>
     expect(gone.volatile).toBe("");
   });
 
-  it("a section upstream keeps stable on purpose still changes the stable half", () => {
-    expect(build([part("webhook", " a")]).stable).not.toBe(build([part("webhook", " b")]).stable);
+  it.each(["webhook", "device", "mcp"])("a %s section still changes the stable half", (id) => {
+    expect(build([part(id, " a")]).stable).not.toBe(build([part(id, " b")]).stable);
   });
 
   it("the whole prompt keeps every section in its place", () => {
-    const built = build([part("user-profile", " About the user."), part("mcp", " Servers."), part("recall", " Recall.")]);
-    expect(built.text.startsWith("You are Lizhi. Team rules. About the user. Servers. Recall.")).toBe(true);
-    expect(built.stable.startsWith("You are Lizhi. Team rules. Recall.")).toBe(true);
-    expect(built.volatile).toBe(" About the user. Servers.");
+    const built = build([part("user-profile", " About the user."), part("mcp", " Servers."), part("just-do-it", " Just do it."), part("recall", " Recall.")]);
+    expect(built.text.startsWith("You are Lizhi. Team rules. About the user. Servers. Just do it. Recall.")).toBe(true);
+    expect(built.stable.startsWith("You are Lizhi. Team rules. Servers. Recall.")).toBe(true);
+    expect(built.volatile).toBe(" About the user. Just do it.");
   });
 });

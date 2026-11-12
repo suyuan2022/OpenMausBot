@@ -59,7 +59,7 @@ async function main(): Promise<void> {
     const response = await fetch(`${url}/api/internal/hook`, {
       method: "POST",
       headers: { "content-type": "application/json", authorization: `Bearer ${token}` },
-      body: JSON.stringify({ event, payload }),
+      body: JSON.stringify({ event, payload, ...(process.argv[2] ? { slot: process.argv[2] } : {}) }),
       redirect: "error",
       signal: controller.signal,
     });
