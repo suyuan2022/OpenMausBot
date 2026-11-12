@@ -1,5 +1,5 @@
 // Recall rides in front of the turn's message, never the system prompt; fence markers are neutralised so a note cannot close the block.
-import { recallMessages, recallTerms, type MemoryHit, type RecallHit } from "./message-db.ts";
+import { recallMessages, type MemoryHit, type RecallHit } from "./message-db.ts"; import { hanEnoughMatches, hasHan, recallTerms } from "./suyuan/han-search.ts"; // suyuan fork
 import { parseTopicHeader, readTopicHead, topicBody, topicWords } from "./memory-topics.ts";
 import { listMemoryTopics, memoryDate, readMemoryTopic, searchMemoryFiles, workspaceDir } from "./workspace.ts";
 import { withoutExpired, withoutSuperseded } from "./memory-entries.ts";
@@ -62,7 +62,7 @@ const plain = (snippet: string) => snippet.replace(/\[([^[\]]+)\]/g, "$1");
 const matchedTerms = (snippet: string) => new Set([...snippet.matchAll(/\[([^[\]]+)\]/g)].map((m) => m[1]!.toLowerCase())).size;
 
 export function enoughMatches(query: string, snippet: string): boolean {
-  return recallTerms(query).length < MIN_TERMS_FOR_TWO || matchedTerms(snippet) >= 2;
+  return hasHan(query) ? hanEnoughMatches(query, plain(snippet), MIN_TERMS_FOR_TWO) : recallTerms(query).length < MIN_TERMS_FOR_TWO || matchedTerms(snippet) >= 2; // suyuan fork: Chinese words counted, not brackets
 }
 
 function day(at?: number): string {
