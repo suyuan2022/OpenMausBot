@@ -1157,7 +1157,7 @@ function recentWorkFilter(threadId: string): { include?: (threadId: string) => b
 function recentWorkSources(bot: BotRecord) {
   return {
     groups: store.groups.filter((group) => !group.memberIds.includes(bot.id) || roomFeedsBot(group, bot)),
-    taskByThread: (botId: string, threadId: string) => store.taskByThread(botId, threadId),
+    taskByThread: (botId: string, threadId: string) => store.taskByThread(botId, threadId), awaitingAnswer: (threadId: string) => coordinator.awaitingAnswer(threadId), // suyuan fork
   };
 }
 

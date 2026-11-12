@@ -291,10 +291,14 @@ describe("the fork's hooks into upstream files", () => {
     expect(index).toContain('{ id: "recent", label: "Recent work", text: recentWorkPrompt(recentWork(recentWorkSources(bot), bot, {');
     expect(index).toContain('{ id: "recent", label: "Recent work", text: recentWorkPrompt(recentLines) },');
     expect(index).toContain("const recentLines = recentWork(recentWorkSources(bot), bot, {");
+    expect(functionBody(index, "recentWorkSources")).toContain("awaitingAnswer: (threadId: string) => coordinator.awaitingAnswer(threadId),");
+    // recent-work.ts finds a teammate's ask by the request line the coordinator writes when the work starts.
+    expect(index).toContain('roomRequest: { id: request.id, phase: "request" },\n          from: sender ? { botId: sender.id, name: sender.name, color: sender.color } : undefined,');
     expect(source("server/system-prompt.ts")).toContain("export const THREADS_PROMPT = threadFacts(");
     expect(source("server/drivers/agents-catalog.ts")).toContain("].map(withThreadFacts).map((tool) => {");
+    expect(source("server/drivers/agents-call.ts")).toContain("return { text: threadFacts(`Closed #${String(r.title)}");
     // Every phrase thread-facts.ts swaps is still upstream's, word for word: one upstream reworded would stop being swapped.
-    const upstream = source("server/system-prompt.ts") + source("server/drivers/agents-catalog.ts");
+    const upstream = source("server/system-prompt.ts") + source("server/drivers/agents-catalog.ts") + source("server/drivers/agents-call.ts");
     for (const [phrase] of THREAD_FACTS) expect(upstream).toContain(JSON.stringify(phrase).slice(1, -1));
   });
 });

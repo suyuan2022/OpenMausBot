@@ -18,6 +18,7 @@ import { outOfBounds } from "./agents-schema.ts";
 import { callResearchTool, RESEARCH_TOOL_NAMES } from "./agents-research-tools.ts";
 import { callHelperTool, HELPER_TOOL_NAMES } from "./agents-helper-tools.ts";
 import { callChiefReadTool, CHIEF_READ_TOOL_NAMES } from "../suyuan/chief-read-tools.ts";
+import { threadFacts } from "../suyuan/thread-facts.ts";
 import { callUsageLimitsTool, USAGE_LIMITS_TOOL } from "./agents-usage-tool.ts";
 import { callWaitTool, WAIT_TOOL_NAMES } from "./agents-wait-tools.ts";
 import { callComputerAskTool, COMPUTER_ASK_TOOL_NAMES } from "./agents-computer-ask-tool.ts";
@@ -431,7 +432,7 @@ export async function callTool(called: string, input: Json, context: ToolCallCon
     if (!threadId) return { text: "close_thread needs the thread_id from list_threads or start_thread.", isError: true };
     const r = await api(`/api/internal/threads/${encodeURIComponent(threadId)}/close`, { method: "POST", body: JSON.stringify({ fromBotId: BOT_ID, fromThreadId: THREAD_ID }) });
     if (r.error) return { text: `Couldn't close that thread: ${String(r.error)}`, isError: true };
-    return { text: `Closed #${String(r.title)}${r.botName ? ` on @${String(r.botName)}` : ""}. It stays in the person's sidebar, idle, with a note that you closed it.` };
+    return { text: threadFacts(`Closed #${String(r.title)}${r.botName ? ` on @${String(r.botName)}` : ""}. It stays in the person's sidebar, idle, with a note that you closed it.`) };
   }
   if (name === "start_thread") {
     const title = String(args.title ?? "").trim();

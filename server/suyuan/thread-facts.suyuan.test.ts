@@ -15,6 +15,8 @@ describe("what bots are told about threads", () => {
     expect(tool("close_thread").description).toContain("as finished once you have read its result: list_threads reports it as closed, and the person can still open it. Nothing is deleted");
     const title = (tool("coordinate_bots").inputSchema.properties as Record<string, { description: string }>).title!.description;
     expect(title).toBe("With thread \"new\": the new thread's title, shown at the top of the thread and used by list_threads and #Title links; short and specific (e.g. \"Launch: Reddit draft\"). Defaults to the start of message.");
+    // What close_thread answers (server/drivers/agents-call.ts passes it through threadFacts).
+    expect(threadFacts("Closed #Review on @Ada. It stays in the person's sidebar, idle, with a note that you closed it.")).toBe("Closed #Review on @Ada. The person can still open it.");
     const everything = JSON.stringify({ THREADS_PROMPT, tools });
     for (const [upstream] of THREAD_FACTS) expect(everything).not.toContain(JSON.stringify(upstream).slice(1, -1));
     expect(everything).not.toMatch(/sidebar|rows? under/);

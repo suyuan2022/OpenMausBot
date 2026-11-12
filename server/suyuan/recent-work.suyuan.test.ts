@@ -74,6 +74,20 @@ describe("a thread another bot opened to hand this one work", () => {
     expect(recentWorkEntry(work(bot)[0]!, NOW)).toContain("· from 荔枝 · status: waiting on 夙愿 · thread_id t-pay");
   });
 
+  it("waiting on the person too while the coordinator holds a reply that ended on NEEDS INPUT, as list_threads says", () => {
+    askOpening("t-size", at(9, 30), "挑一双手套");
+    reply("t-size", at(9, 40), "两双都合适。\nNEEDS INPUT: 要黑色还是灰色？");
+    const bot = maus([task("home"), task("t-size", opened(LIZHI))]);
+    const held = recentWork({ ...store(), awaitingAnswer: (threadId) => threadId === "t-size" }, bot, { userName: "夙愿", currentThreadId: "home", now: NOW });
+    expect(held[0]).toMatchObject({ threadId: "t-size", status: "waiting on 夙愿" });
+    expect(work(bot)[0]).toMatchObject({ threadId: "t-size", status: "replied" });
+  });
+
+  it("before the work starts (no request line yet) the thread is listed from when it was opened, with nothing quoted", () => {
+    const bot = maus([task("home"), task("t-queued", { openedBy: { ...DAFU, kind: "work", at: at(14, 20) } })]);
+    expect(recentWorkEntry(work(bot)[0]!, NOW)).toBe("\n- today 14:20 · from 大副 · status: no reply yet · thread_id t-queued");
+  });
+
   it("a later ask passed in after the reply is the ask, and the older reply is no answer to it", () => {
     askOpening("t-pr", at(1, 0), "修一下 PR 的 CI");
     reply("t-pr", at(2, 0), "修好了，CI 绿了。");
@@ -138,10 +152,32 @@ describe("limits", () => {
     expect(first.kind === "asked" && first.ask!.text).toBe(`${"问".repeat(ASK_CHARS - 1)}…`);
     expect(first.kind === "asked" && first.result!.text).toBe(`${"答".repeat(RESULT_CHARS - 1)}…`);
     const text = recentWorkPrompt(lines, NOW);
-    const entries = text.split("\n- ").length - 1;
-    expect(text.length - RECENT_WORK_INTRO.length).toBeLessThanOrEqual(RECENT_WORK_MAX_CHARS);
+    const more = "\n- More entries are not shown; session_search with since finds them.";
+    expect(text.endsWith(more)).toBe(true);
+    const body = text.slice(RECENT_WORK_INTRO.length, -more.length);
+    const entries = body.split("\n- ").length - 1;
+    expect(body.length).toBeLessThanOrEqual(RECENT_WORK_MAX_CHARS);
     expect(entries).toBeLessThan(RECENT_WORK_MAX_LINES);
-    expect(text.length - RECENT_WORK_INTRO.length + recentWorkEntry(lines[entries]!, NOW).length).toBeGreaterThan(RECENT_WORK_MAX_CHARS);
+    expect(body).toBe(lines.slice(0, entries).map((line) => recentWorkEntry(line, NOW)).join(""));
+    expect(body.length + recentWorkEntry(lines[entries]!, NOW).length).toBeGreaterThan(RECENT_WORK_MAX_CHARS);
+    expect(recentWorkPrompt(lines.slice(0, 1), NOW)).not.toContain(more);
     expect(recentWorkPrompt([], NOW)).toBe("");
+  });
+
+  it("keeps work still waiting on an answer when newer entries fill the ten lines and the budget", () => {
+    const tasks = [task("home"), task("p-old", opened(DAFU))];
+    askOpening("p-old", at(0, 30), "很早派的活，还没回", DAFU);
+    for (let n = 0; n < 12; n++) {
+      tasks.push(task(`r${n}`, opened(LIZHI)));
+      askOpening(`r${n}`, at(5, n), "新".repeat(300));
+      reply(`r${n}`, at(6, n), "回".repeat(300));
+    }
+    const lines = work(maus(tasks));
+    expect(lines).toHaveLength(RECENT_WORK_MAX_LINES);
+    expect(lines.at(-1)).toMatchObject({ threadId: "p-old", status: "no reply yet" });
+    const text = recentWorkPrompt(lines, NOW);
+    expect(text).toContain("· from 大副 · status: no reply yet · thread_id p-old");
+    // Still newest first: the old ask is the last entry shown.
+    expect(text.indexOf("thread_id p-old")).toBeGreaterThan(text.lastIndexOf("thread_id r"));
   });
 });

@@ -24,6 +24,11 @@ export const THREAD_FACTS: ReadonlyArray<readonly [upstream: string, fork: strin
     "it leaves the person's default sidebar list (still under all threads, with a note saying you closed it) and list_threads reports it as closed.",
     "list_threads reports it as closed, and the person can still open it.",
   ],
+  // server/drivers/agents-call.ts, what close_thread answers
+  [
+    "It stays in the person's sidebar, idle, with a note that you closed it.",
+    "The person can still open it.",
+  ],
   // coordinate_bots, its title parameter
   [
     "With thread \"new\": the new thread's sidebar name, short and specific",
