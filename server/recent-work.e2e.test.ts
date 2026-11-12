@@ -77,7 +77,7 @@ it("carries a bot's recent 1:1 work into a room turn, tells the room, logs the t
     await runControlOmb(["wait", "--bot", lead.id, "--timeout", "30"], { env });
     const room = given();
     expect(room).toContain("Your recent work");
-    expect(room).toMatch(/- today \d{2}:\d{2} · 1:1 with User · (?:"[^"]*" · )?you said: "/);
+    expect(room).toMatch(/- today \d{2}:\d{2} · main conversation with User · (?:"[^"]*" · )?thread_id \S+\n {2}you said: "/);
     const exported = await api("GET", `/api/threads/${group.threadId}/export?format=json`) as { messages?: Array<{ kind?: string; tool?: { name?: string } }> };
     const chips = (exported.messages ?? []).filter((message) => message.kind === "activity" && /recent-work brief/.test(message.tool?.name ?? ""));
     expect(chips).toHaveLength(1);
@@ -87,7 +87,7 @@ it("carries a bot's recent 1:1 work into a room turn, tells the room, logs the t
     await runControlOmb(["wait", "--bot", lead.id, "--timeout", "30"], { env });
     const second = given();
     expect(second).toContain("Your recent work");
-    expect(second).toContain('room "Standup" · you said: "');
+    expect(second).toMatch(/room "Standup" · thread_id \S+\n {2}you said: "/);
     expect(dailyLogs(fixture.info.dataDir).find((log) => log.path.includes(lead.id))!.text).toContain('from room "Standup"');
     const journal = await api("GET", `/api/bots/${lead.id}/memory/journal`) as { entries: Array<{ path: string; actor: string; via: string; threadId?: string }> };
     const logRows = journal.entries.filter((entry) => entry.path.startsWith("memory/log/"));

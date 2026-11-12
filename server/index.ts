@@ -238,7 +238,7 @@ import { BUILT_IN_DRIVERS } from "./drivers/builtIn.ts";
 import { openCodeProviderKeysAllowed, setOpenCodeProviderKeyPolicy } from "./drivers/acp/opencode-go.ts";
 import { liveAppRows, openCardRows, readMessageText, recallMessages, recentMessages, closeMessageSearch, closeMessageDb, chatFollowups, cancelledChatFollowup, settleChatFollowups, threadsReferencing, logNotification, lastRowAt, threadsWithCardsSince } from "./message-db.ts";
 import { briefCrossingLabel, claimRecallCrossings, recallCrossingLabel } from "./recall-disclosure.ts";
-import { parseSince, parseUntil, recentWork, recentWorkPrompt, turnOutcomeLine } from "./recent-work.ts";
+import { parseSince, parseUntil, turnOutcomeLine } from "./recent-work.ts"; import { recentWork, recentWorkPrompt } from "./suyuan/recent-work.ts"; // suyuan fork
 import { chiefEscalationsEnabled, NEEDS_INPUT_GATE, peerApprovalGate, RAISED_GATE } from "./escalations.ts";
 import { createChiefNotices } from "./host/chief-notices.ts";
 import { needsInputQuestion } from "./runtime-coordinator.ts";
@@ -1157,7 +1157,7 @@ function recentWorkFilter(threadId: string): { include?: (threadId: string) => b
 function recentWorkSources(bot: BotRecord) {
   return {
     groups: store.groups.filter((group) => !group.memberIds.includes(bot.id) || roomFeedsBot(group, bot)),
-    taskByThread: (botId: string, threadId: string) => store.taskByThread(botId, threadId),
+    taskByThread: (botId: string, threadId: string) => store.taskByThread(botId, threadId), awaitingAnswer: (threadId: string) => coordinator.awaitingAnswer(threadId), // suyuan fork
   };
 }
 

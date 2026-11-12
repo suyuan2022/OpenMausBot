@@ -149,7 +149,7 @@ const UPSERT_MESSAGE =
   "text = excluded.text, json = excluded.json";
 
 const ACTIVE_LEAF = "SELECT active_leaf_id FROM thread_state WHERE thread_id = ?";
-function db(): DatabaseSync {
+export function db(): DatabaseSync {
   const file = DB_FILE();
   if (handle && handlePath === file && Date.now() - handleCheckedAt < FILE_RECHECK_MS) return handle;
   if (handle && handlePath === file && existsSync(file)) {
