@@ -4,7 +4,7 @@
 # ends, and the install waits for every bot to be idle (up to 10 minutes), this one included: end the turn right after.
 #   deploy-self.sh                 newest release
 #   deploy-self.sh suyuan-v<x>     that release
-#   deploy-self.sh path/to/x.tgz   a test build from pack-test.sh
+#   deploy-self.sh path/to/x.tgz   that tarball
 #   deploy-self.sh --rollback      whatever was installed before the last deploy
 # No --force: a restart while a bot works would cut its turn short.
 set -euo pipefail

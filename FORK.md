@@ -8,7 +8,7 @@ suyuan2022/OpenMausBot 是 [milind-soni/OpenMausBot](https://github.com/milind-s
 
 | 改动 | 为什么 | 改了哪些文件 | 还给原作者 |
 |---|---|---|---|
-| fork 的运维：合并前的检查（一个任务；原作者每个 PR 17 个任务的 `ci.yml` 在仓库的 Actions 设置里关着，文件不动）、合并后打安装包、虚拟机部署脚本、合并前装到手机上试的测试版，以及本文件和 `CLAUDE.md`；每天同步原作者更新的流程已停用 | 只给自己用的部署方式 | `.github/workflows/suyuan-*.yml`、`scripts/suyuan/`、`CLAUDE.md`、`FORK.md`，全是新文件 | 不还 |
+| fork 的运维：合并前的检查（三个任务同时跑，类型检查接着 `suyuan` 上次存下的结果增量查；原作者每个 PR 17 个任务的 `ci.yml` 在仓库的 Actions 设置里关着，文件不动）、合并后打安装包（服务端和前端两个构建同时跑）、虚拟机部署脚本（装完服务起不来会自己装回上一版）、给手机试的测试版（`phone-test.sh`：隔离实例加临时隧道，不动正在用的 bot），以及本文件和 `CLAUDE.md`；每天同步原作者更新的流程已停用 | 只给自己用的部署方式 | `.github/workflows/suyuan-*.yml`、`.github/actions/suyuan-setup/`、`scripts/suyuan/`、`CLAUDE.md`、`FORK.md`，全是新文件 | 不还 |
 | 更新提示指向这个 fork：查本仓库的 `suyuan-v*` release，npm 装法的更新命令换成部署脚本 | 原来提示 `npm install -g openmausbot@latest`，照做会把 fork 换回官方版 | `server/update-check.ts` 4 行，`server/update-check.test.ts` 1 行断言；新文件 `server/update-check.suyuan.test.ts` | 不还 |
 | 网页版推送（Web Push）：设置 → 通知里的「推送到这台设备」。bot 回完、提问、要审批时，App 关着或手机锁屏也弹通知，点开进那个对话；这台设备正开着那个对话时不推。开了推送的设备不再另弹页内通知；「完成时通知我」「通知音效」两个开关同样管推送 | 官方手机 App 闭源，推送绑在原作者的苹果账号上；主屏幕网页 App 从 iOS 16.4 起能收推送 | `server/index.ts` 改 2 行、不增行（这个文件不许变长，接入写在已有行末尾），`src/App.tsx` 2 行（和下一行共用），`src/components/NotificationSettingsRows.tsx` 2 行，`src/lib/notify.ts` 2 行；新文件 `server/suyuan/`、`src/suyuan/`、`public/suyuan-push-sw.js` | 可以还：先问原作者要不要 |
 | 重连不打扰：App 被系统杀掉后重开，先显示上次那个对话的画面（停在最底部，和 App 打开后一样），bot 数据加载完淡出、换成实时界面；离开时停在 bot 列表、设置这类 App 回不去的页面，或者是点推送通知打开的，就不显示；整屏的「正在连接你的机器人…」2 秒后还没连上才出现 | 主屏幕网页 App 在后台常被 iOS 杀掉，重开要经北京中转拉约 1 MB 的数据，这段时间整屏都是「正在连接」 | `src/main.tsx` 1 行；`src/App.tsx` 的 2 行接入调用 `src/suyuan/use-suyuan.ts`，推送也从这里接；新文件 `src/suyuan/last-frame.ts`、`src/suyuan/quiet-start.css` | 可以还：先问原作者要不要 |
@@ -31,6 +31,12 @@ suyuan2022/OpenMausBot 是 [milind-soni/OpenMausBot](https://github.com/milind-s
 | Claude 的对话由 Claude Code 自己压缩：服务端不再在一轮开头抢先折叠、换新会话（手动「立即压缩」照旧）；闲时压缩从闲 3 分钟改成闲 55 分钟，58 分钟前没做成就不做，开着保温的对话闲时不压。要配合 `config.json` 里 Claude 账号的环境变量 `OMB_CLAUDE_AUTOCOMPACT=333000`（和包装脚本同一条线），否则服务端仍按 20 万算「快到线了」。代价：编辑消息、切换版本、换备用模型再换回这类要从聊天记录重建会话的情况，长对话不再有那段折叠总结，只带最近 24KB | 服务端按「Claude 压缩线的九成」先折叠，而它以为压缩线是默认 20 万，包装脚本实际设的是 33.3 万：每到 18 万左右就只剩一段 6KB 的总结开新会话，11/9 晚 Maus 工程师两次被冲掉目标。闲 3 分钟就压，人还没走就丢细节 | `server/index.ts` 改 2 行、不增行；`server/warm-summary.ts` 两个时长；`server/host/warm-summary-host.ts` 3 行；`docs/verification/context-compaction.md` 3 处；上游用例 `server/context-compaction.e2e.test.ts`、`server/warm-summary.test.ts`、`server/warm-summary.e2e.test.ts` 只改被改坏的断言；新文件 `server/suyuan/native-compact.ts`、`server/warm-summary.suyuan.test.ts`、`server/host/warm-summary-host.suyuan.test.ts` | 不还：原作者有意先折叠 |
 | Chief 能只读查队友的对话：荔枝这样的 Chief of Staff 多了两个工具，`team_threads`（按 bot 列它最近的 1:1 对话：标题、状态、最后活动时间、threadId）和 `team_thread_read`（读某条对话最近 N 条消息：谁说的、时间、正文，正文和条数都有上限，工具调用只给一行）。只读：不标已读、不写入、不唤醒那个 bot；只限 Chief 管得到的 bot（同一套 `canManage` 判定），房间不管 | 荔枝要看 Maus 工程师说到哪了，原来只能直接读 `messages.db` | 新文件 `server/suyuan/chief-read-threads.ts`、`server/suyuan/chief-read-tools.ts` 及用例；`server/routes/internal-threads.ts` 4 行，`server/drivers/agents-catalog.ts` 3 行、`server/drivers/agents-call.ts` 2 行、`server/agent-tool-policy.ts` 2 行、`server/activity.ts` 2 行、`src/locales/en.json` 2 行，工具清单金样和几处测试里的清单/体积基线 | 可以还：别的 Chief 也会想看队友在干什么 |
 | 递话放开：coordinate_bots 用 `thread: <id>` 往别人开的对话（夙愿开的、别的 bot 开的）里递单向通知（`reply: "none"`）也行。条件和原作者让 Chief 替人答话的一样：这一轮背后有人（webhook、定时任务起的不行），来源对话在围栏和 bot API 之外、自己不带外来标记（webhook 跑出来的、读过邮件的对话里，夙愿亲自发话也不行）；外部运行（EXTERNAL）的 bot 一律不行；对方对话正在等夙愿回答时也不收。递话不改那条对话的批准级别和「始终允许」，不改它的开启者，回报不会发给递话的 bot。要回报的活仍是原作者的拒绝 | 原来只能往自己开的对话递话，Chief 想往夙愿开在 Maus 工程师身上的对话补一句被拒 | 新文件 `server/suyuan/relay-gate.ts`、用例 `server/host/work-thread.suyuan.test.ts` 和 `server/suyuan/relay-any-thread.suyuan.e2e.test.ts`；原作者文件：`server/host/work-thread.ts` 加 5 行（一个可选输入、一条放行），`server/index.ts` 改 3 行（接入那行还带 EXTERNAL 排除）（接入、级别下传加条件、一行 import），行数不增；原作者的测试没动 | 可以还：别家框架都是按编号投递 |
+| 模型把工具调用又用文字写一遍时，这段不进聊天消息：Gemini 4 经 Antigravity 接入时，每次调用工具前说的那句话后面会跟一段 `工具调用_start:[{…}]工具调用_end`（这次调用的 JSON）。真正的工具调用照常执行、照常画成步骤，这段文字副本从消息里去掉：服务端存的新消息里没有，界面画已存的旧消息时也不显示。只认两头标记齐全、中间是调用列表的整段，讲解这个标记的文字和代码不受影响 | 2026-11-10「内容创作」bot（gemini-4-argon）32 条回复里 31 条带着这段，每段几百字 JSON；同一个模型在 Antigravity 自己的窗口里 60 条回复一条都没有，起因没查明，所以在这里过滤 | `shared/system-message-guard.ts` 2 行；新文件 `shared/suyuan/tool-echo.ts`，用例 `shared/suyuan/tool-echo.suyuan.test.ts` | 可以还：先问原作者要不要 |
+| 所有 bot 都读的规矩（上游）：设置 → 通用 → 账户里点「添加」展开个人资料，「关于我」下面多了「所有机器人的规则」文本框，存进 `config.json` 的 `everyBotRules`（只有管理员看得到），私聊和群聊的系统提示词里放在每个 bot 自己的指令（SOUL）前面，包成一个 JSON 字符串；清空就整节不出现。同一个提交还带来：记忆整理把做完或两周没动的工作记录从 MEMORY.md 移到对应主题，不移「always / never / from now on」开头的规矩；bot 设置里在每轮都加载的文本超过 24KB（其中记忆至少 8KB）时出现「这个机器人每轮都会加载很多内容。」和「整理记忆」按钮；简洁模式的指令编辑器下面有「改动记录」，能撤销。代价：规矩和 SOUL、bot 名字一样算进会话配置，改一次规矩后，每条对话下一次收到队友回报（或别的外部更新）时不续原来的 Claude 会话，只带最近 24KB 聊天记录重开；本 fork 没有服务端的折叠总结，24KB 之前的内容就不在新会话里了 | 夙愿要一个所有 bot 都读的规矩位，上游已经做了 | 上游提交 `7adc19c74`（上游 PR #4987）原样拿来，47 个文件，没改一个字 | 来自上游：下次整体合上游后删掉这一行 |
+| 切换对话只拉最新 80 条（上游）：切进一个对话或群里的对话时请求最新 80 条，原来是 200 条；往上滚照旧按 200 条一页拉更早的 | 长对话带着大段工具输入时 200 条能到约 3 MB，经北京中转要等好几秒 | 上游提交 `fad2d0733` 原样拿来：`src/state/store.tsx` 3 行，测试 `src/state/chat-switch-page.test.ts`、`src/state/room-navigation.test.ts` | 来自上游：下次整体合上游后删掉这一行 |
+| Claude Code 不认 `--autocompact` 时不再每轮失败（上游）：某个版本的 Claude Code 启动时报 `unknown option '--autocompact'`，服务端记下这个版本，之后不再给它这个参数，这一轮去掉参数在原处重来；装回这个版本也不会再加上 | 2.1.129 这类版本 `--help` 里列着 `--autocompact` 却拒收，原来每一轮都启动失败 | 上游 PR #5048（`d4bf62972^1..d4bf62972^2` 的 9 个提交，其中 2 个是空的重跑 CI 提交，没拿）原样拿来：`server/drivers/claude.ts`、`server/drivers/claude.test.ts`、`server/testing/fake-claude-cli.ts` | 来自上游：下次整体合上游后删掉这一行 |
+| `coordinate_bots` 的工具说明跟上「递话放开」：说明里写明单向通知（`reply: "none"`）也能递进夙愿或别的 bot 开的对话，不只是自己开的；定时任务、webhook 起的这一轮，或来源对话带外来标记时被拒，报错直接说是这个原因、让它在回复里说要转达什么，不再说「这不是你开的对话」 | 所有 bot 都读这份说明；原来写着只能指定自己开的对话，bot 照着说明就不会去递；被拒时的报错和说明对不上，bot 会以为编号错了、另开一条对话 | `server/drivers/agents-catalog.ts` 1 行，工具清单金样 `server/drivers/agents-catalog-goldens/` 4 个文件重新生成（体积多约 100 字节，在原作者 2% 的预算内，`BUDGET_BASELINE` 没动）；`server/suyuan/relay-gate.ts` 的拒绝原因和它的两份用例 | 跟「递话放开」一起还 |
+| 一个 bot 一个家（前两步，完整规则见「待做」里同名一节）：简洁模式下，每个 bot 有一条固定的对话（家），别的对话是后台运行。后台运行有未读、在干活时，bot 那行不亮红点、不显示工作中、下面不出子行、不计入 App 图标数字，点 bot 进的是家；它正等夙愿批准或回答时照常亮、照常带他进去。进到后台运行里（从派活消息下的小标签），输入框换成一行「后台对话，只能看」和「返回你的聊天」；它等批准或回答期间保留输入框，批准卡就画在那里。服务端：家是夙愿选定的那条，没选过就在不由 bot 开的对话里按原作者的规则挑；bot 关不掉家（`close_thread` 拒绝，派活干完的自动关也跳过）；点名往家里派要回报的活被拒，沿用的工作对话已成了家就另开一条，单向通知照收。简洁模式里不再提供别的对话：对话页和群的「⋯」菜单没有「新对话」和「切换对话」，bot 的菜单没有「新对话」「查看对话」「设为主对话」，bot 面板没有对话列表，Cmd/Ctrl+Shift+N 不新建对话，定时任务的结果去向只能选家；对话太长时的提示改成「要聊另一件事，可以新建一个群聊」。这些判断由 App 外壳每次渲染时告诉 fork 的模块「对话列表是否隐藏」才生效，所以原作者的用例一条没改。高级模式不变 | 点 bot 会被带进「有未读」或「在干活」的对话，常常是别的 bot 派活开的那条，夙愿在里面接着聊，它就成了主对话：11 个 bot 里 5 个是这么来的 | `server/index.ts` 改 4 行、不增行，`server/host/work-thread.ts` 6 行，`server/routes/internal-threads.ts` 2 行，`src/components/ChatView.tsx` 改 3 行、不增行，`src/state/thread-navigation.ts`、`src/components/SidebarBotActivity.tsx`、`src/components/SidebarBotMenu.tsx`、`src/App.tsx`、`src/components/bot-panel/DetailsTab.tsx`、`src/components/routines/ResultsDestination.tsx` 各 2 行，`src/lib/bot-unread.ts`、`src/components/ChatMoreMenu.tsx`、`src/components/RoomMoreMenu.tsx` 各 3 行，`src/locales/zh.json` 1 句；新文件 `server/suyuan/home.ts`、`src/suyuan/home.ts`、`src/suyuan/BackgroundRunBar.tsx` 和三份用例，`src/suyuan/own-work.ts`、`src/suyuan/use-suyuan.ts` 接入 | 不还：原作者有意让多条对话并存 |
 | 系统提示词里四段不再进稳定部分：「关于用户」（`user-profile`）、手机（`device`）、自己接的 MCP 服务器（`mcp`）、「Just do it」（`just-do-it`）改成随当回合的消息发给 Claude，内容变了只多发一小段说明 | Claude 的进程按系统提示词的稳定部分启动，这部分一变就换新进程，整段对话按写入价重新写一遍提示缓存。这四段隔几回合就变：任何 bot 学到一条夙愿的偏好，所有 bot 进行中的对话都跟着变；手机那段随定时任务的汇报进出对话来回切；lcu 启动慢时 MCP 那段多一句「没启动」；「Just do it」只在夙愿亲自发话的回合出现。2026-11-06 到 11-10 同一对话相邻回合里稳定部分有 23% 变了，重写缓存约占这几天成本的一成 | `server/system-prompt.ts` 1 个词（导出 `VOLATILE_SECTIONS`），`server/suyuan/register.ts` 1 行引入；新文件 `server/suyuan/steady-prompt.ts` 及用例 | 可以还：先问原作者要不要，他有意把 `setup`、`webhook` 留在稳定部分，这四段没说明 |
 
 ## 待做
@@ -44,3 +50,31 @@ suyuan2022/OpenMausBot 是 [milind-soni/OpenMausBot](https://github.com/milind-s
 5. **排队中的消息删不掉。** 点删除没有反应。
 6. **去掉轮换的状态文字。** bot 干活时只留头像加跳动的三个点，不显示「正在一点点推进」这类文字。
 7. **撤销设备后推送不停。** 在「人员」里撤掉一台设备的登录后，它的推送订阅还留在服务端，照样收到通知。撤销时一并删掉那台设备的订阅。
+
+### 一个 bot 只有一条和夙愿的对话
+
+排在上面七条之前做，分三步。前两步做完了，在上面的清单里；还剩第三步。
+
+**做成什么样。** 每个 bot 有一条固定的对话，下面叫它的「家」：夙愿和这个 bot 说话只在这里。bot 身上别的对话都算后台运行，包括别的 bot 派活开的、定时任务每次跑的、bot 自己另开的。后台运行不进任何列表、不亮红点，点 bot 不会被带进去；夙愿能进去看，不能在里面说话。
+
+**为什么。** 夙愿不想管多条对话。原来点一个 bot，会被带进「有未读」或「正在干活」的那条，常常是别的 bot 派活开的；他在里面接着聊，那条就成了主对话。2026-11-11 虚拟机上 11 个 bot 里有 5 个的主对话是这么来的，22 条 bot 开的对话里 11 条有他的发言。
+
+**规则。**
+
+- 家怎么定：夙愿选定的那条（bot 记录上的 `mainThreadChoice`，原作者「设为主对话」存的就是它）；没选过的，在不由 bot 开的对话里按原作者的规则挑（他最后写过字的那条，没写过就是最早建的），对只有一条自己对话的 bot 来说就是和 bot 一起建的那条。bot 新建的 bot 同样如此。
+- 家可以是别的 bot 开的对话（那 5 个就是）。为此有三处例外：开它的 bot 不能关它；别的 bot 再派活不落进家里，另开一条；「最近工作」把它写成和夙愿的主对话。
+- 一条对话什么时候算「在找夙愿」：它是家，或者它正等他批准、等他回答。红点、点 bot 打开哪条、bot 下面的子行、收件箱的「进行中」、App 图标上的数字，全用这一条判断。
+- 后台运行要他批准或回答时，卡片出现在收件箱，在那里直接答，答完它接着跑（2026-11-11 在隔离实例上测过批准卡和两种提问卡）；点 bot 进到那条对话里答也行，等他期间那里保留输入框。bot 的批准级别是「Just do it」时不会问人，也就没有卡片。有一种只在收件箱里看得到：bot 那一轮已经结束、留下一个问题（回复里写 `NEEDS INPUT`），这时 bot 那行不亮。
+- 想插手一件正在后台跑的活，跟派活的那个 bot 说，由它递话。
+- 从哪里看后台运行：派活那条消息下面的小标签，点进去只读，输入框的位置是一行说明和「返回你的聊天」。
+- 后台对话不用关，看不见就行。
+- 没有「新对话」：bot 和群的菜单、bot 面板、快捷键 Cmd/Ctrl+Shift+N 里的入口都去掉，提示里说「开个新对话」的地方改成指向新建群聊。群也是一个群一条对话。
+- 家怎么知道后台干过什么：系统提示词里的「最近工作」一段（服务端每轮从聊天记录现算，列这个 bot 48 小时内在别的对话里做了什么）。后台运行那一行写成「谁派的 · 派了什么 · 结论」，还没回话的也占一行。细节由 bot 自己搜聊天记录。
+- 记忆：派来的活本身不记；活里得知的长期事实，由现有的记忆整理照常记下。群聊里的也记（打开 `features.roomMemoryCapture`）。
+- 这些只在简洁模式下生效。高级模式照原作者的来，对话列表、新对话都在，出问题时可以切过去。
+
+**不改的。** bot 之间派活的机制；电脑上的 Claude 找 bot 的方式（走一次性定时任务，本来就是后台运行）；bot 自己另开的对话，结果暂时不带回家。
+
+**还剩一步。** 改写「最近工作」那一行和写给 bot 看的工具说明。它和 PR #29（系统提示词里每回合会变的内容不再让缓存失效）改同一段，叠在它上面做。
+
+**上线时改两处真实数据，改前备份。** 给现有 11 个 bot 设家（夙愿逐个定过）；打开群聊记忆。
