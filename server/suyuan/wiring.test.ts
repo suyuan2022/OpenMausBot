@@ -290,7 +290,7 @@ describe("the fork's hooks into upstream files", () => {
 
   it("after a compaction the running turn's volatile half goes back to Claude on hooks of its own", () => {
     const index = source("server/index.ts");
-    expect(index).toMatch(/^import \{ noteTurnVolatile, volatileHookReply \} from "\.\/suyuan\/compact-volatile\.ts";/m);
+    expect(index).toContain('import { noteTurnVolatile, volatileHookReply } from "./suyuan/compact-volatile.ts";');
     // Each turn notes its half under the generation its hooks bearer carries.
     expect(index).toContain("integrations.hooks = hooksIntegration(bot.id, threadId, dispatchClaimId);");
     expect(index).toContain("noteTurnVolatile(threadId, dispatchClaimId, prompt.volatile);");
