@@ -20,8 +20,12 @@ const ZH_STOP = new Set(
     "也可以 之类 尽量 其他 一起 里面 本身 那种 这种 也没有 关于 必须 以及 起来 哪里 最好 类似 想要 看一下 记得 告诉 帮我 谢谢 好的 是的 对的 " +
     "然后 有没有 要不 要不要 一直 还要 只是 只有 而且 不过 虽然 并且 另外 我想 你看 你好 请问 麻烦 一点 有点 有些 很多 非常 特别 真的 确实 当然 " +
     "大概 好像 一样 上次 刚才 刚刚 我要 我在 我还 说的 做的 的是 不对 不行 就行 行吗 好了 好吧 可以吗 对吧 是吗 以为 嗯嗯 噢噢 哈哈 " +
-    "问题 意思 情况 原因 办法 方式 地方 部分 整个 另一 过去 继续 开始 进行 使用 出现 看到 提到 了解 发现 处理").split(" "),
+    "问题 意思 情况 原因 办法 方式 地方 部分 整个 另一 过去 继续 开始 进行 使用 出现 看到 提到 了解 发现 处理 提醒 问问 到了 会不会 " +
+    "今天 明天 昨天 早上 晚上 上午 下午 中午 等会 一会儿 待会 那天 这天 当时 那时 那件 这件 那条 这条 那次 这次 " +
+    "我看 是有 给我一个 弄好 具体 主要 不少 回去 正常 前面 后面 最后").split(" "),
 );
+/** A two-character word ending in a particle says no more than its first character: 改了, 洗了, 说的, 对吧. */
+const PARTICLE_END = /^\p{Script=Han}[了的吗呢吧啊]$/u;
 
 /** One-character segments that join nothing: "磁/吸" makes 磁吸 and "手机/壳" makes 手机壳, "你/看" and "的/事" make nothing. */
 const ZH_GLUE = new Set("的了吗呢吧啊呀哦嗯嘛么着过得地你我他她它们这那哪啥谁是有没不别在和与跟及或也都就才又再还很太更最已刚先把被给让叫对从向往为于以而但并如若会能要想去来说看用点弄做干帮试查找写发改聊个些一两几下上里中后前等好多少");
@@ -30,20 +34,25 @@ const segmenter = new Intl.Segmenter("zh", { granularity: "word" });
 const RECALL_TERMS = 16;
 /** A clause this long also stands as one term, so a passage that repeats it word for word ranks first. */
 const CLAUSE_CHARS = 4;
+/** In Chinese a number sits right against the characters around it, so one or two digits would match every count and date. */
+const SHORT_NUMBER = /^\d{1,2}$/;
 
-/** message-db's recallTerms with every run of Han characters cut into words; a query without Han gets upstream's list as is. */
-export function recallTerms(query: string): string[] {
-  const tokens = upstreamTerms(query);
-  if (!hasHan(query)) return tokens;
+interface HanTerms {
+  terms: string[];
+  /** The whole clauses among terms: they help find and rank, but are not words of their own. */
+  clauses: ReadonlySet<string>;
+}
+
+function hanTerms(query: string): HanTerms {
   const words: string[] = [];
   const clauses: string[] = [];
   const keep = (term: string) => {
-    if (!words.includes(term)) words.push(term);
+    if (!SHORT_NUMBER.test(term) && !words.includes(term)) words.push(term);
   };
   const add = (term: string) => {
-    if (term.length >= 2 && !ZH_STOP.has(term)) keep(term);
+    if (term.length >= 2 && !ZH_STOP.has(term) && !PARTICLE_END.test(term)) keep(term);
   };
-  for (const token of tokens) {
+  for (const token of upstreamTerms(query)) {
     if (!hasHan(token)) {
       keep(token);
       continue;
@@ -54,28 +63,44 @@ export function recallTerms(query: string): string[] {
     const flush = () => {
       if (run.length >= 2) add(run);
       for (let i = 0; run.length >= 3 && i + 1 < run.length; i++) add(run.slice(i, i + 2));
-      if (word && run) add(word + run[0]);
+      if (word && hasHan(run.charAt(0))) add(word + run.charAt(0));
       run = "";
     };
-    for (const { segment, isWordLike } of segmenter.segment(token)) {
-      if (!isWordLike || !hasHan(segment)) {
+    // The parts between Han characters stay whole, as upstream keeps them: "11/12" is one term, which recallMatchTerm skips.
+    for (const part of token.split(/(\p{Script=Han}+)/u)) {
+      if (!part) continue;
+      if (!hasHan(part)) {
+        // One letter joins the characters after it: T恤, B站, U盘.
+        if (/^\p{L}$/u.test(part)) {
+          run += part;
+          continue;
+        }
         flush();
         word = "";
-        if (isWordLike) for (const term of upstreamTerms(segment)) keep(term);
-      } else if (segment.length > 1) {
-        flush();
-        word = ZH_STOP.has(segment) ? "" : segment;
-        add(segment);
-      } else if (ZH_GLUE.has(segment)) {
-        flush();
-        word = "";
-      } else {
-        run += segment;
+        for (const term of upstreamTerms(part)) keep(term);
+        continue;
+      }
+      for (const { segment } of segmenter.segment(part)) {
+        if (segment.length > 1) {
+          flush();
+          word = ZH_STOP.has(segment) ? "" : segment;
+          add(segment);
+        } else if (ZH_GLUE.has(segment)) {
+          flush();
+          word = "";
+        } else {
+          run += segment;
+        }
       }
     }
     flush();
   }
-  return [...words, ...clauses.filter((clause) => !words.includes(clause))].slice(0, RECALL_TERMS);
+  return { terms: [...words, ...clauses.filter((clause) => !words.includes(clause))].slice(0, RECALL_TERMS), clauses: new Set(clauses) };
+}
+
+/** message-db's recallTerms with every run of Han characters cut into words; a query without Han gets upstream's list as is. */
+export function recallTerms(query: string): string[] {
+  return hasHan(query) ? hanTerms(query).terms : upstreamTerms(query);
 }
 
 // ---- Matching ----------------------------------------------------------------------------------------------------------
@@ -113,19 +138,17 @@ function allMatchers(query: string): Matcher[] {
   return out;
 }
 
-/** Auto-recall: any term may match; non-Han terms keep recallMatchTerm's whole-word, prefix and skip rules. */
+/** Auto-recall's test for one term: Han ones anywhere; the others keep recallMatchTerm's whole-word, prefix and skip rules. */
+function recallMatcher(term: string): Matcher | null {
+  if (hasHan(term)) return matcher(term, false);
+  const fts = recallMatchTerm(term);
+  if (!fts) return null;
+  return fts.endsWith("*") ? matcher(term, true, fts.slice(1, -2)) : matcher(term, false);
+}
+
+/** Auto-recall: any term may match. */
 function anyMatchers(query: string): Matcher[] {
-  const out: Matcher[] = [];
-  for (const term of recallTerms(query)) {
-    if (hasHan(term)) {
-      out.push(matcher(term, false));
-      continue;
-    }
-    const fts = recallMatchTerm(term);
-    if (!fts) continue;
-    out.push(fts.endsWith("*") ? matcher(term, true, fts.slice(1, -2)) : matcher(term, false));
-  }
-  return out;
+  return recallTerms(query).flatMap((term) => recallMatcher(term) ?? []);
 }
 
 interface Found {
@@ -171,9 +194,26 @@ function snippet(text: string, found: readonly Found[]): string {
   return out.replace(/\s+/g, " ").trim();
 }
 
-/** How many of the query's terms a recalled passage holds, for recall.ts's enoughMatches: terms counted, not brackets. */
-export function hanMatchedTerms(query: string, passage: string): number {
-  return new Set(occurrences(passage, anyMatchers(query)).map((hit) => hit.term)).size;
+/**
+ * recall.ts's enoughMatches for a query with Han characters: once the query has `min` words, a passage must hold two of them.
+ * The passage's words are found in its text, not counted by its brackets, which the original text may have too. A word and
+ * the longer pieces made from it (手机, 手机壳) count once, and whole clauses not at all, so one thing named is one word.
+ */
+export function hanEnoughMatches(query: string, passage: string, min: number): boolean {
+  const { terms, clauses } = hanTerms(query);
+  const words = terms.filter((term) => !clauses.has(term));
+  const parent = words.map((_, i) => i);
+  const root = (i: number): number => (parent[i] === i ? i : (parent[i] = root(parent[i]!)));
+  words.forEach((a, i) => words.forEach((b, j) => {
+    if (j > i && (a.includes(b) || b.includes(a))) parent[root(j)] = root(i);
+  }));
+  if (new Set(words.map((_, i) => root(i))).size < min) return true;
+  const held = new Set<number>();
+  words.forEach((word, i) => {
+    const test = recallMatcher(word);
+    if (test && passage.search(test.pattern) >= 0) held.add(root(i));
+  });
+  return held.size >= 2;
 }
 
 // ---- Ranking -----------------------------------------------------------------------------------------------------------
@@ -209,22 +249,21 @@ const likeClause = (column: string, matchers: readonly Matcher[], mode: SearchMo
 // ---- Conversations -----------------------------------------------------------------------------------------------------
 
 /**
- * The line a routine run is handed, the same every run: composeExecutionPrompt (server/routine-execution.ts) opens it with
- * `[Scheduled routine "…"` or `[Routine "…"`, a webhook's set-up instructions open with webhookRunNote (server/webhooks.ts).
+ * The line a scheduled or manual run is handed, the same every run: composeExecutionPrompt (server/routine-execution.ts)
+ * opens it with `[Scheduled routine "…"` or `[Routine "…"`, the headers routinePrompt there recognises.
  */
-const RUN_INSTRUCTION = (alias: string) =>
-  `(${alias}.role = 'user' AND (${alias}.text LIKE '[Scheduled routine "%' OR ${alias}.text LIKE '[Routine "%' OR ${alias}.text LIKE '[From webhook "%" · run · %'))`;
-/** A webhook without set-up instructions hands over only its event (webhookNote): new data each time, so it stays a hit. */
-const RUN_OPENING = (alias: string) => `(${RUN_INSTRUCTION(alias)} OR (${alias}.role = 'user' AND ${alias}.text LIKE '[From webhook "%'))`;
+const RUN_INSTRUCTION = (alias: string) => `(${alias}.role = 'user' AND (${alias}.text LIKE '[Scheduled routine "%' OR ${alias}.text LIKE '[Routine "%'))`;
+/** A webhook's run opens with webhookRunNote or webhookNote (server/webhooks.ts) and carries that event's data, so it stays a hit. */
+const RUN_OPENING = (alias: string) => `coalesce(${alias}.text LIKE '[Scheduled routine "%' OR ${alias}.text LIKE '[Routine "%' OR ${alias}.text LIKE '[From webhook "%', 0)`;
 
 /**
- * Conversations a routine run opened: their first line from the person's side is what the run was handed. The routineRunId
- * the bot record keeps for them (store.ts) is not known down here.
+ * Conversations a routine run opened and the person has not written in: every line there from his side is what a run was
+ * handed. Upstream keeps the same set as the routineRunId of the bot's records (store.ts, cleared once he writes), which is
+ * not known down here.
  */
 const RUNS =
-  "runs(id) AS (SELECT f.thread_id FROM messages f WHERE f.thread_id IN (SELECT id FROM scope) AND f.kind = 'text' AND " +
-  `${RUN_OPENING("f")} AND NOT EXISTS (SELECT 1 FROM messages e WHERE e.thread_id = f.thread_id AND e.role = 'user' ` +
-  "AND e.kind = 'text' AND e.at < f.at))";
+  "runs(id) AS (SELECT f.thread_id FROM messages f WHERE f.thread_id IN (SELECT id FROM scope) AND f.role = 'user' AND f.kind = 'text' " +
+  `AND json_extract(f.json, '$.peerAsk') IS NULL GROUP BY f.thread_id HAVING min(${RUN_OPENING("f")}) = 1)`;
 
 const PEER_NOTE_HEAD_CHARS = 160;
 

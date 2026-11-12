@@ -70,9 +70,21 @@ describe("routine runs", () => {
     const threads = ["home", "run-1", "run-2", "run-3", "run-4"];
     const all = ids(recallMessages("冬装", threads));
     expect(all[0]).toBe("said-home");
-    expect(all.slice(1).sort()).toEqual(["event-4", "found-1", "said-4"]);
+    // A webhook's run line carries that event's data, so it stays, ranked with the runs.
+    expect(all.slice(1).sort()).toEqual(["ask-3", "event-4", "found-1", "said-4"]);
     expect(ids(recallMessages("冬装 购物车", threads))).toEqual([]);
     expect(ids(recallMessages("找冬装 加购", threads, 12, undefined, "any"))[0]).toBe("said-home");
+  });
+
+  it("stops ranking a run's conversation last once the person writes in it, as upstream clears its routineRunId", () => {
+    insertMessage("home", line("said-home", "冬装找到了，三件厚款都放进购物车了，等你挑", { at: 1 }));
+    insertMessage("run", line("ask-run", composeExecutionPrompt(routine("schedule"), "找冬装", undefined), { role: "user" }));
+    insertMessage("run", line("said-run", "冬装找到了"));
+    expect(ids(recallMessages("冬装", ["home", "run"]))).toEqual(["said-home", "said-run"]);
+    insertMessage("run", line("peer", "冬装那边怎么样", { role: "user", peerAsk: { botId: "b2", name: "穿搭" } } as Partial<Message>));
+    expect(ids(recallMessages("冬装", ["home", "run"]))[0]).toBe("said-home");
+    insertMessage("run", line("he-said", "这件不要", { role: "user" }));
+    expect(ids(recallMessages("冬装", ["home", "run"]))[0]).toBe("said-run");
   });
 
   it("ranks a run's line after the rest only in a conversation the run opened, not where a routine runs in the bot's own chat", () => {
@@ -96,6 +108,15 @@ describe("auto-recall with Chinese", () => {
     expect(recallTerms("What is my balance?")).toEqual(["balance"]);
   });
 
+  it("keeps a date whole, as upstream does, drops a one- or two-digit number, and joins a letter to the character after it", () => {
+    expect(recallTerms("11/12那天退货了没，改了3处")).toEqual(["11/12", "退货", "11/12那天退货了没", "改了3处"]);
+    expect(recallTerms("上次那件T恤洗了会不会缩水")).toEqual(["t恤", "缩水", "上次那件t恤洗了会不会缩水"]);
+    insertMessage("work", line("date", "11月12日的账单已经发你了"));
+    insertMessage("work", line("shirt", "这件T恤是纯棉的，洗了不会缩"));
+    const hits = ids(recallMessages("11/12那天的T恤", ["work"], 12, undefined, "any"));
+    expect(hits).toEqual(["shirt"]);
+  });
+
   it("recalls the original line from another conversation for a sentence in plain Chinese", () => {
     insertMessage("work", line("w1", "记录找到了：手机壳那次跑过的命令里，B 站一次都没打开过"));
     insertMessage("work", line("w2", "今天天气不错"));
@@ -104,11 +125,14 @@ describe("auto-recall with Chinese", () => {
     expect(result?.text).toContain("shopping: 记录找到了：手机壳那次跑过的命令里，B 站一次都没打开过");
   });
 
-  it("counts the terms a passage holds, not the brackets in it", () => {
+  it("counts the words a passage holds, not the brackets in it, and a word with the pieces made from it once", () => {
+    // 小齐, 冬装, 购物车, 羽绒服, 围巾: five words, so a passage needs two of them.
     const query = "给小齐找冬装加购物车再看看羽绒服和围巾";
-    expect(recallTerms(query).length).toBeGreaterThanOrEqual(5);
     expect(enoughMatches(query, "原文自带 [1] 和 [2]，只提到 [冬装]")).toBe(false);
-    expect(enoughMatches(query, "[冬装] 和羽绒服都加进购物车了")).toBe(true);
+    expect(enoughMatches(query, "[购物车]里的[购物]清单")).toBe(false);
+    expect(enoughMatches(query, "[冬装] 和[羽绒服]都加进购物车了")).toBe(true);
+    // Time words and "remind" are filler, as upstream drops "remind": four words left, so one is enough.
+    expect(enoughMatches("明天早上提醒我给妈妈打电话，问问她体检结果", "体检报告出来了")).toBe(true);
   });
 });
 

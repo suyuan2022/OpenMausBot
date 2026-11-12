@@ -287,8 +287,8 @@ describe("the fork's hooks into upstream files", () => {
     expect(functionBody(db, "recallMessages")).toContain("if (hasHan(query)) return hanRecallMessages(db(), query, threadIds, limit, range, mode);");
     expect(functionBody(db, "recallMemory")).toContain("if (hasHan(query)) return hanRecallMemory(db(), query, botId, limit, mode);");
     const recall = source("server/recall.ts");
-    expect(recall).toContain('import { hanMatchedTerms, hasHan, recallTerms } from "./suyuan/han-search.ts";');
+    expect(recall).toContain('import { hanEnoughMatches, hasHan, recallTerms } from "./suyuan/han-search.ts";');
     expect(recall).not.toMatch(/import \{[^}]*\brecallTerms\b[^}]*\} from "\.\/message-db\.ts"/);
-    expect(functionBody(recall, "enoughMatches")).toContain("(hasHan(query) ? hanMatchedTerms(query, plain(snippet)) : matchedTerms(snippet)) >= 2");
+    expect(functionBody(recall, "enoughMatches")).toContain("return hasHan(query) ? hanEnoughMatches(query, plain(snippet), MIN_TERMS_FOR_TWO) :");
   });
 });
