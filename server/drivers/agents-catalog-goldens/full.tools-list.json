@@ -157,7 +157,7 @@
           "title": {
             "type": "string",
             "maxLength": 80,
-            "description": "With thread \"new\": the new thread's sidebar name, short and specific (e.g. \"Launch: Reddit draft\"). Defaults to the start of message."
+            "description": "With thread \"new\": the new thread's title, shown at the top of the thread and used by list_threads and #Title links; short and specific (e.g. \"Launch: Reddit draft\"). Defaults to the start of message."
           },
           "in_my_folder": {
             "type": "boolean",
@@ -372,7 +372,7 @@
     },
     {
       "name": "close_thread",
-      "description": "Mark a thread you opened (or one of your own) as finished once you have read its result: it leaves the person's default sidebar list (still under all threads, with a note saying you closed it) and list_threads reports it as closed. Nothing is deleted — deleting stays the person's decision — and a thread that is still running cannot be closed; wait for it or leave it. Use the thread id from list_threads or from the start_thread result. If a close is refused, do not retry it.",
+      "description": "Mark a thread you opened (or one of your own) as finished once you have read its result: list_threads reports it as closed, and the person can still open it. Nothing is deleted — deleting stays the person's decision — and a thread that is still running cannot be closed; wait for it or leave it. Use the thread id from list_threads or from the start_thread result. If a close is refused, do not retry it.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
@@ -389,7 +389,7 @@
     },
     {
       "name": "start_thread",
-      "description": "Open a separate job on yourself: one conversation with its own history and its own run, shown to the person as a row under you, without switching the person's selected conversation. Use it only when the user requests independent jobs (for example one review per pull request, \"review each pull request\" — one thread per pull request) instead of doing them inside this conversation. The title becomes the row's name, so make it short and specific, and write it as #Title when you mention it to the person; give complete instructions, since the run will not see this conversation. You can open at most five per turn; a self-opened job cannot open more jobs. This is not a teammate handoff: use coordinate_bots for teammates (thread \"new\" opens a fresh thread on them) and their automatic replies. If a call is refused, do not retry it: say what you still wanted opened.",
+      "description": "Open a separate job on yourself: one conversation with its own history and its own run, which the person opens from the chip this call leaves in this conversation, without switching the person's selected conversation. Use it only when the user requests independent jobs (for example one review per pull request, \"review each pull request\" — one thread per pull request) instead of doing them inside this conversation. The title names the thread on that chip, at the top of the thread and in list_threads, so make it short and specific, and write it as #Title when you mention it to the person; give complete instructions, since the run will not see this conversation. You can open at most five per turn; a self-opened job cannot open more jobs. This is not a teammate handoff: use coordinate_bots for teammates (thread \"new\" opens a fresh thread on them) and their automatic replies. If a call is refused, do not retry it: say what you still wanted opened.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,

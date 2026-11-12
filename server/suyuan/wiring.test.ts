@@ -4,6 +4,8 @@ import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
+import { THREAD_FACTS } from "./thread-facts.ts";
+
 const ROOT = join(import.meta.dirname, "..", "..");
 const source = (path: string) => readFileSync(join(ROOT, path), "utf8");
 
@@ -279,5 +281,20 @@ describe("the fork's hooks into upstream files", () => {
     expect(source("src/components/bot-panel/DetailsTab.tsx")).toContain("{threadsShownNow() && <BotConversations bot={bot} />}");
     expect(source("src/App.tsx")).toContain('if (!e.repeat && selected && selected.yourAccess !== "view" && threadsShownNow()) dispatch({ type: "newTask", botId: selected.id });');
     expect(source("src/components/routines/ResultsDestination.tsx")).toContain("const tasks = listedThreads(bot, (bot?.tasks ?? []).filter((task) => !task.routineRunId));");
+  });
+
+  it("a bot's Recent work and what it is told about threads come from the fork", () => {
+    const index = source("server/index.ts");
+    // A regex, as above: the import line written as a string would read to ci-scope as this test importing the module.
+    expect(index).toMatch(/^import \{ parseSince, parseUntil, turnOutcomeLine \} from "\.\/recent-work\.ts"; import \{ recentWork, recentWorkPrompt \} from "\.\/suyuan\/recent-work\.ts";/m);
+    // The 1:1 turn and the room turn both build the section from that import.
+    expect(index).toContain('{ id: "recent", label: "Recent work", text: recentWorkPrompt(recentWork(recentWorkSources(bot), bot, {');
+    expect(index).toContain('{ id: "recent", label: "Recent work", text: recentWorkPrompt(recentLines) },');
+    expect(index).toContain("const recentLines = recentWork(recentWorkSources(bot), bot, {");
+    expect(source("server/system-prompt.ts")).toContain("export const THREADS_PROMPT = threadFacts(");
+    expect(source("server/drivers/agents-catalog.ts")).toContain("].map(withThreadFacts).map((tool) => {");
+    // Every phrase thread-facts.ts swaps is still upstream's, word for word: one upstream reworded would stop being swapped.
+    const upstream = source("server/system-prompt.ts") + source("server/drivers/agents-catalog.ts");
+    for (const [phrase] of THREAD_FACTS) expect(upstream).toContain(JSON.stringify(phrase).slice(1, -1));
   });
 });
