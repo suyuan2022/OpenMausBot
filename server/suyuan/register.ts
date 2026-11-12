@@ -6,6 +6,7 @@ import { ownerOrAdmin } from "../request-auth.ts";
 import { ROUTES } from "../routes/table.ts";
 import { webPushFor } from "./web-push.ts";
 import { createWebPushRoutes } from "./web-push-routes.ts";
+import "./steady-prompt.ts";
 
 // The "hasn't heard back from Claude" notice (server/first-reply-rescue.ts) stays off unless the environment asks for it:
 // its two ways out, switch AI and connect a subscription, are no use here, and the chat's working line already counts

@@ -13,7 +13,7 @@ import { attentionSelect } from "./message-db-attention.ts";
 import { MessageSearchWorker } from "./message-search-worker.ts";
 import { searchMessagesInDatabase, type SearchHit } from "./message-search-query.ts";
 import type { Notification, NotificationLogEntry } from "../shared/notification.ts";
-export type { SearchHit } from "./message-search-query.ts";
+export type { SearchHit } from "./message-search-query.ts"; import { hanRecallMemory, hanRecallMessages, hasHan } from "./suyuan/han-search.ts"; // suyuan fork
 
 const DB_FILE = () => join(DATA_DIR, "messages.db");
 /** The rows the Today page reads, and among them the failed tool calls. JSON.stringify escapes every quote inside a
@@ -827,7 +827,7 @@ function rangeClause(range: RecallRange | undefined, column: string): { sql: str
 }
 
 export function recallMessages(query: string, threadIds: readonly string[], limit = 12, range?: RecallRange, mode: SearchMode = "all"): RecallHit[] {
-  const match = ftsQuery(query, mode);
+  if (hasHan(query)) return hanRecallMessages(db(), query, threadIds, limit, range, mode); const match = ftsQuery(query, mode); // suyuan fork: Chinese
   if (!match || !threadIds.length) return [];
   const placeholders = threadIds.map(() => "?").join(", ");
   const window = rangeClause(range, "m.at");
@@ -970,7 +970,7 @@ export interface MemoryHit {
 }
 
 export function recallMemory(query: string, botId: string, limit = 12, mode: SearchMode = "all"): MemoryHit[] {
-  const match = ftsQuery(query, mode);
+  if (hasHan(query)) return hanRecallMemory(db(), query, botId, limit, mode); const match = ftsQuery(query, mode); // suyuan fork: Chinese
   if (!match) return [];
   const rows = db()
     .prepare(
