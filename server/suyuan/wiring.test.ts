@@ -280,4 +280,15 @@ describe("the fork's hooks into upstream files", () => {
     expect(source("src/App.tsx")).toContain('if (!e.repeat && selected && selected.yourAccess !== "view" && threadsShownNow()) dispatch({ type: "newTask", botId: selected.id });');
     expect(source("src/components/routines/ResultsDestination.tsx")).toContain("const tasks = listedThreads(bot, (bot?.tasks ?? []).filter((task) => !task.routineRunId));");
   });
+
+  it("a query with Chinese in it is searched by containment, and auto-recall cuts Chinese into words and counts them", () => {
+    const db = source("server/message-db.ts");
+    expect(db).toContain('import { hanRecallMemory, hanRecallMessages, hasHan } from "./suyuan/han-search.ts";');
+    expect(functionBody(db, "recallMessages")).toContain("if (hasHan(query)) return hanRecallMessages(db(), query, threadIds, limit, range, mode);");
+    expect(functionBody(db, "recallMemory")).toContain("if (hasHan(query)) return hanRecallMemory(db(), query, botId, limit, mode);");
+    const recall = source("server/recall.ts");
+    expect(recall).toContain('import { hanMatchedTerms, hasHan, recallTerms } from "./suyuan/han-search.ts";');
+    expect(recall).not.toMatch(/import \{[^}]*\brecallTerms\b[^}]*\} from "\.\/message-db\.ts"/);
+    expect(functionBody(recall, "enoughMatches")).toContain("(hasHan(query) ? hanMatchedTerms(query, plain(snippet)) : matchedTerms(snippet)) >= 2");
+  });
 });
