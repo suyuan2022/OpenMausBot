@@ -13,6 +13,7 @@ import "./phone-tables.css";
 import "./phone-tiles.css";
 import "./room-router.css";
 import "./phone-header.css";
+import "./quiet-status.css";
 import "./steady-tables.css";
 import "./no-zoom.css";
 import { installNoZoom } from "./no-zoom";
