@@ -161,11 +161,13 @@ describe("BotListItem", () => {
     });
 
     it("times the open row by the last reply, not by the hang-up", () => {
+      vi.useFakeTimers({ now: at(30), toFake: ["Date"] }); // suyuan fork: a row from before today shows its day (src/suyuan/list-order.ts)
       const markup = draw(bot({
         messages: [spoken, { id: "b1", role: "bot", kind: "text", text: "Sunny in Pune.", at: at(1) }, record] as Bot["messages"],
       }), { selected: true });
       expect(markup).toContain(formatTime(at(1)));
       expect(markup).not.toContain(formatTime(at(2)));
+      vi.useRealTimers();
     });
 
     it("names the step the bot is on while it works, when the call ended under it", () => {

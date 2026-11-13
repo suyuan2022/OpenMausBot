@@ -155,6 +155,16 @@ describe("the fork's hooks into upstream files", () => {
     expect(source("src/components/RoomQueueList.tsx")).toContain('<div data-testid="routed-by" className="mt-1 px-1 text-[11px] text-ink-secondary">');
   });
 
+  it("the phone's bot list words its times and leads with the newest by list-order.ts, and a tile's working dot sits apart from its unread one", () => {
+    const sidebar = source("src/components/Sidebar.tsx");
+    expect(sidebar).toMatch(/import \{ listTime, recentBotsFirst \} from "@\/suyuan\/list-order";/);
+    expect(sidebar).toContain("              {listTime(last.at)}\n");
+    expect(sidebar).toContain("= { ...saved, ...(simple && phone ? recentBotsFirst(visibleMessages) : activeBotsFirst)(saved, (bot) => {");
+    const tiles = source("src/components/SidebarTiles.tsx");
+    expect(tiles).toContain(') : unread ? dot("unread-dot", "bg-accent")\n          : null}\n        {working ? corner("working-dot", "bg-success")');
+    expect(tiles).toContain('<span data-testid="chief-badge" className={cn("absolute -left-px -top-px flex');
+  });
+
   it("the phone list's avatar row is lifted by phone-header.css, found by the row's data attribute", () => {
     expect(source("src/suyuan/use-suyuan.ts")).toMatch(/^import "\.\/phone-header\.css";/m);
     expect(source("src/components/Sidebar.tsx")).toContain('data-sidebar-top-row={corner ? "corner" : true}');

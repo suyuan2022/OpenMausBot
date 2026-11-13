@@ -58,6 +58,9 @@ export const SidebarBotTile = memo(function SidebarBotTile({ primary = false, dr
     }
   };
   const dot = (testId: string, tone: string) => <span data-testid={testId} aria-hidden="true" className={cn("absolute -right-0.5 -top-0.5 size-3 rounded-full", tone, RING)} />;
+  // suyuan fork: what the bot is doing goes on the avatar's bottom corner, as on a list row; the top one is for what needs
+  // the person (unread, waiting), so a working bot's dot is not mistaken for an unread one.
+  const corner = (testId: string, tone: string) => <span data-testid={testId} aria-hidden="true" className={cn("absolute bottom-0.5 right-0.5 size-3 rounded-full", tone, RING)} />;
   return (
     <div
       role={renaming ? undefined : "button"}
@@ -90,7 +93,7 @@ export const SidebarBotTile = memo(function SidebarBotTile({ primary = false, dr
           animated={working || noticing || (mascotMotion?.kind ?? "none") !== "none"}
         />
         {primary && bot.chiefOfStaff && (
-          <span data-testid="chief-badge" className={cn("absolute -bottom-px -right-px flex size-4 items-center justify-center rounded-full bg-[#E8993A] text-white", RING)}>
+          <span data-testid="chief-badge" className={cn("absolute -left-px -top-px flex size-4 items-center justify-center rounded-full bg-[#E8993A] text-white", RING)}>
             <Crown size={10} strokeWidth={1.5} fill="currentColor" aria-hidden="true" />
           </span>
         )}
@@ -100,10 +103,11 @@ export const SidebarBotTile = memo(function SidebarBotTile({ primary = false, dr
           </span>
         ) : waiting ? (
           <span data-testid="waiting-dot" aria-hidden="true" className={cn("absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-warning text-[11px] font-black leading-none text-panel", RING)}>!</span>
-        ) : working ? dot("working-dot", "bg-success")
-          : teammateWait ? dot("teammate-wait-dot", "bg-accent")
-          : queued ? dot("queued-dot", "bg-ink-tertiary")
-          : unread ? dot("unread-dot", "bg-accent")
+        ) : unread ? dot("unread-dot", "bg-accent")
+          : null}
+        {working ? corner("working-dot", "bg-success")
+          : teammateWait ? corner("teammate-wait-dot", "bg-accent")
+          : queued && !waiting ? corner("queued-dot", "bg-ink-tertiary")
           : null}
         {deleting && (
           <span className="absolute inset-0 flex items-center justify-center rounded-full bg-panel/60 text-ink-secondary">

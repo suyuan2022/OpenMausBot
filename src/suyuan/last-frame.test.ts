@@ -146,6 +146,33 @@ describe("captureFrame and showFrame", () => {
     expect(html).toContain('id="u-grad"');
     expect(html).not.toContain('id="row"');
   });
+
+  it("gives the shown copy's SVG ids, and what points at them, a name of its own: the app draws the same ids underneath", async () => {
+    const { showFrame, ownIds } = await fresh();
+    const svg = '<svg id="omb-mermaid-1" viewBox="0 0 10 10"><defs><linearGradient id="mascotr2-grad"></linearGradient>'
+      + '<clipPath id="mascotr2-clip"></clipPath></defs><g fill="url(#mascotr2-grad)" stroke="#fff"></g><g clip-path="url(#mascotr2-clip)"></g><use href="#mascotr2-clip"></use><path fill="url(#elsewhere)"></path></svg>';
+    const shown = showFrame(document, { html: `<div>${svg}</div>`, width: 1, height: 1, at: 1, build: BUILD });
+    const html = shown.innerHTML;
+    for (const id of ["omb-mermaid-1", "mascotr2-grad", "mascotr2-clip"]) {
+      expect(html).toContain(`id="suyuan-frame-${id}"`);
+      expect(html).not.toContain(`id="${id}"`);
+    }
+    expect(html).toContain('fill="url(#suyuan-frame-mascotr2-grad)"');
+    expect(html).toContain('clip-path="url(#suyuan-frame-mascotr2-clip)"');
+    expect(html).toContain('href="#suyuan-frame-mascotr2-clip"');
+    // A Mermaid chart's own style finds it by its id. (happy-dom drops what follows a <style> parsed inside an SVG.)
+    const chart = document.createElementNS("http://www.w3.org/2000/svg", "svg");
+    chart.id = "omb-mermaid-2";
+    chart.append(Object.assign(document.createElementNS("http://www.w3.org/2000/svg", "style"), { textContent: "#omb-mermaid-2 .node{fill:#377FE6}" }));
+    const holder = document.createElement("div");
+    holder.append(chart);
+    ownIds(holder);
+    expect(chart.id).toBe("suyuan-frame-omb-mermaid-2");
+    expect(chart.firstElementChild?.textContent).toBe("#suyuan-frame-omb-mermaid-2 .node{fill:#377FE6}");
+    // Colours and ids the copy does not hold stay as they were.
+    expect(html).toContain('stroke="#fff"');
+    expect(html).toContain('fill="url(#elsewhere)"');
+  });
 });
 
 describe("usableFrame", () => {
