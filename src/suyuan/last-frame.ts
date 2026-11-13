@@ -66,6 +66,21 @@ export function cleanMarkup(doc: Document, html: string): HTMLTemplateElement {
   return template;
 }
 
+/** The copy's SVG ids, and what points at them inside it, take a prefix. The app draws the same avatars underneath with
+ * the same ids (React numbers them in the same order each start), so for a moment every avatar's gradient id is on the
+ * page twice; on the phone some live avatars came out with no body once the copy went. */
+export function ownIds(root: ParentNode, prefix = "suyuan-frame-"): void {
+  const ids = new Set<string>();
+  for (const element of root.querySelectorAll("svg[id], svg [id]")) ids.add(element.id);
+  if (!ids.size) return;
+  const swap = (text: string) => text.replace(/#([^\s"'()#,;>{}]+)/g, (whole, id: string) => (ids.has(id) ? `#${prefix}${id}` : whole));
+  for (const element of root.querySelectorAll("svg, svg *")) {
+    if (ids.has(element.id)) element.id = prefix + element.id;
+    for (const { name, value } of element.attributes) if (value.includes("#")) element.setAttribute(name, swap(value));
+    if (element.localName === "style" && element.textContent) element.textContent = swap(element.textContent);
+  }
+}
+
 /** The "Show later messages (N more)" button a chat opened around an older message (a pin, a search hit) ends in. */
 function showsLater(button: Element): boolean {
   const [before, after] = t("chat.showLater", { count: "\u0000" }).split("\u0000");
@@ -142,7 +157,9 @@ export function showFrame(doc: Document, frame: Frame): HTMLElement {
   copy.inert = true;
   copy.style.height = "100%";
   // Cleaned again: what localStorage hands back is only as trustworthy as everything else on this origin.
-  copy.append(cleanMarkup(doc, frame.html).content);
+  const content = cleanMarkup(doc, frame.html).content;
+  ownIds(content);
+  copy.append(content);
   cover.append(copy);
   doc.body.append(cover);
   for (const chat of cover.querySelectorAll<HTMLElement>(`[${AT_END}]`)) chat.scrollTop = chat.scrollHeight;
