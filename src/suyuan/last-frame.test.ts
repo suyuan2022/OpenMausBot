@@ -157,6 +157,8 @@ describe("usableFrame", () => {
     expect(usableFrame(JSON.stringify(frame), size, 2_000, "/assets/index-new.js")).toBeNull();
     expect(usableFrame(JSON.stringify(frame), size, 1_000 + 4 * 24 * 3600_000, BUILD)).toBeNull();
     expect(usableFrame(JSON.stringify(frame), { width: 844, height: 390 }, 2_000, BUILD)).toBeNull();
+    // Safari's toolbar changes the height alone: the copy still wraps as the page does.
+    expect(usableFrame(JSON.stringify(frame), { width: 390, height: 760 }, 2_000, BUILD)).toEqual(frame);
     expect(usableFrame("{ not json", size, 2_000, BUILD)).toBeNull();
     expect(usableFrame(null, size, 2_000, BUILD)).toBeNull();
   });

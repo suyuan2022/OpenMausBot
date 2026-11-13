@@ -1,4 +1,4 @@
-// suyuan fork: the app reopens on the screen it was left on. A home-screen web app that iOS dropped in the background
+// suyuan fork: the app reopens on the screen it was left on. A home-screen web app or Safari tab that iOS dropped in the background
 // otherwise starts on "Connecting to your bots…" until the bots load, a second or more over the relay. When the app goes
 // out of sight its markup is kept in localStorage; the next start lays that over the page, inert, and lifts it once the
 // bots have loaded. quiet-start.css holds the page's own connecting line back for the first seconds.
@@ -116,14 +116,15 @@ export function captureFrame(root: HTMLElement, chat: HTMLElement, view: { width
   }
 }
 
-/** A kept frame worth showing: recent, from this build, and taken at this window size, so it lines up with the page
- * that replaces it. */
+/** A kept frame worth showing: recent, from this build, and taken at this window width, so its lines wrap as the page's
+ * that replaces it. The height may differ: Safari's toolbar shows and hides, and the copy lays out at the window it opens
+ * in, its chat at the end, as the app's does. */
 export function usableFrame(text: string | null, view: { width: number; height: number }, now: number, build: string): Frame | null {
   if (!text) return null;
   try {
     const frame = JSON.parse(text) as Partial<Frame>;
     if (typeof frame.html !== "string" || typeof frame.at !== "number" || now - frame.at > MAX_AGE_MS || frame.build !== build) return null;
-    return frame.width === view.width && frame.height === view.height ? frame as Frame : null;
+    return frame.width === view.width ? frame as Frame : null;
   } catch {
     return null;
   }
