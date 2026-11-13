@@ -16,6 +16,7 @@ import { HomeScreen, SignedOutAtHome } from "./components/HomeScreen";
 import { PageBoundary } from "./components/PageBoundary";
 import { endedBeforeReload, forgetEndedSession } from "./lib/session-ended";
 import "./styles.css";
+import "@/suyuan/lifecycle-log"; // suyuan fork, temporary: what the page did before a black screen on return
 import "@/suyuan/last-frame"; // suyuan fork: reopen on the last screen while the bots load
 
 // Before first paint; settleAdvancedModeDefault must run before applySkin writes omb-skin.
