@@ -177,6 +177,12 @@ describe("the fork's hooks into upstream files", () => {
     expect(functionBody(index, "compactConversation")).toContain("(cfg.context?.autoCompact === false || engineCompactsItself(instance.driverKind))");
   });
 
+  it("the app starts with the fork's count of each bot's latest messages", () => {
+    const store = source("src/state/store.tsx");
+    expect(store).toMatch(/; import \{ BOOT_MESSAGE_COUNT \} from "@\/suyuan\/boot-messages"; \/\/ suyuan fork$/m);
+    expect(store).toContain('api(`/api/bots?messages=${BOOT_MESSAGE_COUNT}`).then((answer) => snapshotArrays(answer, "bots"))');
+  });
+
   it("a chat's window counts only drawn rows, and a chat too short to scroll pages older messages in", () => {
     const viewport = source("src/hooks/use-transcript-viewport.ts");
     expect(viewport).toContain("const tailStart = drawnTailStart(messages, TRANSCRIPT_WINDOW_SIZE);");
