@@ -1,4 +1,4 @@
-// suyuan fork: the phone's bot list says when each bot last wrote in words that fit how long ago, and leads with the newest.
+// suyuan fork: the simple bot list says when each bot last wrote in words that fit how long ago, and leads with the newest.
 import { afterAll, describe, expect, it } from "vitest";
 
 import { formatTime } from "@/lib/clock-time";
@@ -49,11 +49,11 @@ describe("the order of a phone's bot list", () => {
     expect(ids(unsectionedBots)).toEqual(["research", "loop", "shopping", "styling", "empty"]);
   });
 
-  it("still leads with the bots working or waiting on the person, newest first among them", () => {
+  it("orders the bots working or waiting on the person by their newest message too, not ahead of the rest", () => {
     const list = [bot("a", 10), bot("b", 50), bot("c", 20), bot("d", 40)];
     const busy = new Set(["a", "c"]);
     const { unsectionedBots } = order({ pinnedBots: [], sectionedBots: [], unsectionedBots: list }, (b) => busy.has(b.id));
-    expect(ids(unsectionedBots)).toEqual(["c", "a", "b", "d"]);
+    expect(ids(unsectionedBots)).toEqual(["b", "d", "c", "a"]);
   });
 
   it("orders each department's bots the same way and leaves the pinned tiles in the person's order", () => {

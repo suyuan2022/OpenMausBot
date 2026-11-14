@@ -1,5 +1,6 @@
-// suyuan fork (FORK.md): the phone's bot list reads like a chat app's. Each row says when its last message came in words
-// that fit how long ago it was, not a clock time that could be any day, and the bots with the newest messages come first.
+// suyuan fork (FORK.md): the simple bot list, on a phone and on a computer, reads like a chat app's. Each row says when its
+// last message came in words that fit how long ago it was, not a clock time that could be any day, and the bots with the
+// newest messages come first.
 import { formatTime } from "@/lib/clock-time";
 import { intlLocale, t } from "@/lib/i18n";
 import { lastNonReceipt } from "@/lib/receipts";
@@ -34,13 +35,13 @@ export function listTime(at: number, now = Date.now()): string {
 
 type Parts<T> = { pinnedBots: T[]; sectionedBots: T[]; unsectionedBots: T[] };
 
-/** activeBotsFirst for the phone: working or waiting bots still lead, and below them, and among them, the bot with the
- * newest message comes first, so the list says which bot to read next. Pinned bots, the tiles, keep activeBotsFirst's. */
+/** activeBotsFirst for the simple list: the bot with the newest message comes first, working or done, so the list says
+ * which bot to read next. Pinned bots, the tiles, keep activeBotsFirst's. */
 export function recentBotsFirst<B>(messagesOf: (bot: B) => readonly { kind: string; at: number }[]) {
   return <T extends B>(parts: Parts<T>, active: (bot: T) => boolean): Parts<T> => {
     const byRecent = (bots: T[]) => bots
-      .map((bot, index) => ({ bot, index, active: active(bot), at: lastNonReceipt(messagesOf(bot))?.at ?? 0 }))
-      .sort((a, b) => Number(b.active) - Number(a.active) || b.at - a.at || a.index - b.index)
+      .map((bot, index) => ({ bot, index, at: lastNonReceipt(messagesOf(bot))?.at ?? 0 }))
+      .sort((a, b) => b.at - a.at || a.index - b.index)
       .map((entry) => entry.bot);
     return { pinnedBots: activeBotsFirst({ ...parts, sectionedBots: [], unsectionedBots: [] }, active).pinnedBots, sectionedBots: byRecent(parts.sectionedBots), unsectionedBots: byRecent(parts.unsectionedBots) };
   };

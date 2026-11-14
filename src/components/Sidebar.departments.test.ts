@@ -302,7 +302,7 @@ describe("bots that are working or waiting on the person", () => {
     busy("cleo", { busy: true });
     busy("bea", { activity: "waiting-on-you" });
     busy("echo", { busy: true });
-    expect(listed()).toEqual(["bea", "cleo", "atlas", "echo", "dodo"]);
+    expect(listed()).toEqual(["atlas", "bea", "cleo", "dodo", "echo"]); // suyuan fork: Simple mode lists by newest message (src/suyuan/list-order.ts)
     busy("cleo", { busy: false });
     busy("bea", { activity: "idle" });
     busy("echo", { busy: false });
@@ -312,7 +312,7 @@ describe("bots that are working or waiting on the person", () => {
   it("count a working thread, but not a wait on a teammate", () => {
     busy("cleo", { tasks: [{ threadId: "c1", title: "Run", createdAt: 1, busy: true } as Task] });
     busy("bea", { waitingForTeammates: true });
-    expect(listed()).toEqual(["cleo", "atlas", "bea", "dodo", "echo"]);
+    expect(listed()).toEqual(["atlas", "bea", "cleo", "dodo", "echo"]); // suyuan fork: as above
   });
 
   it("never store the shown order: Alt+Up/Down and drops use the person's own order", () => {

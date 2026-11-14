@@ -159,7 +159,7 @@ describe("the fork's hooks into upstream files", () => {
     const sidebar = source("src/components/Sidebar.tsx");
     expect(sidebar).toMatch(/import \{ listTime, recentBotsFirst \} from "@\/suyuan\/list-order";/);
     expect(sidebar).toContain("              {listTime(last.at)}\n");
-    expect(sidebar).toContain("= { ...saved, ...(simple && phone ? recentBotsFirst(visibleMessages) : activeBotsFirst)(saved, (bot) => {");
+    expect(sidebar).toContain("= { ...saved, ...(simple ? recentBotsFirst(visibleMessages) : activeBotsFirst)(saved, (bot) => {");
     const tiles = source("src/components/SidebarTiles.tsx");
     expect(tiles).toContain(') : unread ? dot("unread-dot", "bg-accent")\n          : null}\n        {working ? corner("working-dot", "bg-success")');
     expect(tiles).toContain('<span data-testid="chief-badge" className={cn("absolute -left-px -top-px flex');
