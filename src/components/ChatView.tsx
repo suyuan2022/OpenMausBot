@@ -65,7 +65,7 @@ import { VoiceNoteBubble, type VoiceNoteAttachment } from "./VoiceNoteBubble";
 import { RawMarkdownView, RawToggleAction } from "./RawMarkdownToggle";
 import { ThreadChip } from "./ThreadChip";
 import { HandoffChip } from "./HandoffReply"; import { TeammateChip } from "./TeammateChip"; import { useTeammates } from "@/state/team-people"; import type { MentionPeer } from "@/lib/mentions";
-import { NewConversationInstead } from "./NewConversationInstead"; import { BackgroundRunBar } from "@/suyuan/BackgroundRunBar"; import { readsBackgroundRun } from "@/suyuan/home"; // suyuan fork: on this line, the file's length is pinned
+import { NewConversationInstead } from "./NewConversationInstead"; import { BackgroundRunBar } from "@/suyuan/BackgroundRunBar"; import { quietChat } from "@/suyuan/quiet-english"; import { readsBackgroundRun } from "@/suyuan/home"; // suyuan fork: on this line, the file's length is pinned
 import { VerifyCard } from "./VerifyCard";
 import { askText, runSkill, runSteps, runSummary, showRun, skillPrompt } from "@/lib/verify-steps";
 import { useShowRunCard } from "@/lib/run-card-preferences";
@@ -849,7 +849,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
   }, []);
 
   const { messages: allMessages, activeLeafId } = bot;
-  const messages = useMemo(() => visibleMessages({ messages: allMessages, activeLeafId }), [allMessages, activeLeafId]);
+  const turnRuns = Boolean(bot.busy), messages = useMemo(() => quietChat(visibleMessages({ messages: allMessages, activeLeafId }), advanced, turnRuns), [allMessages, activeLeafId, advanced, turnRuns]); // suyuan fork
   const lookups = useMemo(() => transcriptLookups(allMessages, messages), [allMessages, messages]);
   const liveTools = useLiveToolIds(messages, bot);
   const recordedRun = useMemo(() => runSteps(messages, liveTools), [messages, liveTools]);
@@ -1276,7 +1276,7 @@ export function ChatView({ bot: profile }: { bot: Bot }) {
       )}
       <LiveCallBar bot={bot} />
       {canWrite === false ? (
-        background ? <BackgroundRunBar onHome={() => openBot(dispatch, profile, false)} /> : <NewConversationInstead bot={bot} onNew={() => dispatch({ type: "newTask", botId: bot.id })} />
+        background ? <BackgroundRunBar bot={profile} /> : <NewConversationInstead bot={bot} onNew={() => dispatch({ type: "newTask", botId: bot.id })} />
       ) : (
       <Composer
         key={bot.threadId}
