@@ -18,6 +18,7 @@ import { openBotContextMenu, useVisibleMessages, type BotRowProps } from "./Side
 import { sidebarBotStatus } from "./SidebarBotActivity";
 import { SIMPLE_ROW_FOCUS } from "./SidebarSimpleTop";
 import { useBotUnread } from "./unread-notice";
+import { unreadTone, workingDotShown } from "@/suyuan/quiet-dots"; // suyuan fork: no dot on a working bot in Simple, unread is green
 
 const RING = "ring-2 ring-[var(--tile)]";
 
@@ -103,9 +104,9 @@ export const SidebarBotTile = memo(function SidebarBotTile({ primary = false, dr
           </span>
         ) : waiting ? (
           <span data-testid="waiting-dot" aria-hidden="true" className={cn("absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-warning text-[11px] font-black leading-none text-panel", RING)}>!</span>
-        ) : unread ? dot("unread-dot", "bg-accent")
+        ) : unread ? dot("unread-dot", unreadTone())
           : null}
-        {working ? corner("working-dot", "bg-success")
+        {working ? (workingDotShown() ? corner("working-dot", "bg-success") : null)
           : teammateWait ? corner("teammate-wait-dot", "bg-accent")
           : queued && !waiting ? corner("queued-dot", "bg-ink-tertiary")
           : null}

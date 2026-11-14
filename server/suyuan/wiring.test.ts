@@ -163,7 +163,7 @@ describe("the fork's hooks into upstream files", () => {
     expect(sidebar).toContain("              {listTime(rowAt(bot, last.at))}\n");
     expect(sidebar).toContain("= { ...saved, ...(simple ? recentBotsFirst(visibleMessages) : activeBotsFirst)(saved, (bot) => {");
     const tiles = source("src/components/SidebarTiles.tsx");
-    expect(tiles).toContain(') : unread ? dot("unread-dot", "bg-accent")\n          : null}\n        {working ? corner("working-dot", "bg-success")');
+    expect(tiles).toContain(') : unread ? dot("unread-dot", unreadTone())\n          : null}\n        {working ? (workingDotShown() ? corner("working-dot", "bg-success") : null)');
     expect(tiles).toContain('<span data-testid="chief-badge" className={cn("absolute -left-px -top-px flex');
   });
 
@@ -367,5 +367,11 @@ describe("the fork's hooks into upstream files", () => {
     expect(recall).toContain('import { hanEnoughMatches, hasHan, recallTerms } from "./suyuan/han-search.ts";');
     expect(recall).not.toMatch(/import \{[^}]*\brecallTerms\b[^}]*\} from "\.\/message-db\.ts"/);
     expect(functionBody(recall, "enoughMatches")).toContain("return hasHan(query) ? hanEnoughMatches(query, plain(snippet), MIN_TERMS_FOR_TWO) :");
+  });
+  it("keeps the quiet dots wired into the list row, its markers and the tiles", () => {
+    expect(source("src/components/Sidebar.tsx")).toContain('activity={working ? (workingDotShown() ? "working" : null)');
+    expect(source("src/components/SidebarRowMarkers.tsx")).toContain('waiting ? "bg-warning" : unreadTone())');
+    expect(source("src/components/SidebarTiles.tsx")).toContain('unread ? dot("unread-dot", unreadTone())');
+    expect(source("src/components/SidebarTiles.tsx")).toContain('working ? (workingDotShown() ? corner("working-dot", "bg-success") : null)');
   });
 });

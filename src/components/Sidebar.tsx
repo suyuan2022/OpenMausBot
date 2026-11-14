@@ -16,7 +16,7 @@ import { cn } from "@/lib/cn";
 import { searchMatchesThreads, useSearchDisclosure } from "@/lib/search-disclosure";
 import { useHeldMenuMotion, useMenuMotion } from "./MenuMotion";
 import { lastNonReceipt } from "@/lib/receipts";
-import { botPreview, groupPreview } from "./sidebar-preview"; import { QuietRowLine, quietRow } from "@/suyuan/quiet-row"; // suyuan fork: a simple row quotes its own conversation, never narrates
+import { botPreview, groupPreview } from "./sidebar-preview"; import { QuietRowLine, quietRow } from "@/suyuan/quiet-row"; import { workingDotShown } from "@/suyuan/quiet-dots"; // suyuan fork: a simple row quotes its own conversation, never narrates
 import { activeLocale, t } from "@/lib/i18n";
 import { copyText } from "@/lib/copy-text";
 import type { LocaleKey } from "@/locales";
@@ -743,7 +743,7 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
         />
         {/* Bottom-left, clear of the status dots on the right and of the row's hover actions. */}
         {(iconOnly || !simpleList) && <BotModelBadge bot={bot} instances={instances} avatarSize={avatarSize} />}
-        {simpleRow && <AvatarActivityDot activity={working ? "working" : teammateWait ? "teammate" : queued && !waiting ? "queued" : null} />}
+        {simpleRow && <AvatarActivityDot activity={working ? (workingDotShown() ? "working" : null) : teammateWait ? "teammate" : queued && !waiting ? "queued" : null} />}
         {!simpleRow && working && (
           <span
             data-testid="working-dot"

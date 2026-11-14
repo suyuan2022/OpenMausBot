@@ -1,5 +1,6 @@
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
+import { unreadTone } from "@/suyuan/quiet-dots";
 
 /** The colour behind a Simple row, which the status dot on its avatar is ring-cut against. */
 export function rowSurface(selected: boolean): string {
@@ -27,7 +28,7 @@ export function AvatarActivityDot({ activity }: { activity: RowActivity | null }
  * or focus. A touch screen always shows the ⋯, so there the dot sits just before it, at the end of the name line. */
 export function RowDot({ waiting = false }: { waiting?: boolean }) {
   const label = waiting ? t("sidebar.preview.waiting") : t("task.unread");
-  const tone = cn("size-2 shrink-0 rounded-full", waiting ? "bg-warning" : "bg-accent");
+  const tone = cn("size-2 shrink-0 rounded-full", waiting ? "bg-warning" : unreadTone()); // suyuan fork: green in Simple
   return (
     <>
       <span aria-hidden="true" data-row-dot="" className="pointer-events-none absolute right-2 top-1 flex size-7 items-center justify-center transition-opacity group-hover:opacity-0 group-focus-within:opacity-0 touch:opacity-0 max-md:hidden">
