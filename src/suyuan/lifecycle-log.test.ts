@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { KEPT, appended, beaconAddress, brief, keptLines, line, scene } from "./lifecycle-log";
+import { KEPT, appended, beaconAddress, brief, chatAt, keptLines, line, scene } from "./lifecycle-log";
 
 const KEY = "suyuan:lifecycle-log";
 /** Beacons the module sent; happy-dom's own would try to reach a server. Set before the import above runs the module. */
@@ -59,6 +59,19 @@ describe("what is on screen", () => {
   });
 
   it("notes scroll, window, focus and the middle of the screen", () => {
-    expect(scene(window)).toMatch(/^scroll=\d+ inner=\d+x\d+ vv=\S+( scale=\S+)? focus=(true|false) active=\S+ middle=\S+$/);
+    expect(scene(window)).toMatch(/^scroll=\d+ inner=\d+x\d+ vv=\S+( scale=\S+)? focus=(true|false) active=\S+ middle=\S+ chat=\S+$/);
+  });
+});
+
+describe("where the chat sits", () => {
+  it("gives how far down the chat is and how far from its end, or none", () => {
+    expect(chatAt(document)).toBe("chat=none");
+    const main = document.body.appendChild(document.createElement("main"));
+    const chat = main.appendChild(document.createElement("div"));
+    chat.className = "glass-scroller";
+    Object.defineProperties(chat, { scrollHeight: { value: 3000 }, clientHeight: { value: 700 } });
+    chat.scrollTop = 100;
+    expect(chatAt(document)).toBe("chat=100/2200");
+    main.remove();
   });
 });
