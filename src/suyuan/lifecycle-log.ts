@@ -55,7 +55,7 @@ export function scene(win: Window): string {
   const view = win.visualViewport;
   const visible = view ? `vv=${Math.round(view.width)}x${Math.round(view.height)}+${Math.round(view.offsetTop)} scale=${view.scale.toFixed(2)}` : "vv=none";
   const middle = doc.elementFromPoint(win.innerWidth / 2, win.innerHeight / 2);
-  return `scroll=${Math.round(win.scrollY)} inner=${win.innerWidth}x${win.innerHeight} ${visible} focus=${doc.hasFocus()} active=${brief(doc.activeElement)} middle=${brief(middle)} ${chatAt(doc)}`;
+  return `scroll=${Math.round(win.scrollY)} inner=${win.innerWidth}x${win.innerHeight} doc=${doc.documentElement.clientHeight}/${doc.documentElement.scrollHeight} ${visible} focus=${doc.hasFocus()} active=${brief(doc.activeElement)} middle=${brief(middle)} ${chatAt(doc)}`;
 }
 
 /** Where the open chat sits: how far down it is scrolled, and how far that is from its end ("chat=6705/0" is at the end). */
@@ -135,6 +135,15 @@ function start() {
     watchPaint(changeAt, "visible");
     backAt = changeAt;
     setTimeout(() => { if (document.visibilityState === "visible") note(`visible later ${scene(window)}`); }, LATER_MS);
+  });
+  // The keyboard rising after a return is when the screen went black (11/15 00:29): how the screen settled each time.
+  let returnedAt = -Infinity;
+  let settling: ReturnType<typeof setTimeout> | undefined;
+  document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") returnedAt = Date.now(); });
+  window.visualViewport?.addEventListener("resize", () => {
+    if (Date.now() - returnedAt > 10_000) return;
+    clearTimeout(settling);
+    settling = setTimeout(() => note(`resized ${scene(window)}`), 400);
   });
   // 11/15: a chat opened from the list sometimes shows an older stretch, not its end. Where it settled, a moment after.
   window.addEventListener("click", (event) => {

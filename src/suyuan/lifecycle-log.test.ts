@@ -59,7 +59,7 @@ describe("what is on screen", () => {
   });
 
   it("notes scroll, window, focus and the middle of the screen", () => {
-    expect(scene(window)).toMatch(/^scroll=\d+ inner=\d+x\d+ vv=\S+( scale=\S+)? focus=(true|false) active=\S+ middle=\S+ chat=\S+$/);
+    expect(scene(window)).toMatch(/^scroll=\d+ inner=\d+x\d+ doc=\d+\/\d+ vv=\S+( scale=\S+)? focus=(true|false) active=\S+ middle=\S+ chat=\S+$/);
   });
 });
 
