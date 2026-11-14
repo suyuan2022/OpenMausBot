@@ -34,6 +34,7 @@ describe("the fork's hooks into upstream files", () => {
     // A regex, not the line as a string: scripts/ci-scope.test.ts would read the string as this test importing the module.
     expect(source("src/main.tsx")).toMatch(/^import "@\/suyuan\/last-frame";/m);
     expect(source("src/main.tsx")).toMatch(/^import "@\/suyuan\/lifecycle-log";/m);
+    expect(source("src/main.tsx")).toMatch(/^import "@\/suyuan\/theme-color";/m);
     const loading = source("src/App.tsx");
     expect(loading).toContain("<main data-app-loading={loading.text}");
     expect(loading).toContain('<Loader2 size={20} className="animate-spin" />');

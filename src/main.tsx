@@ -18,6 +18,7 @@ import { endedBeforeReload, forgetEndedSession } from "./lib/session-ended";
 import "./styles.css";
 import "@/suyuan/lifecycle-log"; // suyuan fork, temporary: what the page did before a black screen on return
 import "@/suyuan/last-frame"; // suyuan fork: reopen on the last screen while the bots load
+import "@/suyuan/theme-color"; // suyuan fork: an installed app's title bar takes the skin's color, not near-black
 
 // Before first paint; settleAdvancedModeDefault must run before applySkin writes omb-skin.
 settleAdvancedModeDefault();
