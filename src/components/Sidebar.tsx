@@ -16,7 +16,7 @@ import { cn } from "@/lib/cn";
 import { searchMatchesThreads, useSearchDisclosure } from "@/lib/search-disclosure";
 import { useHeldMenuMotion, useMenuMotion } from "./MenuMotion";
 import { lastNonReceipt } from "@/lib/receipts";
-import { botPreview, groupPreview } from "./sidebar-preview";
+import { botPreview, groupPreview } from "./sidebar-preview"; import { QuietRowLine, quietRow } from "@/suyuan/quiet-row"; // suyuan fork: a simple row quotes its own conversation, never narrates
 import { activeLocale, t } from "@/lib/i18n";
 import { copyText } from "@/lib/copy-text";
 import type { LocaleKey } from "@/locales";
@@ -74,7 +74,7 @@ import { GlassBar, GlassScrollFrame, GlassScroller } from "./GlassScrollFrame";
 import { DesktopWorkspaceSwitcher, endCloudHowTo } from "./DesktopWorkspaceSwitcher"; import { PlaceTint } from "./PlaceTint"; import { ChromeRailToggle } from "./ChromeRailToggle";
 import { useCloudOwner } from "./CloudOwner";
 import { SidebarSectionHeader } from "./SidebarSectionHeader";
-import { NeedsYouButton, OwnerPickerHost, pickOwnerOf } from "./TeamOwner"; import { SidebarPeople } from "./SidebarPeople"; import { SidebarInboxRow } from "./SidebarInboxRow"; import { SidebarActiveThreads } from "./SidebarActiveThreads"; import { setAttentionPinned, useAttentionPinned } from "./inbox/attention-pinned"; import { useInboxSupport } from "@/state/inbox"; import { PhoneInboxButton } from "@/suyuan/PhoneInboxButton"; import { listTime, recentBotsFirst } from "@/suyuan/list-order";
+import { NeedsYouButton, OwnerPickerHost, pickOwnerOf } from "./TeamOwner"; import { SidebarPeople } from "./SidebarPeople"; import { SidebarInboxRow } from "./SidebarInboxRow"; import { SidebarActiveThreads } from "./SidebarActiveThreads"; import { setAttentionPinned, useAttentionPinned } from "./inbox/attention-pinned"; import { useInboxSupport } from "@/state/inbox"; import { PhoneInboxButton } from "@/suyuan/PhoneInboxButton"; import { listTime, recentBotsFirst, rowAt } from "@/suyuan/list-order";
 import { showWhoReportsToWhom, TeamMenuItems } from "./SidebarTeamMenu";
 import { MENU_ITEM, MENU_SHEET } from "./menu-recipe";
 import { ELEVATED_CONTROL } from "./elevated";
@@ -814,7 +814,7 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
               // Phones and the simple list show the time on every row; elsewhere only the selected row, until its actions appear.
               selected && !simpleList ? "group-hover:opacity-0 group-focus-within:opacity-0 touch:opacity-0 max-md:touch:opacity-100" : simpleList ? "" : "hidden max-md:inline",
             )}>
-              {listTime(last.at)}
+              {listTime(rowAt(bot, last.at))}
             </span>
           )}
           {expanded && unread && <span className="size-1.5 shrink-0 rounded-full bg-accent" aria-label={t("task.unreadMany")} />}
@@ -828,10 +828,10 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
             </span>
           ) : (
             <span className={cn("flex min-w-0 items-center gap-1.5 truncate text-[13px] leading-[18px]", waiting ? simpleRow ? "text-warning" : "font-semibold text-warning" : "text-ink-secondary")}>
-              {working ? (
+              {working && !quietRow(simpleRow) ? (
                 <SidebarWorkingStep bot={bot} last={last} />
               ) : (
-                <span dir="auto" className="truncate">{waiting ? t("sidebar.preview.waiting") : teammateWait ? t("sidebar.preview.waitingOnTeammate") : queued ? t("task.queued") : botPreview(bot, visible, instances, advanced)}</span>
+                <span dir="auto" className="truncate">{quietRow(simpleRow) ? <QuietRowLine bot={bot} visible={visible} instances={instances} waiting={waiting} /> : waiting ? t("sidebar.preview.waiting") : teammateWait ? t("sidebar.preview.waitingOnTeammate") : queued ? t("task.queued") : botPreview(bot, visible, instances, advanced)}</span>
               )}
             </span>
           )}
