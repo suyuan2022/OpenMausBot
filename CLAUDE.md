@@ -62,7 +62,7 @@ bot「Maus 工程师」跑在 `lizhi-vm` 的 OpenMausBot 服务里，仓库在�
 - 动手前把仓库更新到最新的 `suyuan`，从它拉分支。这份说明以 `suyuan` 上的为准。
 - 上面写「在 MacBook 上跑」「`ssh lizhi-vm`」的，在这里直接在本机跑。
 - 你在服务里面，夙愿只能通过这个界面找到你。界面改坏了（打不开、发不出消息），他在手机上找不到任何 bot，只能去 MacBook 上退回。所以第 2 步「在打包后的页面上走一遍主路径」走通了才部署界面改动。
-- 部署正式版用 `scripts/suyuan/deploy-self.sh`，参数和 `deploy-vm.sh` 一样，只是没有 `--force`。重启服务会把你自己也重启，所以它在后台等所有 bot 都空闲才装，你自己也算在内：它一跑完，你就告诉夙愿「在等空闲，装完会重启」，然后结束这一轮。服务重启后夙愿再找你时，先读 `~/.openmausbot-releases/deploy.log` 的末尾，确认装上了，再做第 7 步的查正式版和汇报。
+- 部署正式版用 `scripts/suyuan/deploy-self.sh`，参数和 `deploy-vm.sh` 一样，只是没有 `--force`。重启服务会把你自己也重启，所以它在后台等所有 bot 都空闲才装，你自己也算在内：它一跑完，你就告诉夙愿「在等空闲，装完会重启」，然后结束这一轮。装完（或者没起来、装回了旧版）后，`deploy-vm-remote.sh` 会调你的自动任务「正式版装完：查一遍再告诉夙愿」把你叫醒，它的地址存在虚拟机的 `~/.openmausbot-releases/wake-hook`，不进仓库；叫醒的那一趟读 `deploy.log` 末尾，做第 7 步的查正式版和汇报。
 - 手机测试版 `phone-test.sh` 不碰正在用的服务，直接跑，不用等空闲。
 - 这台机器上同时跑着夙愿的真实 bot。隔离实例只用 `scripts/control-omb.ts launch` 或 `phone-test.sh` 起的临时实例，不碰 8799 端口。Chrome 和 lcu 也是共用的：测试时用 lcu 新开标签页，测完关掉自己开的，别的标签页不碰。跑全量测试、打包这类吃 CPU 的活之前看一眼 `uptime`，负载高就等一等。
 - 虚拟机连 GitHub 时通时断：`gh`、`git push` 失败就隔几分钟再试，试几次还不行就告诉夙愿。
