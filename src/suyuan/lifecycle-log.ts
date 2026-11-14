@@ -7,6 +7,7 @@
 // A drawn frame does not mean a seen one: at 22:36 on 11/14 the page came back, drew within 41ms and fetched, and the screen
 // stayed black. So each trip also notes what was on screen (./wake-paint.ts repaints on return) and the first touch after
 // coming back: a touch on a black screen that reaches the page says the page is there and iOS shows none of it.
+// It also notes where the open chat sits, and where a chat opened from the list settles.
 
 const KEY = "suyuan:lifecycle-log";
 /** Lines kept: a session's last few trips out and back. */
@@ -16,6 +17,8 @@ export const NO_PAINT_MS = 3_000;
 const PATH = "/api/suyuan/probe";
 /** A second look at the screen after a return, once iOS has surely put the app back. */
 const LATER_MS = 1_500;
+/** The open chat's scroller (src/components/ChatView.tsx). */
+const CHAT = "main .glass-scroller";
 
 /** "02:00:29.512 k3x9 hidden handlers=12ms": local time, the page's id, what happened. */
 export function line(at: number, page: string, what: string): string {
@@ -52,7 +55,13 @@ export function scene(win: Window): string {
   const view = win.visualViewport;
   const visible = view ? `vv=${Math.round(view.width)}x${Math.round(view.height)}+${Math.round(view.offsetTop)} scale=${view.scale.toFixed(2)}` : "vv=none";
   const middle = doc.elementFromPoint(win.innerWidth / 2, win.innerHeight / 2);
-  return `scroll=${Math.round(win.scrollY)} inner=${win.innerWidth}x${win.innerHeight} ${visible} focus=${doc.hasFocus()} active=${brief(doc.activeElement)} middle=${brief(middle)}`;
+  return `scroll=${Math.round(win.scrollY)} inner=${win.innerWidth}x${win.innerHeight} ${visible} focus=${doc.hasFocus()} active=${brief(doc.activeElement)} middle=${brief(middle)} ${chatAt(doc)}`;
+}
+
+/** Where the open chat sits: how far down it is scrolled, and how far that is from its end ("chat=6705/0" is at the end). */
+export function chatAt(doc: Document): string {
+  const chat = doc.querySelector<HTMLElement>(CHAT);
+  return chat ? `chat=${Math.round(chat.scrollTop)}/${Math.round(chat.scrollHeight - chat.scrollTop - chat.clientHeight)}` : "chat=none";
 }
 
 export function beaconAddress(lines: string[]): string {
@@ -127,6 +136,11 @@ function start() {
     backAt = changeAt;
     setTimeout(() => { if (document.visibilityState === "visible") note(`visible later ${scene(window)}`); }, LATER_MS);
   });
+  // 11/15: a chat opened from the list sometimes shows an older stretch, not its end. Where it settled, a moment after.
+  window.addEventListener("click", (event) => {
+    const row = event.target instanceof Element ? event.target.closest("[data-sidebar-bot-row]") : null;
+    if (row) setTimeout(() => note(`row opened ${chatAt(document)}`), LATER_MS);
+  }, true);
   window.addEventListener("pointerdown", (event) => {
     if (backAt === null) return;
     note(`touch +${Math.round(performance.now() - backAt)}ms at ${Math.round(event.clientX)},${Math.round(event.clientY)} on ${brief(event.target instanceof Element ? event.target : null)}`);
