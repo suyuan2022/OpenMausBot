@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { KEPT, appended, beaconAddress, keptLines, line } from "./lifecycle-log";
+import { KEPT, appended, beaconAddress, brief, keptLines, line, scene } from "./lifecycle-log";
 
 const KEY = "suyuan:lifecycle-log";
 /** Beacons the module sent; happy-dom's own would try to reach a server. Set before the import above runs the module. */
@@ -45,5 +45,20 @@ describe("lifecycle log", () => {
     expect(said[0]).toMatch(/^\w+ last session: \| 02:00:29\.005 k3x9 hidden handlers=12ms$/);
     expect(said[1]).toMatch(/ start visible nav=\S+ standalone=false frame=0$/);
     expect(keptLines(localStorage.getItem(KEY))).toHaveLength(1);
+  });
+});
+
+describe("what is on screen", () => {
+  it("names an element by its tag, id and first data attribute", () => {
+    const row = document.createElement("div");
+    row.id = "root";
+    row.setAttribute("data-sidebar-bot-row", "");
+    expect(brief(row)).toBe("div#root[data-sidebar-bot-row]");
+    expect(brief(document.createElement("textarea"))).toBe("textarea");
+    expect(brief(null)).toBe("none");
+  });
+
+  it("notes scroll, window, focus and the middle of the screen", () => {
+    expect(scene(window)).toMatch(/^scroll=\d+ inner=\d+x\d+ vv=\S+( scale=\S+)? focus=(true|false) active=\S+ middle=\S+$/);
   });
 });

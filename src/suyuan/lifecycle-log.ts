@@ -4,6 +4,9 @@
 // and every start sends the last session's log along: whether it came back, painted, or was started afresh. Each line also
 // goes out as it happens. Both travel as the address of a beacon, which the relay's access log keeps; the server answers
 // 404 and keeps nothing. Remove once the cause is found.
+// A drawn frame does not mean a seen one: at 22:36 on 11/14 the page came back, drew within 41ms and fetched, and the screen
+// stayed black. So each trip also notes what was on screen (./wake-paint.ts repaints on return) and the first touch after
+// coming back: a touch on a black screen that reaches the page says the page is there and iOS shows none of it.
 
 const KEY = "suyuan:lifecycle-log";
 /** Lines kept: a session's last few trips out and back. */
@@ -11,6 +14,8 @@ export const KEPT = 30;
 /** No frame drawn this long after a start or a return: the screen is likely still the black the manifest sets. */
 export const NO_PAINT_MS = 3_000;
 const PATH = "/api/suyuan/probe";
+/** A second look at the screen after a return, once iOS has surely put the app back. */
+const LATER_MS = 1_500;
 
 /** "02:00:29.512 k3x9 hidden handlers=12ms": local time, the page's id, what happened. */
 export function line(at: number, page: string, what: string): string {
@@ -31,6 +36,23 @@ export function keptLines(kept: string | null): string[] {
 /** The kept log with one more line, the oldest dropped past `KEPT`. */
 export function appended(kept: string | null, next: string): string[] {
   return [...keptLines(kept), next].slice(-KEPT);
+}
+
+/** An element in a few characters: its tag, id and first data attribute. */
+export function brief(element: Element | null): string {
+  if (!element) return "none";
+  const data = [...element.attributes].find((attribute) => attribute.name.startsWith("data-"))?.name;
+  return `${element.tagName.toLowerCase()}${element.id ? `#${element.id}` : ""}${data ? `[${data}]` : ""}`;
+}
+
+/** What is on screen: how far the page is scrolled, the window and its visible part (the keyboard takes from it), whether the
+ * page has focus and on what, and what sits in the middle of the screen. */
+export function scene(win: Window): string {
+  const doc = win.document;
+  const view = win.visualViewport;
+  const visible = view ? `vv=${Math.round(view.width)}x${Math.round(view.height)}+${Math.round(view.offsetTop)} scale=${view.scale.toFixed(2)}` : "vv=none";
+  const middle = doc.elementFromPoint(win.innerWidth / 2, win.innerHeight / 2);
+  return `scroll=${Math.round(win.scrollY)} inner=${win.innerWidth}x${win.innerHeight} ${visible} focus=${doc.hasFocus()} active=${brief(doc.activeElement)} middle=${brief(middle)}`;
 }
 
 export function beaconAddress(lines: string[]): string {
@@ -90,16 +112,26 @@ function start() {
   // Window listeners in the capture phase run before the page's own on the document, those in the bubble phase after:
   // the gap is what the page did on that change, src/suyuan/last-frame.ts copying the screen among it.
   let changeAt = 0;
+  /** When the page last came back in sight, until its first touch. */
+  let backAt: number | null = null;
   window.addEventListener("visibilitychange", () => { changeAt = performance.now(); }, true);
   window.addEventListener("visibilitychange", () => {
     const handlers = Math.round(performance.now() - changeAt);
     if (document.visibilityState === "hidden") {
-      note(`hidden handlers=${handlers}ms nodes=${document.getElementsByTagName("*").length} imgs=${document.images.length}`);
+      note(`hidden handlers=${handlers}ms nodes=${document.getElementsByTagName("*").length} imgs=${document.images.length} ${scene(window)}`);
+      backAt = null;
       return;
     }
-    note(`visible handlers=${handlers}ms`);
+    note(`visible handlers=${handlers}ms ${scene(window)}`);
     watchPaint(changeAt, "visible");
+    backAt = changeAt;
+    setTimeout(() => { if (document.visibilityState === "visible") note(`visible later ${scene(window)}`); }, LATER_MS);
   });
+  window.addEventListener("pointerdown", (event) => {
+    if (backAt === null) return;
+    note(`touch +${Math.round(performance.now() - backAt)}ms at ${Math.round(event.clientX)},${Math.round(event.clientY)} on ${brief(event.target instanceof Element ? event.target : null)}`);
+    backAt = null;
+  }, true);
   window.addEventListener("pagehide", (event) => note(`pagehide persisted=${event.persisted}`));
   window.addEventListener("pageshow", (event) => { if (event.persisted) note("pageshow persisted"); });
   window.addEventListener("focus", () => note("focus", false));
