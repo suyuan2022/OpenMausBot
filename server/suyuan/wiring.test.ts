@@ -287,7 +287,20 @@ describe("the fork's hooks into upstream files", () => {
     expect(functionBody(source("src/lib/bot-unread.ts"), "botShowsUnread")).toContain("return foreground(bot).tasks!.some(");
     const chat = source("src/components/ChatView.tsx");
     expect(chat).toContain('const background = readsBackgroundRun(profile, bot.messages), canWrite = useCanWriteIn(bot.threadId, background ? "view" : bot.yourAccess);');
-    expect(chat).toContain("background ? <BackgroundRunBar onHome={() => openBot(dispatch, profile, false)} /> : <NewConversationInstead");
+    expect(chat).toContain("background ? <BackgroundRunBar bot={profile} /> : <NewConversationInstead");
+    // A run another bot passed on reads "荔枝 → shopping · <title>" in the header (src/suyuan/relay.ts).
+    const pill = source("src/components/ChatHeadPill.tsx");
+    expect(pill).toContain("const passed = passedOnBy(bot); // suyuan fork");
+    expect(pill).toContain("<PassedOnFrom passed={passed} />\n      <BotAvatar bot={bot} size={24} {...avatar} />");
+    expect(pill).toContain('{passed ? <span aria-hidden="true" className="shrink-0 text-ink-tertiary">·</span> : <ChevronRight');
+    // A simple row quotes the last line said in the bot's own conversation, never a live step (src/suyuan/quiet-row.tsx),
+    // and the chat leaves out all-English lines along the way (src/suyuan/quiet-english.ts).
+    const sidebar = source("src/components/Sidebar.tsx");
+    expect(sidebar).toContain('import { QuietRowLine, quietRow } from "@/suyuan/quiet-row";');
+    expect(sidebar).toContain("{working && !quietRow(simpleRow) ? (\n                <SidebarWorkingStep bot={bot} last={last} />");
+    expect(sidebar).toContain("{quietRow(simpleRow) ? <QuietRowLine bot={bot} visible={visible} instances={instances} waiting={waiting} /> : waiting ?");
+    expect(chat).toContain('import { quietChat } from "@/suyuan/quiet-english";');
+    expect(chat).toContain("messages = useMemo(() => quietChat(visibleMessages({ messages: allMessages, activeLeafId }), advanced, turnRuns)");
     // No other conversation is offered: a bot's and a room's ⋯ menu list no threads and start none, the bot's menu has no
     // thread items (Set as main thread among them, so the home stays where it is), the bot panel lists no conversations,
     // the new-thread shortcut does nothing, and a routine's results can go to the home alone.

@@ -16,7 +16,7 @@ import { cn } from "@/lib/cn";
 import { searchMatchesThreads, useSearchDisclosure } from "@/lib/search-disclosure";
 import { useHeldMenuMotion, useMenuMotion } from "./MenuMotion";
 import { lastNonReceipt } from "@/lib/receipts";
-import { botPreview, groupPreview } from "./sidebar-preview";
+import { botPreview, groupPreview } from "./sidebar-preview"; import { QuietRowLine, quietRow } from "@/suyuan/quiet-row"; // suyuan fork: a simple row quotes its own conversation, never narrates
 import { activeLocale, t } from "@/lib/i18n";
 import { copyText } from "@/lib/copy-text";
 import type { LocaleKey } from "@/locales";
@@ -828,10 +828,10 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
             </span>
           ) : (
             <span className={cn("flex min-w-0 items-center gap-1.5 truncate text-[13px] leading-[18px]", waiting ? simpleRow ? "text-warning" : "font-semibold text-warning" : "text-ink-secondary")}>
-              {working ? (
+              {working && !quietRow(simpleRow) ? (
                 <SidebarWorkingStep bot={bot} last={last} />
               ) : (
-                <span dir="auto" className="truncate">{waiting ? t("sidebar.preview.waiting") : teammateWait ? t("sidebar.preview.waitingOnTeammate") : queued ? t("task.queued") : botPreview(bot, visible, instances, advanced)}</span>
+                <span dir="auto" className="truncate">{quietRow(simpleRow) ? <QuietRowLine bot={bot} visible={visible} instances={instances} waiting={waiting} /> : waiting ? t("sidebar.preview.waiting") : teammateWait ? t("sidebar.preview.waitingOnTeammate") : queued ? t("task.queued") : botPreview(bot, visible, instances, advanced)}</span>
               )}
             </span>
           )}
