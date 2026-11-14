@@ -158,8 +158,8 @@ describe("the fork's hooks into upstream files", () => {
 
   it("the phone's bot list words its times and leads with the newest by list-order.ts, and a tile's working dot sits apart from its unread one", () => {
     const sidebar = source("src/components/Sidebar.tsx");
-    expect(sidebar).toMatch(/import \{ listTime, recentBotsFirst \} from "@\/suyuan\/list-order";/);
-    expect(sidebar).toContain("              {listTime(last.at)}\n");
+    expect(sidebar).toMatch(/import \{ listTime, recentBotsFirst, rowAt \} from "@\/suyuan\/list-order";/);
+    expect(sidebar).toContain("              {listTime(rowAt(bot, last.at))}\n");
     expect(sidebar).toContain("= { ...saved, ...(simple ? recentBotsFirst(visibleMessages) : activeBotsFirst)(saved, (bot) => {");
     const tiles = source("src/components/SidebarTiles.tsx");
     expect(tiles).toContain(') : unread ? dot("unread-dot", "bg-accent")\n          : null}\n        {working ? corner("working-dot", "bg-success")');

@@ -5,6 +5,7 @@ import { formatTime } from "@/lib/clock-time";
 import { intlLocale, t } from "@/lib/i18n";
 import { lastNonReceipt } from "@/lib/receipts";
 import { activeBotsFirst } from "@/lib/sidebar-layout";
+import { homeOf } from "./home";
 
 const DAY_MS = 86_400_000;
 
@@ -33,6 +34,16 @@ export function listTime(at: number, now = Date.now()): string {
   return formatted(at, { year: "numeric", month: "numeric", day: "numeric" });
 }
 
+type Owner = { threadId?: string; mainThreadId?: string; tasks?: ReadonlyArray<{ threadId?: string; updatedAt?: number }> | null };
+
+/** When a bot's row last moved: `at`, its last message on hand, unless the app holds one of its background runs, whose
+ * messages say nothing of the bot's own conversation (./quiet-row.tsx); then the last that happened at home. */
+export function rowAt(bot: Owner, at: number): number {
+  const home = homeOf(bot);
+  if (home === undefined || bot.threadId === home) return at;
+  return bot.tasks?.find((task) => task.threadId === home)?.updatedAt ?? at;
+}
+
 type Parts<T> = { pinnedBots: T[]; sectionedBots: T[]; unsectionedBots: T[] };
 
 /** activeBotsFirst for the simple list: the bot with the newest message comes first, working or done, so the list says
@@ -40,7 +51,7 @@ type Parts<T> = { pinnedBots: T[]; sectionedBots: T[]; unsectionedBots: T[] };
 export function recentBotsFirst<B>(messagesOf: (bot: B) => readonly { kind: string; at: number }[]) {
   return <T extends B>(parts: Parts<T>, active: (bot: T) => boolean): Parts<T> => {
     const byRecent = (bots: T[]) => bots
-      .map((bot, index) => ({ bot, index, at: lastNonReceipt(messagesOf(bot))?.at ?? 0 }))
+      .map((bot, index) => ({ bot, index, at: rowAt(bot as Owner, lastNonReceipt(messagesOf(bot))?.at ?? 0) }))
       .sort((a, b) => b.at - a.at || a.index - b.index)
       .map((entry) => entry.bot);
     return { pinnedBots: activeBotsFirst({ ...parts, sectionedBots: [], unsectionedBots: [] }, active).pinnedBots, sectionedBots: byRecent(parts.sectionedBots), unsectionedBots: byRecent(parts.unsectionedBots) };

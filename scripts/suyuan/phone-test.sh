@@ -99,6 +99,8 @@ print -r -- '[]' > $STATE/calls.json
 # its 返回 and shopping's row in the list. Both turns hold on a step until the calls are cleared, so neither answer
 # passes anything on again.
 curl -fsS -X PATCH -H 'content-type: application/json' $url/api/bots/$bot/profile -d '{"name":"荔枝"}' >/dev/null
+# A fresh install keeps the Chief out of the list until the person adds it on its welcome card; this copy has added it.
+curl -fsS -X PATCH -H 'content-type: application/json' $url/api/bots/$bot -d '{"welcomed":true,"sidebarHidden":false,"pinned":true}' >/dev/null
 shop=$(node --experimental-strip-types scripts/control-omb.ts new-bot --name shopping --url $url | json 'd.bot ? d.bot.id : d.id')
 print -r -- '炒锅选好了：WMF 中华炽能 32cm。' > $STATE/reply.md
 node --experimental-strip-types scripts/control-omb.ts send --url $url --bot $shop --text "炒锅最后选哪个" >/dev/null

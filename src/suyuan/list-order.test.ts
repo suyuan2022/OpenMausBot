@@ -1,9 +1,10 @@
 // suyuan fork: the simple bot list says when each bot last wrote in words that fit how long ago, and leads with the newest.
-import { afterAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, describe, expect, it } from "vitest";
 
 import { formatTime } from "@/lib/clock-time";
 import { loadLocale, setLocale } from "@/lib/i18n";
-import { listTime, recentBotsFirst } from "./list-order";
+import { noteThreadsShown } from "./home";
+import { listTime, recentBotsFirst, rowAt } from "./list-order";
 
 const now = new Date(2026, 10, 14, 3, 5).getTime();
 const at = (...parts: [number, number, number, number, number]) => new Date(...parts).getTime();
@@ -68,5 +69,21 @@ describe("the order of a phone's bot list", () => {
     const quiet = { id: "quiet", messages: [{ kind: "text", at: 10 }, { kind: "digest", at: 99 }] };
     const { unsectionedBots } = order({ pinnedBots: [], sectionedBots: [], unsectionedBots: [quiet, bot("loud", 20)] }, () => false);
     expect(ids(unsectionedBots)).toEqual(["loud", "quiet"]);
+  });
+});
+
+describe("rowAt", () => {
+  // shopping's home, and a run 荔枝 passed on that the app holds after the person read it.
+  const shopping = (threadId: string) => ({ threadId, mainThreadId: "home", tasks: [{ threadId: "home", updatedAt: 2_000 }, { threadId: "run", updatedAt: 1_000 }] });
+  afterEach(() => noteThreadsShown(true));
+
+  it("is the bot's own conversation's last moment while the app holds a background run", () => {
+    noteThreadsShown(false);
+    expect(rowAt(shopping("run"), 1_000)).toBe(2_000);
+    expect(rowAt(shopping("home"), 1_500)).toBe(1_500);
+  });
+
+  it("is the last message on hand while the thread list shows", () => {
+    expect(rowAt(shopping("run"), 1_000)).toBe(1_000);
   });
 });
