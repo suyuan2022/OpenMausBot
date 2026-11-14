@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { AGAIN_MS, repaint } from "./wake-paint";
+import { AGAIN_MS, KEYBOARD_BACK_MS, SETTLE_MS, nudge, repaint } from "./wake-paint";
 
 /** Frames run only when the test says so, the module's own too: set before the import above wires it to this window. */
 const queued = vi.hoisted(() => {
@@ -50,5 +50,43 @@ describe("repaint on return", () => {
     expect(document.documentElement.style.opacity).toBe("");
     vi.advanceTimersByTime(AGAIN_MS);
     expect(document.documentElement.style.opacity).toBe("0.999");
+  });
+});
+
+describe("nudge once the keyboard is back", () => {
+  it("moves the page a pixel and puts it back the next frame", () => {
+    const moves: number[] = [];
+    const spy = vi.spyOn(window, "scrollTo").mockImplementation(((_x: number, y: number) => { moves.push(y); }) as typeof window.scrollTo);
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 409 });
+    nudge(window);
+    next();
+    expect(moves).toEqual([408, 409]);
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
+    moves.length = 0;
+    nudge(window);
+    next();
+    expect(moves).toEqual([1, 0]);
+    spy.mockRestore();
+  });
+
+  it("nudges after a resize shortly after a return, once it settles, and not long after", () => {
+    vi.useFakeTimers();
+    const moves: number[] = [];
+    const spy = vi.spyOn(window, "scrollTo").mockImplementation(((_x: number, y: number) => { moves.push(y); }) as typeof window.scrollTo);
+    Object.defineProperty(window, "scrollY", { configurable: true, value: 0 });
+    seeing("visible");
+    next(); next();
+    window.dispatchEvent(new Event("resize"));
+    window.dispatchEvent(new Event("resize"));
+    vi.advanceTimersByTime(SETTLE_MS);
+    expect(moves).toEqual([1]);
+    expect(document.documentElement.style.opacity).toBe("0.999");
+    next(); next();
+    vi.advanceTimersByTime(KEYBOARD_BACK_MS);
+    moves.length = 0;
+    window.dispatchEvent(new Event("resize"));
+    vi.advanceTimersByTime(SETTLE_MS);
+    expect(moves).toEqual([]);
+    spy.mockRestore();
   });
 });
