@@ -4,7 +4,6 @@
 // keeps upstream's one-way thread; and the loop guards still hold for a thread opened from a thread and for work that went
 // through another bot and came back.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { expect, it } from "vitest";
