@@ -6,6 +6,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { DATA_DIR } from "../config.ts";
 import { workThreadFor } from "../host/work-thread.ts";
 import { Store, type TaskRecord } from "../store.ts";
+import { sawThread } from "../thread-presence.ts";
 import {
   archiveIdleThreads, botOpenedJob, IDLE_ARCHIVE_LINE, IDLE_ARCHIVE_NAME, idleArchiveAfterMs, idleArchived, idleArchiveHold, idleArchiveStartMs,
   idleArchiveSweepMs, personSpoke, reopenIdleArchived, startIdleArchive, unattendedBotJob, type IdleArchiveDeps,
@@ -72,7 +73,6 @@ describe("the idle sweep", () => {
 
   it("closes and archives the three kinds of job after an hour, and nothing else", () => {
     const f = fixture();
-    f.store.patchTask(f.maus.id, f.self.threadId, { unread: true });
     const at = f.later(HOUR + MINUTE);
     expect(f.sweep().sort()).toEqual([f.self.threadId, f.fresh.threadId, f.work.threadId].sort());
     for (const thread of [f.self, f.fresh, f.work]) {
@@ -82,11 +82,27 @@ describe("the idle sweep", () => {
       expect(idleArchived(task)).toBe(true);
       expect(f.store.messagesFor(thread.threadId).at(-1)).toMatchObject({ role: "bot", kind: "activity", tool: { name: IDLE_ARCHIVE_LINE, ok: true } });
     }
-    expect(f.task(f.self).unread).toBeFalsy();
     for (const thread of [f.pair, f.lane, f.run, f.own]) expect(f.task(thread).archivedAt).toBeUndefined();
     expect(f.store.taskByThread(f.maus.id, f.maus.threadId)?.archivedAt).toBeUndefined();
     expect(f.store.taskByThread(f.chief.id, f.chief.threadId)?.archivedAt).toBeUndefined();
     expect(f.log).toEqual(["idle archive: archived 3 bot-opened thread(s) idle for over 60 min"]);
+  });
+
+  it("leaves a thread the person has not read, and one they had open within the hour; both go once read and left alone", () => {
+    const f = fixture();
+    f.store.patchTask(f.maus.id, f.self.threadId, { unread: true });
+    f.later(HOUR + MINUTE);
+    sawThread(f.fresh.threadId, f.now() - 10 * MINUTE);
+    expect(f.hold(f.self)).toBe("the person has not read it");
+    expect(f.hold(f.fresh)).toBe("the person had it open within the hour");
+    expect(f.sweep()).toEqual([f.work.threadId]);
+    expect(f.task(f.self).unread).toBe(true);
+    // They open and read the first one: it stays while they have it in front of them, and goes an hour after.
+    f.store.patchTask(f.maus.id, f.self.threadId, { unread: false });
+    sawThread(f.self.threadId, f.now());
+    expect(f.sweep()).toEqual([]);
+    f.later(HOUR + MINUTE);
+    expect(f.sweep().sort()).toEqual([f.self.threadId, f.fresh.threadId].sort());
   });
 
   it("does not archive twice, and archives a work thread its opener already closed", () => {
