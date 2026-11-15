@@ -396,4 +396,9 @@ describe("the fork's hooks into upstream files", () => {
     expect(index).toContain("...(awaiting.has(bot.threadId) && !threadBusy(bot.id, bot.threadId) ? waitingOnWire(teammatesAwaited(bot.threadId)) : {})");
     expect(index).toContain("teammatesAwaited = (threadId) => coordinator.outstandingDirect(threadId).map((handoff) => handoff.botId);");
   });
+  it("folds the New messages divider once it is on screen at the bottom", () => {
+    const hook = source("src/hooks/use-unread-divider.ts");
+    expect(hook).toContain("const onScreen = useDividerSeen(messageId, following, messages.length);");
+    expect(hook).toContain("(following && seen.current.leftEnd) || onScreen)) seen.current.caughtUp = true;");
+  });
 });
