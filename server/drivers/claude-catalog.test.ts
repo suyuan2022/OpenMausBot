@@ -17,8 +17,8 @@ describe("readClaudeModelCatalog", () => {
   it("returns the official models when settings are missing", () => {
     expect(readClaudeModelCatalog({ HOME: join(tmpdir(), "omb-claude-missing-home") })).toEqual(STATIC_CLAUDE_MODELS);
     expect(STATIC_CLAUDE_MODELS.options.slice(0, 2)).toEqual([
+      { id: "claude-fable-5-2", label: "Claude Fable 5.2", contextWindow: 1_000_000 },
       { id: "claude-fable-5-1", label: "Claude Fable 5.1" },
-      { id: "claude-fable-5", label: "Claude Fable 5" },
     ]);
     const ids = STATIC_CLAUDE_MODELS.options.map((option) => option.id);
     expect(STATIC_CLAUDE_MODELS.options[ids.indexOf("claude-opus-5-5")]).toEqual({
