@@ -41,12 +41,14 @@ busy() {
 answering() { curl -fs -m 5 -o /dev/null http://127.0.0.1:8799/; }
 # A restart ends every bot's turn, Maus 工程师's own when it deployed from lizhi-vm, and nothing would bring it back to check
 # the install and tell 夙愿. So a finished install calls its automation, whose private address is kept in this file, outside
-# the repository. The service's webhook port may come up a moment after 8799.
+# the repository. The service's webhook port may come up a moment after 8799. A deploy that gave up without installing
+# calls it too (outcome not-installed), or nobody learns the new version never went in.
+#   wake_engineer installed | rolled-back | not-installed
 wake_engineer() {
   [[ -r $STORE/wake-hook ]] || return 0
-  local hook=$(<"$STORE/wake-hook")
-  for _ in {1..15}; do
-    curl -fsS -m 10 -o /dev/null -X POST -H 'content-type: application/json' -d "{\"installed\":\"$(openmausbot --version)\"}" "$hook" 2>/dev/null && return 0
+  local hook=$(<"$STORE/wake-hook") outcome=$1
+  for _ in {1..${WAKE_TRIES:-15}}; do
+    curl -fsS -m 10 -o /dev/null -X POST -H 'content-type: application/json' -d "{\"outcome\":\"$outcome\",\"installed\":\"$(openmausbot --version 2>/dev/null)\"}" "$hook" 2>/dev/null && return 0
     sleep 2
   done
   echo "could not reach Maus 工程师's after-install automation" >&2
@@ -68,19 +70,21 @@ fi
 
 # Wait for idle before touching anything: once npm replaces the files, a turn still running would mix two versions.
 if (( force == 0 )); then
-  for attempt in {1..120}; do
+  for attempt in {1..${WAIT_TRIES:-120}}; do
     who=$(busy) && code=0 || code=$?
     (( code == 0 )) && break
     if (( code == 2 )); then
       echo "can't tell whether the bots are idle: $who. Nothing was installed; look, then rerun with --force" >&2
+      wake_engineer not-installed
       exit 2
     fi
     (( attempt == 1 )) && echo "waiting until this is done: $who"
-    if (( attempt == 120 )); then
+    if (( attempt == ${WAIT_TRIES:-120} )); then
       echo "still busy after 10 minutes ($who). Nothing was installed; rerun later" >&2
+      wake_engineer not-installed
       exit 3
     fi
-    sleep 5
+    sleep ${WAIT_SECONDS:-5}
   done
 fi
 
@@ -109,9 +113,9 @@ if ! restart; then
   [[ -n $earlier ]] && echo "$earlier" > "$STORE/previous"
   restart || { echo "${back:t} is not answering either; look at the server's log" >&2; exit 1; }
   echo "openmausbot $before -> $(openmausbot --version): back on ${back:t}, since ${target:t} did not start" >&2
-  wake_engineer
+  wake_engineer rolled-back
   exit 1
 fi
 echo "openmausbot $before -> $(openmausbot --version)"
-wake_engineer
+wake_engineer installed
 ls -t "$STORE"/*.tgz 2>/dev/null | tail -n +6 | while read -r old; do trash "$old" 2>/dev/null || true; done
