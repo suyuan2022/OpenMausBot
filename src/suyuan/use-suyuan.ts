@@ -24,6 +24,7 @@ import { installTablePlate } from "./table-plate";
 import { installTileMenu } from "./tile-menu";
 import { useWebPush } from "./use-web-push";
 import { noteBotNames } from "./waiting-on";
+import { inboxCatchUpKey, useInboxCatchUp } from "./inbox-unread";
 import "./wide-replies.css";
 
 /** Long enough for the live chat to lay out and scroll before the frozen copy over it goes. */
@@ -35,6 +36,7 @@ export function useSuyuan(state: AppState, dispatch: (action: Action) => void): 
   noteBotNames(state.bots);
   useWebPush(state, dispatch);
   const loaded = state.hydrated === true;
+  useInboxCatchUp(inboxCatchUpKey(state), loaded);
   const alone = chatAlone(state, { inboxOpen: useInboxPanel().open, roomOpen: useRoomPanel() !== null });
   // A layout effect runs inside React's commit, before the cover's watcher hears that #root changed.
   useLayoutEffect(() => noteApp(loaded, alone), [loaded, alone]);

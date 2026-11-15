@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from "vitest";
 
 import { setLocale, t } from "@/lib/i18n";
 import type { InboxRow, InboxView } from "../../shared/inbox";
-import { unreadRows } from "./inbox-unread";
+import { inboxCatchUpKey, unreadRows } from "./inbox-unread";
 import { noteBotNames, waitingOnLine } from "./waiting-on";
 
 afterEach(() => { setLocale("en"); });
@@ -39,9 +39,17 @@ describe("the inbox's list", () => {
     expect(unreadRows(view, new Set()).map((one) => one.id)).toEqual(["ask-read", "news-new"]);
   });
 
-  it("keeps a line it already showed while the panel is open, even once read", () => {
+  it("keeps a line opened in the panel while it is open, and drops one read elsewhere at once", () => {
     const read = { ...view, rows: view.rows.map((one) => (one.id === "news-new" ? { ...one, unread: false } : one)) };
     expect(unreadRows(read, new Set(["news-new"])).map((one) => one.id)).toEqual(["ask-read", "news-new"]);
-    expect(unreadRows(read, new Set()).map((one) => one.id)).toEqual(["ask-read"]);
+    expect(unreadRows(read, new Set()).map((one) => one.id), "the server says it was read in its conversation").toEqual(["ask-read"]);
+  });
+
+  it("reads the inbox again when the person moves to another conversation or a bot's unread mark changes", () => {
+    const bots = [{ id: "a", threadId: "a1", unread: true }, { id: "b", threadId: "b1" }];
+    const before = inboxCatchUpKey({ selectedId: "a", bots });
+    expect(inboxCatchUpKey({ selectedId: "a", bots: [...bots] })).toBe(before);
+    expect(inboxCatchUpKey({ selectedId: "b", bots })).not.toBe(before);
+    expect(inboxCatchUpKey({ selectedId: "a", bots: [{ ...bots[0]!, unread: false }, bots[1]!] })).not.toBe(before);
   });
 });

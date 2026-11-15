@@ -385,6 +385,7 @@ describe("the fork's hooks into upstream files", () => {
     expect(tiles).toContain("teammateWait ? waitingOnLine(bot)");
     expect(tiles).toContain(": teammateWait ? null // suyuan fork");
     expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("noteBotNames(state.bots);");
+    expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("useInboxCatchUp(inboxCatchUpKey(state), loaded);");
     const panel = source("src/components/inbox/InboxPanel.tsx");
     expect(panel).toContain("const listed = useUnreadRows(view);");
     expect(panel).toContain("const rows = listed.filter((row) => matchesSearch(row, query));");
