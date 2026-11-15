@@ -3,7 +3,8 @@
 // from the model, not from how the stream is read here. The thinking opens the reply with a mark and is English; the
 // reply, when there is one, is glued straight onto its end, often with no space:
 //   💡 Thought\n Let's check where `x-analytics` is … (and VM just in case).看到你 MacBook 的 Chrome 里正开着…
-// The marks seen so far: "💡 Thought" on a line of its own (2026-11-15, 13 replies in one turn), "[-thought-]",
+// The marks seen so far: "💡 Thought" on a line of its own (2026-11-15, 13 replies in one turn), "🫧thought" the same
+// way with the reply right after it and no thinking at all (2026-11-15, gemini-4-argon on High), "[-thought-]",
 // "सिस्टम/thought:" with or without a few stray letters before it, and a "</thought>" that closes thinking with no
 // opening tag (2026-11-10). A model is not told about any of them, so the list grows when a new one turns up.
 // stripThoughtLeak() keeps only the reply. shared/system-message-guard.ts calls it, which covers both ends, as for
@@ -12,7 +13,8 @@
 // empty: the server stores nothing and the chat hides a stored one.
 
 /** A mark at the very start of a reply. Only at the start, so a reply that talks about the marks keeps its words. */
-const OPENING = /^\s*(?:(?:💡\s*)?Thought:?[ \t]*\r?\n|\[-thought-\]|[^\n`]{0,24}?\/thought:)/i;
+/** "Thought" on a line of its own may have an emoji before it, and which one changes ("💡 Thought", "🫧thought"). */
+const OPENING = /^\s*(?:(?:[^\p{L}\p{N}\s]{1,4}\s*)?Thought:?[ \t]*\r?\n|\[-thought-\]|[^\n`]{0,24}?\/thought:)/iu;
 const CLOSING = "</thought>";
 const HAN = /[㐀-䶿一-鿿]/;
 
@@ -25,11 +27,20 @@ function readsChinese(text: string): boolean {
   return han > 0 && han >= latin;
 }
 
+/** English thinking runs a few words before its first Han character; a reply opens in Chinese, or with no more than
+ * a name in code before it ("`vm_stat` 看下来，…"). */
+function opensChinese(text: string): boolean {
+  const han = text.search(HAN);
+  if (han < 0) return false;
+  const lead = text.slice(0, han).replace(/`[^`\n]*`/g, "").replace(/\]\([^)\s]*\)/g, "]");
+  return (lead.match(/[A-Za-z]+/g)?.length ?? 0) < 3 && readsChinese(text);
+}
+
 /** Where the reply starts in what follows the mark: the first place the text turns to Chinese and stays Chinese.
  * It turns at the start, or right after an English sentence ends ("…in case).看到你"). -1 when it never does. */
 function replyStart(rest: string): number {
   const first = rest.search(/\S/);
-  if (first >= 0 && HAN.test(rest[first]) && readsChinese(rest.slice(first))) return first;
+  if (first >= 0 && opensChinese(rest.slice(first))) return first;
   const turns = /[.!?)\]][ \t\r\n]*(?=[㐀-䶿一-鿿])/g;
   for (let m = turns.exec(rest); m; m = turns.exec(rest)) {
     const at = m.index + m[0].length;

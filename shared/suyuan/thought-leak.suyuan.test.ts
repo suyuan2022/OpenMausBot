@@ -19,6 +19,19 @@ describe("stripThoughtLeak", () => {
     expect(stripThoughtLeak(LISTED)).toBe(FOUND);
   });
 
+  // gemini-4-argon on High, 2026-11-15: only the mark, the reply straight after it, sometimes opening on a name in code.
+  it("cuts a mark with another emoji and keeps the reply that follows it", () => {
+    for (const reply of [
+      "好嘞，这就帮你测算一下，我先用 `vm_stat` 看看现在系统内存实际用了多少 👌",
+      "`vm_stat` 看下来，12 GB 内存里现在活跃、联动和压缩占了大概 7.1 GB，空闲加可回收缓存还有约 4.9 GB，而且 Swap 是 0，内存还没见底。接着我用 `ps` 看看现在一个 bot 进程和 CPU 实际占多少。",
+      "`ps` 里看到机器上其实已经挂着 2 个 `claude` 进程，每个连带它的辅助 node 进程大约占 650 MB 到 750 MB 内存；我再看一眼 Gemini（`antigravity`）进程占多少。",
+    ]) {
+      expect(stripThoughtLeak(`🫧thought\n${reply}`)).toBe(reply);
+      expect(isPureLeakedSystemHarnessMessage(`🫧thought\n${reply}`)).toBe(false);
+    }
+    expect(stripThoughtLeak("🧠 Thought\nLet's check `ps` first.")).toBe("");
+  });
+
   it("leaves nothing of a reply that is only thinking", () => {
     expect(stripThoughtLeak("💡 Thought\n Forgot `FULL=1`! Without `FULL=1`, `mcpc.mjs` slices lines at 6000 chars. Let's run with `FULL=1`.")).toBe("");
     expect(stripThoughtLeak("Thought\nWhy did `t1 is not defined` happen? Let's print every line.")).toBe("");
