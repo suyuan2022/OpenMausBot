@@ -969,9 +969,10 @@ describe("Antigravity driver over shared ACP", () => {
     });
   });
 
-  it("runs a saved Gemini 4 Argon (High) pick as the base model at High thinking when the runtime offers only the base", async () => {
+  // suyuan fork: argon at High writes its thinking into the reply, so it runs at Medium (server/suyuan/argon-thinking.ts).
+  it("runs a saved Gemini 4 Argon (High) pick as the base model at Medium thinking when the runtime offers only the base", async () => {
     const { calls, selection } = await legacyPickTurn("antigravity-legacy-argon", "gemini-3.8-flash,gemini-4-argon", "gemini-4-argon-high");
-    expect(selection).toEqual({ sessionId: expect.any(String), model: "gemini-4-argon", variant: "high" });
+    expect(selection).toEqual({ sessionId: expect.any(String), model: "gemini-4-argon", variant: "medium" });
     expect(calls.some((call: any) => call.params.value === "gemini-4-argon-high")).toBe(false);
   });
 

@@ -32,6 +32,29 @@ describe("stripThoughtLeak", () => {
     expect(stripThoughtLeak("🧠 Thought\nLet's check `ps` first.")).toBe("");
   });
 
+  // The model makes the mark up as it goes, so the cut goes by shape: English sentences in front of the Chinese reply.
+  it("cuts English thinking in front of the reply whatever mark it carries, or none", () => {
+    expect(stripThoughtLeak("✨ [reasoning-trace]\nLet's check the logs first. Then answer in one line.日志里没有报错。")).toBe("日志里没有报错。");
+    expect(stripThoughtLeak("I should check the disk first, then reply to him in one short line.磁盘还剩 60 GiB。")).toBe("磁盘还剩 60 GiB。");
+    expect(stripThoughtLeak("🧠 Thinking:\nThe user wants the count. Two files, so say that.共享目录下有 2 个文件。")).toBe("共享目录下有 2 个文件。");
+    expect(stripThoughtLeak("<thinking-ish/thought: Let's keep it short.好，就这样。")).toBe("好，就这样。");
+  });
+
+  it("does not touch a Chinese reply that opens with a name, a command or a short English phrase", () => {
+    for (const reply of [
+      "`vm_stat` 看下来，内存还没见底。",
+      "Google Chrome Helper (Renderer) 占了 276 MB，排第三。",
+      "MacBook 上的 Chrome 开着两个公众号标签页。",
+      "OK，搞定了 👌",
+      "PR #60 已经推上去了，没合并。",
+      "Error: cannot find module 'x' 这个报错是因为依赖没装。",
+      "[2026-11-15.md](file:///Users/lizhi/.openmausbot/workspaces/a/memory/2026-11-15.md) 里记了 5 条。",
+      "/Users/lizhi/Documents/OpenMausBot/server/drivers/acp/core.ts 第 1165 行是存回复的地方。",
+      "Hey! I'm new here. I'm here to be your Chief of Staff.",
+      "Working in the built-in browser tab. Trying Tmall search for 窒化熟铁锅 first.",
+    ]) expect(stripThoughtLeak(reply)).toBe(reply);
+  });
+
   it("leaves nothing of a reply that is only thinking", () => {
     expect(stripThoughtLeak("💡 Thought\n Forgot `FULL=1`! Without `FULL=1`, `mcpc.mjs` slices lines at 6000 chars. Let's run with `FULL=1`.")).toBe("");
     expect(stripThoughtLeak("Thought\nWhy did `t1 is not defined` happen? Let's print every line.")).toBe("");

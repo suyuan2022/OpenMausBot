@@ -27,6 +27,7 @@ import {
 import { resolveAntigravityReleaseAsset } from "./antigravity-release.ts";
 import { VERIFICATION_TEMP_KEY, scheduleAntigravityTempSweep } from "./antigravity-temp.ts";
 import { augmentedPath } from "../env-path.ts";
+import { argonAtMostMedium, withoutArgonHigh } from "../suyuan/argon-thinking.ts"; // suyuan fork
 
 export const STATIC_ANTIGRAVITY_MODELS: ModelCatalog = {
   default: "gemini-3.8-flash",
@@ -80,7 +81,8 @@ const support: AcpSupport = {
   spawnArgs: () => [],
   selectModel: { configId: "model" },
   modelVariants: true,
-  normalizeSessionSelection: normalizeAntigravityTurn,
+  // suyuan fork: argon never runs at High, see server/suyuan/argon-thinking.ts.
+  normalizeSessionSelection: (turn, offered) => argonAtMostMedium(normalizeAntigravityTurn(turn, offered), offered),
   // Google's server reads its new-session default from this variable (agy_acp_server 1.4.3
   // model_selection.get_default_model_id); a later switch re-fetches the model list (1.3-1.8 s).
   sessionModelEnv: "AGY_ACP_DEFAULT_MODEL",
@@ -104,11 +106,11 @@ const support: AcpSupport = {
     const runtime = await resolveAntigravityRuntime(config.cli, env);
     const profile = await prepareAntigravityProfile({ instanceId, runtime, baseEnv: env });
     if (!(await antigravityProfileAuthenticated(profile))) throw new Error(support.loginNote);
-    return probeAntigravityModels({
+    return withoutArgonHigh(await probeAntigravityModels({ // suyuan fork: no High for argon
       runtime,
       profile,
       fallbackDefault: STATIC_ANTIGRAVITY_MODELS.default,
-    });
+    }));
   },
 
   pickAuthMethod: (methods) => methods.some((method) => method.id === "oauth-personal")
