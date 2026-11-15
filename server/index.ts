@@ -594,7 +594,7 @@ import { createBotSkillsRoutes } from "./routes/bot-skills.ts"; import { noteTur
 import { createSkillShareRoutes } from "./routes/skill-share.ts";
 import { createTeamContextRoutes } from "./routes/team-context.ts";
 import { createDeciderRoutes } from "./routes/decider.ts"; import { createCloudSendRoutes } from "./routes/cloud-send.ts"; import { claudeCodeSkillInputs } from "./setup-import.ts"; import { createCloudConnectionsHost } from "./cloud-connections-host.ts";
-import { createUpdateCheckRoutes, serverUpdateChecker } from "./routes/update-check.ts"; import { createTimeZoneRoutes } from "./routes/time-zone.ts"; import { relayGate } from "./suyuan/relay-gate.ts"; import { suyuanFrame } from "./suyuan/register.ts"; import { homeThread, isHome } from "./suyuan/home.ts"; import { engineCompactsItself } from "./suyuan/native-compact.ts"; import { roomRoutingReady, routedText, withRoomRouter, withRoomRouterStatus } from "./suyuan/room-router.ts"; import { readsWith as suyuanReadsWith, waitingOnWire } from "./suyuan/inbox-read.ts"; // suyuan fork
+import { createUpdateCheckRoutes, serverUpdateChecker } from "./routes/update-check.ts"; import { createTimeZoneRoutes } from "./routes/time-zone.ts"; import { relayGate } from "./suyuan/relay-gate.ts"; import { suyuanFrame } from "./suyuan/register.ts"; import { homeThread, isHome } from "./suyuan/home.ts"; import { engineCompactsItself } from "./suyuan/native-compact.ts"; import { roomRoutingReady, routedText, withRoomRouter, withRoomRouterStatus } from "./suyuan/room-router.ts"; import { readsWith as suyuanReadsWith, waitingOnWire } from "./suyuan/inbox-read.ts"; // suyuan fork import { watchConfigFile } from "./suyuan/config-reload-host.ts";
 import { createBrowserSiteRoutes } from "./routes/browser-sites.ts";
 import { createInternalSignInRoutes } from "./routes/sign-in.ts";
 import { createInternalMcpRoutes } from "./routes/internal-mcp.ts";
@@ -12071,7 +12071,7 @@ async function reloadProviders(before: Record<string, unknown>) {
 // Config writes replace the engines they change. Single-flight, so two settings requests cannot drop each other's changes.
 let providerConfigBusy = false;
 const providerInstancesChanging = new Set<string>();
-let mcpConfigBusy = false;
+let mcpConfigBusy = false; if (!hostedModels) watchConfigFile({ cfg, engines: () => engineLaunches(providerConfigs()), working: () => store.bots.some((bot) => botHasActiveTurn(bot.id)) || store.groups.some(groupIsWorking) || Boolean(routines?.hasActiveRuns()), reloadEngines: reloadProviders, settings: { get: () => providerConfigBusy, set: (busy) => { providerConfigBusy = busy; } }, changed: (keys) => { registry.forgetSnapshots(); if (keys.includes("signIn")) { sessions.membershipChanged(); sessions.revalidateEmailSessions(); } if (keys.includes("cacheKeepWarm")) cacheKeepWarm.refresh(); broadcast({ kind: "config", ...configStatus() }); if (keys.includes("threads")) drainQueuedSends(); } });
 
 const workspaceBackupAccess = {
   authorized: (req: IncomingMessage, original: RequestAuth) => {

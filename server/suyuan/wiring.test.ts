@@ -24,6 +24,13 @@ describe("the fork's hooks into upstream files", () => {
     expect(functionBody(index, "broadcast")).toContain("suyuanFrame(payload)");
   });
 
+  it("server/index.ts watches config.json for edits made outside the app, and never stops a turn to apply one", () => {
+    const index = source("server/index.ts");
+    expect(index).toContain('import { watchConfigFile } from "./suyuan/config-reload-host.ts";');
+    expect(index).toContain("if (!hostedModels) watchConfigFile({ cfg, engines: () => engineLaunches(providerConfigs()), working: () => store.bots.some((bot) => botHasActiveTurn(bot.id)) || store.groups.some(groupIsWorking) || Boolean(routines?.hasActiveRuns()), reloadEngines: reloadProviders,");
+    expect(index).toContain('changed: (keys) => { registry.forgetSnapshots(); if (keys.includes("signIn")) { sessions.membershipChanged(); sessions.revalidateEmailSessions(); } if (keys.includes("cacheKeepWarm")) cacheKeepWarm.refresh(); broadcast({ kind: "config", ...configStatus() }); if (keys.includes("threads")) drainQueuedSends(); } });');
+  });
+
   it("the app runs the fork's hook, shows the push switch, and leaves notifications to push where it is on", () => {
     expect(functionBody(source("src/App.tsx"), "Shell")).toContain("useSuyuan(state, dispatch)");
     expect(functionBody(source("src/components/NotificationSettingsRows.tsx"), "NotificationRows")).toContain("<WebPushRow />");
