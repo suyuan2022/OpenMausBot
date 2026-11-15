@@ -590,7 +590,7 @@ import { createBotSettingsRoutes } from "./routes/bot-settings.ts";
 import { createBotPatchRoutes } from "./routes/bot-patch.ts";
 import { createBotOrderRoutes } from "./routes/bot-order.ts";
 import { createBotLifecycleRoutes } from "./routes/bot-lifecycle.ts";
-import { createBotSkillsRoutes } from "./routes/bot-skills.ts"; import { noteTurnVolatile, volatileHookReply } from "./suyuan/compact-volatile.ts"; import { reopenIdleArchived, startIdleArchive, unattendedBotJob } from "./suyuan/idle-archive.ts"; // suyuan fork
+import { createBotSkillsRoutes } from "./routes/bot-skills.ts"; import { noteTurnVolatile, volatileHookReply } from "./suyuan/compact-volatile.ts"; import { deliverPlainReminder } from "./suyuan/plain-reminder.ts"; import { takeRunWith, type RunWithDeps } from "./suyuan/run-with.ts"; import { commandChecks } from "./suyuan/check-first.ts"; import { reopenIdleArchived, startIdleArchive, unattendedBotJob } from "./suyuan/idle-archive.ts"; // suyuan fork
 import { createSkillShareRoutes } from "./routes/skill-share.ts";
 import { createTeamContextRoutes } from "./routes/team-context.ts";
 import { createDeciderRoutes } from "./routes/decider.ts"; import { createCloudSendRoutes } from "./routes/cloud-send.ts"; import { claudeCodeSkillInputs } from "./setup-import.ts"; import { createCloudConnectionsHost } from "./cloud-connections-host.ts";
@@ -8796,9 +8796,9 @@ const limitFailovers = new LimitFailovers({ file: join(DATA_DIR, "limit-failover
   } });
 const automationDestinations = createAutomationDestinations({ store, mainThread: botMainThread, runs: () => routines?.listRuns() ?? [],
   cloud: CLOUD_HOME ? { owner: CLOUD_OWNER_KEY!, opener: routineOpener, reportFromOthers: cloudReportFromOthers, opened: (threadId, person) => threadStarters.set(threadId, person), outside: (threadId) => outsideLineage.mark(threadId) } : null });
-const routineModelChecks: RoutineModelChecks = { check: (raw) => checkedModelSelection(raw), bot: (botId) => store.bot(botId), engineSwitchNeedsAsk };
+const routineModelChecks: RoutineModelChecks = { check: (raw) => checkedModelSelection(raw), bot: (botId) => store.bot(botId), engineSwitchNeedsAsk }; const runWithDeps: RunWithDeps = { routine: (id) => routines?.listRoutines().find((routine) => routine.id === id), engine: (botId) => { const instanceId = store.bot(botId)?.modelSelection.instanceId, options = instanceId ? registry.get(instanceId)?.models.options : undefined; return instanceId && options ? { instanceId, models: options } : undefined; }, setModel: (id, modelSelection) => { const body = { modelSelection }, refused = routineModelRefusal(body, routineModelChecks, runWithDeps.routine(id) as Routine | undefined); if (!refused) routines!.update(id, body); return refused?.error ?? null; }, mayRun: (botId) => { const bot = store.bot(botId); return Boolean(bot && approvalModeFor(bot) === "full"); }, setCheck: (id, on) => { try { routines!.update(id, { checks: on ? ["command"] : null }); return null; } catch (error) { return error instanceof Error ? error.message : String(error); } }, undoFollows: (threadId, messageId, id) => { const card = store.messagesFor(threadId).find((message) => message.id === messageId)?.card, payload = card?.routineRequest, at = routines?.listRoutines().find((routine) => routine.id === id)?.updatedAt; if (card && payload?.undo?.appliedUpdatedAt !== undefined && at !== undefined) store.patchMessage(threadId, messageId, { card: { ...card, routineRequest: { ...payload, undo: { ...payload.undo, appliedUpdatedAt: at } } } }); } }; // suyuan fork
 routines = new RoutineManager({
-  emit: broadcast, limitResetAt: (engine) => limitClock.resetAt(engine), checks: proactive.checks,
+  emit: broadcast, limitResetAt: (engine) => limitClock.resetAt(engine), checks: commandChecks(proactive.checks, { mayRun: runWithDeps.mayRun, cwd: (botId) => store.bot(botId)?.cwd || workspaceDir(botId) }), // suyuan fork: a command check
   limitBackup: (botId, scope) => { const bot = store.bot(botId); return quotaSwitchEnabled() ? Boolean(bot && limitTakeover.backups(botId, bot.modelSelection, scope, approvalModeFor(bot)).length) : Boolean(bot && startupBackups(bot, cfg.automaticRecovery).length); },
   launchId: DESKTOP_MANAGED && /^[\w-]{1,100}$/.test(process.env.OMB_DESKTOP_LAUNCH_ID ?? "")
     ? process.env.OMB_DESKTOP_LAUNCH_ID : undefined,
@@ -8856,7 +8856,7 @@ routines = new RoutineManager({
     }
   },
   startTurn: async (botId, threadId, prompt, runOn, triggerSource, onDispatchError) => {
-    if (!companyShutdown) await startTurn(botId, prompt, { threadId, runOn, automationSource: triggerSource, onDispatchError });
+    if (!companyShutdown && !deliverPlainReminder(threadId, { run: (id) => routines!.runForThread(id), say: (id, text) => { store.appendMessage(id, { role: "bot", kind: "text", text, turnTerminal: true }); }, settle: (event) => routines!.handleRuntimeEvent(event), report: (run) => { if (!routineSourceThread(run)) store.patchTask(run.botId, run.threadId!, { unread: true }); automationReports.runSettled(run); } })) await startTurn(botId, prompt, { threadId, runOn, automationSource: triggerSource, onDispatchError }); // suyuan fork: a plain reminder is posted as it is, with no turn
   },
   startGoal: async (groupId, threadId, prompt, coordinatorBotId, runId, _onDispatchError) => {
     if (!groupId) {
@@ -13399,7 +13399,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           const hookOwner = store.bot(forBot?.botId ?? from.id);
           return json(res, 201, { ...applied, ...(applied.action === "create" && hookOwner ? addressFor({ from, owner: hookOwner, guestDriven: false, outsideDriven: outsideDrivenThread(fromThreadId) }, webhooks, applied.resultId, webhookIngressStatus().baseUrl) : {}) });
         }
-        const proposedInput = { ...request.proposal, forBot };
+        const runWith = takeRunWith(request.proposal, forBot?.botId ?? from.id, runWithDeps, fullAccessForSource(from.id, fromThreadId)); if (runWith.error) return json(res, 400, { error: runWith.error }); const proposedInput = { ...request.proposal, forBot }; // suyuan fork: run_with
         if (proposedInput.action !== "create" && (proposedInput.action === "update" ? outsideWorkStaysHere(fromThreadId) : cloudGuestDriven(fromThreadId)) && !outsideLineage.routineRunsConfined(String(proposedInput.routineId))) return json(res, 403, { error: OUTSIDE_STAYS_HERE });
         const wasOwners = proposedInput.action !== "create" && typeof proposedInput.routineId === "string" ? cloudRoutineIsOwners(proposedInput.routineId) : false;
         const run = activeRoutineRunForThread(fromThreadId);
@@ -13437,7 +13437,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           decision: "auto-approved",
           source: proposed.appliedBy ?? "routine",
         });
-        return json(res, 201, proposed);
+        runWith.applied(proposed, fromThreadId); return json(res, 201, proposed); // suyuan fork
       }
       if (method === "POST" && path === "/api/internal/team-memory") {
         const parsed = z.object({
@@ -13755,17 +13755,12 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         if (folder.error) return refuse(400, folder.error);
         if (fresh && !EXTERNAL && internalCapability.openedThreads >= MAX_THREADS_OPENED_PER_TURN) {
           return refuse(429, `You have already opened ${MAX_THREADS_OPENED_PER_TURN} threads this turn, which is the limit. Do not retry — finish your turn and tell the person which threads you still wanted to open, so they can open them or ask you again.`);
-        }
-        const ownTargetRefusal = (sent: typeof call) => { const back = sent.reply === "none" ? coordinator.answersTo(internalCapability.roomHandoffId ?? internalCapability.generation) : undefined;
-          return selfTargetRefusal({ opening: Boolean(sent.self), answers: Boolean(sent.answers), answeringBack: back?.botId === internalSender.id && back.threadId === sent.thread, consult: sent.consult, thread: sent.thread,
-            botId: internalSender.id, fromThreadId: address.threadId, handoff: handedTurn(internalCapability.roomHandoffId, (id) => coordinator.node(id)), requestLine: store.activePath(address.threadId).findLast((line) => line.role === "user" && line.kind === "text"),
-            task: store.taskByThread(internalSender.id, sent.thread) }); };
+        } const ownTargetRefusal = (sent: typeof call) => { const back = sent.reply === "none" ? coordinator.answersTo(internalCapability.roomHandoffId ?? internalCapability.generation) : undefined; return selfTargetRefusal({ opening: Boolean(sent.self), answers: Boolean(sent.answers), answeringBack: back?.botId === internalSender.id && back.threadId === sent.thread, consult: sent.consult, thread: sent.thread, botId: internalSender.id, fromThreadId: address.threadId, handoff: handedTurn(internalCapability.roomHandoffId, (id) => coordinator.node(id)), requestLine: store.activePath(address.threadId).findLast((line) => line.role === "user" && line.kind === "text"), task: store.taskByThread(internalSender.id, sent.thread) }); };
         for (const target of targets) {
             // Echo only the id the caller sent, never a bot's name.
           const addressed = store.bot(target.botId);
           const eligibility =
-            target.botId === internalSender.id && target.groupId ? "Choose a teammate, not yourself"
-            : target.botId === internalSender.id && ownTargetRefusal(call) ? ownTargetRefusal(call)
+            target.botId === internalSender.id && target.groupId ? "Choose a teammate, not yourself" : target.botId === internalSender.id && ownTargetRefusal(call) ? ownTargetRefusal(call)
             : !addressed ? `No bot with id "${target.botId}" — call list_bots and copy the exact id from the result`
             : addressed.hidden ? `The bot with id "${target.botId}" is no longer available — call list_bots for the ones you can reach`
             : roomHandoffProblem(target, address);
@@ -13810,8 +13805,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
             const opener = (room ? null : handOnFor) ?? openerFrom(address.threadId);
             // A Chief answers, for the person, the question a teammate it manages waits on in a thread the Chief did not open.
             const forPerson = EXTERNAL || room || fresh || call.answers || mode !== "work" || call.thread === "standing" || !teammatePrompts.actsForPerson(internalSender, internalCapability.threadId) || !canManage(internalSender, recipient) || !threadReadableFrom(internalCapability.threadId)(call.thread) || !asksActingPerson(internalCapability.threadId, store.groupByThread(internalCapability.threadId) ? internalCapability.generation : undefined)(call.thread, recipient.id) ? undefined : await questionRouting.answerForPerson({ sender: internalSender, senderThreadId: address.threadId, target: recipient, threadId: call.thread, message: call.message });
-            if (forPerson) { if (forPerson.outcome === "failed") refused.push(forPerson.detail); else answeredForPerson.add(forPerson); receipts.push(forPerson); continue; }
-            if (!room && !fresh) reopenOwnThread(store, target.botId, call.thread, internalSender.id);
+            if (forPerson) { if (forPerson.outcome === "failed") refused.push(forPerson.detail); else answeredForPerson.add(forPerson); receipts.push(forPerson); continue; } if (!room && !fresh) reopenOwnThread(store, target.botId, call.thread, internalSender.id);
             const continued = room || fresh ? undefined : workThreadFor(store, { botId: target.botId, botName: recipient.name, fromBotId: internalSender.id, fromThreadId: address.threadId, thread: call.thread, notice: mode === "notify",
               answering: coordinator.answersTo(internalCapability.roomHandoffId ?? generation), also: (task) => !CLOUD_TEAM || threadStarters.get(task.threadId) === opener, reach: (task) => outsideLineage.mayReach(address.threadId, task.threadId), others: EXTERNAL ? undefined : relayGate({ personBehind: teammatePrompts.personBehind, outside: outsideLineage.handsNoLevel, readableFrom: threadReadableFrom, openPersonCard }, internalSender.id, internalCapability.threadId), home: (task) => isHome(store, target.botId, task.threadId) });
             const relayed = EXTERNAL || (!call.answers && (room || fresh || mode === "consult")) ? undefined : await questionRouting.relay({ sender: internalSender, senderThreadId: address.threadId,
@@ -13868,8 +13862,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
             }));
             if (!duplicate) {
               if (!EXTERNAL) delegatedThisTurn(node.id);
-              store.appendMessage(address.threadId, ownThreadRow({ sender: internalSender, recipient, threadId: node.threadId, title: store.taskByThread(recipient.id, node.threadId)?.title, opening: Boolean(call.self), inRoom: Boolean(source),
-                line: (key, vars) => serverLine(threadLanguage(address.threadId), key, vars) }) ?? sentRow({ sender: internalSender, recipient, threadId: node.threadId, room: addressedRoom, via, language: threadLanguage(address.threadId),
+              store.appendMessage(address.threadId, ownThreadRow({ sender: internalSender, recipient, threadId: node.threadId, title: store.taskByThread(recipient.id, node.threadId)?.title, opening: Boolean(call.self), inRoom: Boolean(source), line: (key, vars) => serverLine(threadLanguage(address.threadId), key, vars) }) ?? sentRow({ sender: internalSender, recipient, threadId: node.threadId, room: addressedRoom, via, language: threadLanguage(address.threadId),
                 reason: call.reason, doneWhen: call.doneWhen ? redactSecretsInText(call.doneWhen) : undefined, title: store.taskByThread(recipient.id, node.threadId)?.title }));
             }
           } catch (error) {
@@ -14175,13 +14168,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         const sourceTitle = owner.group ? owner.group.name : (store.taskByThread(from.id, fromThreadId)?.title ?? "");
         const picked = body.modelSelection === undefined ? null : checkedModelSelection(body.modelSelection, undefined, true); const refused = !picked ? null : target.id !== from.id ? "model_selection is only for threads on yourself" : !picked.ok ? picked.error : validateModelProposal(picked.selection, from); if (refused) return json(res, 400, { error: refused });
         if (target.id === from.id) { const selfRefused = selfThreadRefusal({ handoff: handedTurn(internalCapability.roomHandoffId, (id) => coordinator.node(id)), requestLine: store.activePath(fromThreadId).findLast((line) => line.role === "user" && line.kind === "text") }); if (selfRefused) return json(res, 409, { error: selfRefused });
-          const inherited = picked?.ok ? { modelSelection: picked.selection, approvalMode: undefined } : parentThreadModel(from.id, fromThreadId);
-          // suyuan fork: with report "resume", which the start_thread tool sends unless the bot says "none", a thread on yourself is work in the runtime like a teammate's, so its result returns here (self-thread.ts). Without it, upstream's path below.
-          const report = body.report === undefined ? "none" : body.report; if (report !== "resume" && report !== "none") return json(res, 400, { error: "report is resume or none" });
-          if (report === "resume") { if (message.length > SELF_BRIEF_MAX) return json(res, 400, { error: selfBriefTooLong(message.length) });
-            const own = await coordinateBots({ botIds: [from.id], message, rework: true, thread: "new", reply: "resume", consult: false, title, projectId, inMyFolder: false, self: inherited });
-            const receipt = (own.body.receipts as Array<{ threadId?: string }> | undefined)?.[0];
-            return json(res, own.status, { ...own.body, self: true, report, botId: from.id, botName: from.name, title, ...(receipt?.threadId ? { threadId: receipt.threadId } : {}), limit: maxConcurrentBotThreads(cfg, botThreadsHost(cloudPlanTier.starter())) }); }
+          const inherited = picked?.ok ? { modelSelection: picked.selection, approvalMode: undefined } : parentThreadModel(from.id, fromThreadId); /* suyuan fork: with report "resume", which the start_thread tool sends unless the bot says "none", a thread on yourself is work in the runtime like a teammate's, so its result returns here (self-thread.ts). Without it, upstream's path below. */ const report = body.report === undefined ? "none" : body.report; if (report !== "resume" && report !== "none") return json(res, 400, { error: "report is resume or none" }); if (report === "resume") { if (message.length > SELF_BRIEF_MAX) return json(res, 400, { error: selfBriefTooLong(message.length) }); const own = await coordinateBots({ botIds: [from.id], message, rework: true, thread: "new", reply: "resume", consult: false, title, projectId, inMyFolder: false, self: inherited }); const receipt = (own.body.receipts as Array<{ threadId?: string }> | undefined)?.[0]; return json(res, own.status, { ...own.body, self: true, report, botId: from.id, botName: from.name, title, ...(receipt?.threadId ? { threadId: receipt.threadId } : {}), limit: maxConcurrentBotThreads(cfg, botThreadsHost(cloudPlanTier.starter())) }); }
           const task = store.createTask(from.id, title, false, projectId, { botId: from.id, name: from.name, at: Date.now() }, inherited.approvalMode, inherited.modelSelection);
           if (!task) return json(res, 500, { error: "couldn't create that thread" });
           threadStarters.set(task.threadId, (CLOUD_TEAM ? teamConnections.handOnFor(internalCapability.threadId, internalCapability.generation) : null) ?? openerFrom(fromThreadId));

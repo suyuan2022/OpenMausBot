@@ -2,7 +2,8 @@
 import { describe, expect, it } from "vitest";
 import type { Bot, Message, Task } from "@/state/store";
 import { t } from "@/lib/i18n";
-import { sidebarBotStatus } from "./SidebarBotActivity";
+import { noteThreadsShown } from "@/suyuan/home";
+import { runningRoutineRuns, sidebarBotStatus } from "./SidebarBotActivity";
 import { botPreview } from "./sidebar-preview";
 
 const task = (threadId: string, extra: Partial<Task> = {}): Task => ({ threadId, title: threadId, createdAt: 0, ...extra }) as Task;
@@ -26,6 +27,22 @@ describe("sidebarBotStatus", () => {
 
   it("still shows a room's question waiting on the person", () => {
     expect(sidebarBotStatus(bot([task("chat")], { busy: true, activity: "waiting-on-you" }), {}).waiting).toBe(true);
+  });
+});
+
+describe("runningRoutineRuns", () => {
+  const running = bot([task("chat"), task("run", { busy: true, routineRunId: "r1" })], { busy: true, mainThreadId: "chat" });
+
+  it("gives a running scheduled run a row with the thread list shown, and none with it hidden; the bot still reads as working", () => {
+    noteThreadsShown(true);
+    expect(runningRoutineRuns(running).map((one) => one.threadId)).toEqual(["run"]);
+    noteThreadsShown(false);
+    try {
+      expect(runningRoutineRuns(running)).toEqual([]);
+      expect(sidebarBotStatus(running, {}).working).toBe(true);
+    } finally {
+      noteThreadsShown(true);
+    }
   });
 });
 

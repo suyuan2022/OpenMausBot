@@ -455,4 +455,30 @@ describe("the fork's hooks into upstream files", () => {
     expect(hook).toContain("const onScreen = useDividerSeen(messageId, following, messages.length);");
     expect(hook).toContain("(following && seen.current.leftEnd) || onScreen)) seen.current.caughtUp = true;");
   });
+  it("posts a plain reminder with no turn, and reads run_with off the trigger tool's schedule requests", () => {
+    const index = source("server/index.ts");
+    expect(index).toContain("if (!companyShutdown && !deliverPlainReminder(threadId, {");
+    expect(index).toContain("const runWith = takeRunWith(request.proposal, forBot?.botId ?? from.id, runWithDeps, fullAccessForSource(from.id, fromThreadId)); if (runWith.error) return json(res, 400, { error: runWith.error });");
+    expect(index).toContain("runWith.applied(proposed, fromThreadId); return json(res, 201, proposed);");
+    const call = source("server/drivers/agents-call-triggers.ts");
+    expect(call).toContain("if (args.run_with != null) fields.runWith = args.run_with; if (args.model_selection != null) fields.modelSelection = args.model_selection;");
+    expect(call).toContain('"run_on_startup", "runOnStartup", "run_with", "model_selection", "only_if"] as const;');
+    expect(source("server/drivers/agents-catalog.ts")).toContain("...RUN_WITH_SCHEMA,");
+  });
+  it("a routine may run a command first: the check is one of the scheduler's, and only_if reaches the request", () => {
+    const index = source("server/index.ts");
+    expect(index).toContain("checks: commandChecks(proactive.checks, { mayRun: runWithDeps.mayRun, cwd: (botId) => store.bot(botId)?.cwd || workspaceDir(botId) }),");
+    expect(index).toContain('mayRun: (botId) => { const bot = store.bot(botId); return Boolean(bot && approvalModeFor(bot) === "full"); }');
+    expect(index).toContain('routines!.update(id, { checks: on ? ["command"] : null });');
+    expect(source("shared/routines.ts")).toContain('export const ROUTINE_CHECKS: readonly RoutineCheck[] = ["calendar", "mail", "runs", "command"];');
+    expect(source("server/drivers/agents-call-triggers.ts")).toContain('if (typeof args.only_if === "string") fields.onlyIf = args.only_if;');
+  });
+  it("the Automations form offers what a run costs, and a running background run has no row with the thread list hidden", () => {
+    const form = source("src/components/RoutineCalendarPage.tsx");
+    expect(form).toContain("const [runWith, setRunWith] = useState(() => runWithOf(existingRoutine));");
+    expect(form).toContain('...(routineTarget === "bot" ? runWithFields(runWith, description,');
+    expect(form).toContain("<RunWithSelect indent={advanced} command={commandOf(existingRoutine)} value={runWith} onChange={setRunWith}");
+    expect(form).toContain("existingRoutine?.prompt) : { prompt: description }),");
+    expect(functionBody(source("src/components/SidebarBotActivity.tsx"), "runningRoutineRun")).toContain("return !oneConversation() && Boolean(task.routineRunId)");
+  });
 });
