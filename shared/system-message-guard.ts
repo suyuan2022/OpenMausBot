@@ -4,6 +4,7 @@
 // context using <SYSTEM_MESSAGE> wrappers. Confused or echoing models can sometimes
 // regurgitate these blocks into the assistant message stream.
 
+import { hasThoughtMark, stripThoughtLeak } from "./suyuan/thought-leak.ts";
 import { stripToolEcho } from "./suyuan/tool-echo.ts";
 
 const PREAMBLE_REGEX = /^(?:The following is a|Notice: This is a)\s*<SYSTEM_(?:MESSAGE|NOTIFICATION)>[^\n]*\n?/gim;
@@ -18,13 +19,15 @@ export function stripLeakedSystemHarnessMessages(text: string | null | undefined
   result = result.replace(UNCLOSED_SYSTEM_TAG_REGEX, "");
   result = result.replace(PREAMBLE_REGEX, "");
   result = stripToolEcho(result.replace(ORPHANED_TAG_REGEX, "")); // suyuan fork: a tool call written again as text
+  result = stripThoughtLeak(result); // suyuan fork: Gemini's thinking written into the reply
   return result.trim();
 }
 
 /** Returns true if the message text consists entirely of leaked system harness messages. */
 export function isPureLeakedSystemHarnessMessage(text: string | null | undefined): boolean {
   if (!text || typeof text !== "string") return false;
-  const hasMarkers = /<SYSTEM_(?:MESSAGE|NOTIFICATION)>/i.test(text) || /The following is a <SYSTEM_/i.test(text);
+  const hasMarkers = /<SYSTEM_(?:MESSAGE|NOTIFICATION)>/i.test(text) || /The following is a <SYSTEM_/i.test(text)
+    || hasThoughtMark(text); // suyuan fork
   if (!hasMarkers) return false;
   return stripLeakedSystemHarnessMessages(text).length === 0;
 }
