@@ -173,7 +173,7 @@ export function verificationServerEnvironment(parentEnv: NodeJS.ProcessEnv, data
   // One log line per browser call and preview frame.
   if (parentEnv.OMB_BROWSER_TIMING === "1") childEnv.OMB_BROWSER_TIMING = "1";
   // Warm summaries' minutes as seconds (server/warm-summary.ts), and the switch that turns them off.
-  for (const key of ["OMB_WARM_SUMMARY_TIME_SCALE", "OMB_WARM_SUMMARY"]) if (parentEnv[key]) childEnv[key] = parentEnv[key];
+  for (const key of ["OMB_WARM_SUMMARY_TIME_SCALE", "OMB_WARM_SUMMARY", "OMB_BOT_THREAD_ARCHIVE_MS", "OMB_BOT_THREAD_ARCHIVE_SWEEP_MS", "OMB_BOT_THREAD_ARCHIVE_START_MS"]) if (parentEnv[key]) childEnv[key] = parentEnv[key]; // suyuan fork: and the idle archive's (server/suyuan/idle-archive.ts)
   // A loopback fake only: the key never reaches a real provider.
   const liveUrl = parentEnv.OMB_OPENAI_LIVE_URL?.trim() ?? "";
   if (/^http:\/\/127\.0\.0\.1:\d{1,5}$/.test(liveUrl)) {

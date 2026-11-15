@@ -4,6 +4,7 @@
 // keeps upstream's one-way thread; and the loop guards still hold for a thread opened from a thread and for work that went
 // through another bot and came back.
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
+import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { expect, it } from "vitest";
@@ -12,6 +13,7 @@ import { launchVerificationServer, runControlOmb } from "../../scripts/control-o
 import { SELF_THREAD_REFUSAL } from "../host/self-threads.ts";
 import { hostTimeout } from "../testing/host-timeout.ts";
 import { ownTurnText } from "../testing/room-handoff-agent.ts";
+import { IDLE_ARCHIVE_NAME } from "./idle-archive.ts";
 import { SELF_NEEDS_THREAD, selfNotOpened } from "./self-thread.ts";
 
 type Row = Record<string, any>;
@@ -31,9 +33,9 @@ function assignments(dataDir: string): Row[] {
 
 const THREAD_ID = "\\[thread id: ([\\w-]+)\\]";
 
-async function scenario(test: (f: any) => Promise<void>) {
-  const session = await launchVerificationServer({ ...process.env }, undefined, undefined, undefined, undefined, { scripted: true });
-  const { url, dataDir } = session.info;
+async function scenario(test: (f: any) => Promise<void>, env: NodeJS.ProcessEnv = {}) {
+  const session = await launchVerificationServer({ ...process.env, ...env }, undefined, undefined, undefined, undefined, { scripted: true });
+  const { url, dataDir, logPath } = session.info;
   try {
     const api = async (method: string, path: string, body?: unknown) => {
       const response = await fetch(`${url}${path}`, { method, headers: { "content-type": "application/json", origin: url },
@@ -71,7 +73,7 @@ async function scenario(test: (f: any) => Promise<void>) {
     const open = (name: string) => writeFileSync(gate(name), "open");
     const ready = (name: string) => join(dataDir, `${name}.ready`);
     try {
-      await test({ api, dataDir, clive, mira, job: clive.activeTaskId as string, script, say, children, turns, keys, turn, told, stepTexts, messages, tasks, gate, open, ready });
+      await test({ api, dataDir, logPath, url, clive, mira, job: clive.activeTaskId as string, script, say, children, turns, keys, turn, told, stepTexts, messages, tasks, gate, open, ready });
     } catch (error) {
       const names: Record<string, string> = { [clive.id]: "Clive", [mira.id]: "Mira" };
       const home = (await messages(clive.activeTaskId).catch(() => [])).slice(-12).map((message: any) => `${message.role}/${message.kind}: ${String(message.text ?? message.tool?.name ?? "").slice(0, 200)}`);
@@ -257,3 +259,48 @@ it("S7 a message sent into a thread that was closed and archived brings it back,
   expect(after?.closedBy ?? null, "and open again").toBeNull();
   expect(f.told("C3")).toContain("K2-RESULT: notes extended.");
 }), hostTimeout(180_000));
+
+// The hour is twelve seconds here, and the 55 idle minutes before a summary about seven (OMB_WARM_SUMMARY_TIME_SCALE), so a
+// thread that would be summarized is due well before it is archived. The fake's conversations are 110k tokens and up, past
+// the point where an idle one is summarized.
+it("S8 a thread the bot opened and nobody wrote in is archived once idle and never summarized; one the person wrote in is summarized and stays; a message brings the archived one back", () => scenario(async (f) => {
+  const cli = (...args: string[]) => runControlOmb(args, { env: { OPENMAUSBOT_URL: f.url } }) as Promise<any>;
+  await cli("set-model", "--bot", f.clive.id, "--instance", "claude", "--model", "claude-opus-5-5");
+  f.script(f.clive.id,
+    { key: "C0", match: ["S8-JOB"], steps: [
+      { tool: "start_thread", arguments: { title: "S8 left alone", message: "S8-CHILD-X: sort the inbox." } },
+      { tool: "start_thread", arguments: { title: "S8 the person joins", message: "S8-CHILD-Y: draft the note." } }], reply: "C0: opened both." },
+    { key: "KX", match: ["S8-CHILD-X", OWN], reply: "KX-RESULT: inbox sorted." },
+    { key: "KY", match: ["S8-CHILD-Y", OWN], reply: "KY-RESULT: note drafted." },
+    { key: "C1", match: ["KX-RESULT"], reply: "C1: both are back." },
+    { key: "KY2", match: ["S8-PERSON"], reply: "KY2: shortened." });
+  await f.say(f.clive.id, f.job, "S8-JOB: sort the inbox and draft the note, each in a thread of your own.");
+  await expect.poll(() => f.keys(f.clive.id), { timeout: 90_000 }).toEqual(expect.arrayContaining(["C0", "KX", "KY", "C1"]));
+  const left = openedThread(f, "C0", 0), joined = openedThread(f, "C0", 1);
+  expect(left).not.toBe("");
+  expect(joined).not.toBe("");
+  await f.say(f.clive.id, joined, "S8-PERSON: make the note shorter.");
+  await expect.poll(() => f.keys(f.clive.id), { timeout: 60_000 }).toContain("KY2");
+  const task = async (threadId: string) => (await f.tasks(f.clive.id)).find((one: any) => one.threadId === threadId);
+  await expect.poll(async () => typeof (await task(left))?.archivedAt, { timeout: 60_000, interval: 1_000 }).toBe("number");
+  expect((await task(left)).closedBy?.name).toBe(IDLE_ARCHIVE_NAME);
+  const log = () => readFileSync(f.logPath, "utf8");
+  // The thread the person wrote in was due for its summary before the other was archived, and got one; so did the home.
+  await expect.poll(() => log().includes(`warm summary ${joined}: `), { timeout: 30_000 }).toBe(true);
+  await expect.poll(() => log().includes(`warm summary ${f.job}: `), { timeout: 30_000 }).toBe(true);
+  expect(log(), "the thread nobody wrote in was never summarized").not.toContain(`warm summary ${left}`);
+  expect(log()).toContain("idle archive: archived 1 bot-opened thread(s)");
+  expect((await task(joined)).archivedAt, "the person's thread stays").toBeUndefined();
+  expect((await task(f.job)).archivedAt, "and the home").toBeUndefined();
+  // A message from the conversation that opened it brings it back and runs there.
+  f.script(f.clive.id,
+    { key: "C2", match: ["S8-AGAIN"], steps: [{ arguments: { bot_ids: [f.clive.id], message: "S8-MORE: sort the spam too.", thread: left } }], reply: "C2: asked for more." },
+    { key: "KX2", match: ["S8-MORE", OWN], reply: "KX2-RESULT: spam sorted." },
+    { key: "C3", match: ["KX2-RESULT"], reply: "C3: all done." });
+  await f.say(f.clive.id, f.job, "S8-AGAIN: have the first thread sort the spam too.");
+  await expect.poll(() => f.keys(f.clive.id), { timeout: 90_000 }).toEqual(expect.arrayContaining(["C2", "KX2", "C3"]));
+  expect(f.turn("KX2").threadId).toBe(left);
+  expect((await task(left)).archivedAt, "back in the list").toBeUndefined();
+  expect((await task(left)).closedBy ?? null).toBeNull();
+}, { OMB_BOT_THREAD_ARCHIVE_MS: "12000", OMB_BOT_THREAD_ARCHIVE_SWEEP_MS: "1000", OMB_BOT_THREAD_ARCHIVE_START_MS: "1000", OMB_WARM_SUMMARY_TIME_SCALE: "0.002",
+  FAKE_CLAUDE_VERSION: "2.1.312", FAKE_CLAUDE_CONTEXT_TOKENS: "120000", FAKE_CLAUDE_COMPACT_MS: "300" }), hostTimeout(300_000));
