@@ -48,7 +48,7 @@ export function commandChecks(upstream: RoutineChecks | undefined, deps: Command
       // Its last run still works, or it ran as often as a checked routine may in a day: the command waits too, so a
       // command that hands over what is new does not hand it to nobody.
       if (context.hold) return context.hold === "capped" ? { trouble: "这个任务过去 24 小时已经跑满 24 次，先不检查了，过一阵自动恢复。" } : {};
-      if (!deps.mayRun(routine.botId)) return { trouble: `检查命令没跑：这个 bot 不是「完全访问」权限。命令：${first.command}` };
+      if (routine.access || !deps.mayRun(routine.botId)) return { trouble: `检查命令没跑：这个 bot 不是「完全访问」权限。命令：${first.command}` };
       const outcome = await run(first.command, deps.cwd(routine.botId));
       if (outcome.code === 0) {
         const output = outcome.output.trim().slice(0, OUTPUT_CHARS);

@@ -98,6 +98,13 @@ describe("a routine that runs a command first", () => {
     expect(asking.ran).toEqual([]);
     expect(asking.turns).toEqual([]);
     expect(asking.routines.listRoutines()[0]!.checkTrouble).toMatch(/完全访问/);
+
+    // A routine fenced to reading and drafting never runs a command either.
+    const fenced = scheduler(() => ({ code: 0, output: "" }));
+    fenced.routines.create({ name: "只读", prompt: withCheck("touch pwned", "做事"), botId: "bot-1", schedule: { type: "interval", everyMinutes: 15, anchorAt: START + 15 * MINUTE }, checks: ["command"], access: "read-and-draft" });
+    await fenced.pass(START + 16 * MINUTE);
+    expect(fenced.ran).toEqual([]);
+    expect(fenced.turns).toEqual([]);
   });
 
   it("does not run the command again while the run it started still works", async () => {

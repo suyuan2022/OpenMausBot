@@ -404,8 +404,8 @@ describe("the fork's hooks into upstream files", () => {
   it("posts a plain reminder with no turn, and reads run_with off the trigger tool's schedule requests", () => {
     const index = source("server/index.ts");
     expect(index).toContain("if (!companyShutdown && !deliverPlainReminder(threadId, {");
-    expect(index).toContain("const runWith = takeRunWith(request.proposal, forBot?.botId ?? from.id, runWithDeps); if (runWith.error || runWith.done) return json(");
-    expect(index).toContain("runWith.applied(proposed); return json(res, 201, proposed);");
+    expect(index).toContain("const runWith = takeRunWith(request.proposal, forBot?.botId ?? from.id, runWithDeps, fullAccessForSource(from.id, fromThreadId)); if (runWith.error) return json(res, 400, { error: runWith.error });");
+    expect(index).toContain("runWith.applied(proposed, fromThreadId); return json(res, 201, proposed);");
     const call = source("server/drivers/agents-call-triggers.ts");
     expect(call).toContain("if (args.run_with != null) fields.runWith = args.run_with; if (args.model_selection != null) fields.modelSelection = args.model_selection;");
     expect(call).toContain('"run_on_startup", "runOnStartup", "run_with", "model_selection", "only_if"] as const;');

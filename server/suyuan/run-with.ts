@@ -40,7 +40,7 @@ type Fields = Record<string, unknown>;
 
 export interface RunWithDeps {
   /** A routine as it stands, for an update. */
-  routine(id: string): { id: string; botId: string; prompt: string; schedule?: { type: string } } | undefined;
+  routine(id: string): { id: string; botId: string; prompt: string; schedule?: { type: string }; checks?: readonly string[] } | undefined;
   /** The engine a bot runs on, with the models it offers, newest first. */
   engine(botId: string): { instanceId: string; models: ReadonlyArray<{ id: string }> } | undefined;
   /** Sets or clears a routine's own model; answers with why it could not. */
@@ -49,14 +49,15 @@ export interface RunWithDeps {
   mayRun(botId: string): boolean;
   /** Turns a routine's command check on or off; answers with why it could not. */
   setCheck(routineId: string, on: boolean): string | null;
+  /** The routine changed again after its request applied: the request's Undo follows it, so it still works. */
+  undoFollows(threadId: string, messageId: string, routineId: string): void;
 }
 
 export interface RunWithStep {
   error?: string;
-  /** The whole answer, when run_with was the only change and it is already applied. */
-  done?: { resultId: string; summary: string };
-  /** Called with what the routine request answered: sets the model and the check on the routine it created or changed. */
-  applied(result: unknown): void;
+  /** Called with what the routine request answered, in the conversation that asked: sets the model and the check on
+   * the routine it created or changed. */
+  applied(result: unknown, threadId: string): void;
 }
 
 const NOTHING: RunWithStep = { applied: () => {} };
@@ -75,8 +76,10 @@ function resultId(result: unknown): string | undefined {
   return typeof id === "string" ? id : undefined;
 }
 
-/** Reads run_with, model_selection and only_if off a schedule request from the trigger tool, leaving the request as upstream expects it. */
-export function takeRunWith(proposal: Proposal, botId: string, deps: RunWithDeps): RunWithStep {
+/** Reads run_with, model_selection and only_if off a schedule request from the trigger tool, leaving the request as
+ * upstream expects it. `botId` owns the routine; `fromFull` says the conversation asking is at Full access. Nothing is
+ * set here: the request still goes through upstream, which checks whose routine it is and who may change it. */
+export function takeRunWith(proposal: Proposal, botId: string, deps: RunWithDeps, fromFull: boolean): RunWithStep {
   const fields = fieldsOf(proposal.action === "create" ? proposal.routine : proposal.action === "update" ? proposal.changes : null);
   if (!fields) return NOTHING;
   const raw = fields.runWith, exact = fieldsOf(parsed(fields.modelSelection)), onlyIf = fields.onlyIf;
@@ -89,8 +92,8 @@ export function takeRunWith(proposal: Proposal, botId: string, deps: RunWithDeps
   // An exact model is a model for the routine, like haiku: it clears a plain mark and is checked when it is set.
   const runWith = exact ? "exact" as const : raw as RunWith | undefined;
   const existing = proposal.action === "update" && proposal.routineId ? deps.routine(proposal.routineId) : undefined;
-  if (proposal.action === "update" && !existing) return NOTHING; // upstream answers that it does not exist
-  const owner = existing?.botId ?? botId;
+  // Not there, or another bot's: upstream answers so, and what was read off the request is dropped.
+  if (proposal.action === "update" && existing?.botId !== botId) return NOTHING;
 
   // The instructions are a command to run first, if any, and then what to do; each half changes on its own.
   const given = typeof fields.instructions === "string" ? fields.instructions : undefined;
@@ -99,11 +102,14 @@ export function takeRunWith(proposal: Proposal, botId: string, deps: RunWithDeps
   const wasPlain = plainText(was) !== null;
   // only_if names the command and "" takes it away; instructions that carry the mark name it too; otherwise it stays.
   const command = onlyIf !== undefined ? (onlyIf as string).trim() || undefined : givenCheck?.command ?? wasCommand;
-  const check = onlyIf !== undefined || givenCheck ? command !== undefined : undefined;
+  // A routine with upstream's checks keeps them: the command check does not go with them.
+  const theirs = existing?.checks?.some((one) => one !== "command") === true;
+  const check = (onlyIf !== undefined || givenCheck) && !(theirs && !command) ? command !== undefined : undefined;
   if (check) {
     const schedule = fieldsOf(fields.schedule)?.type ?? existing?.schedule?.type;
     if (schedule === "once" || schedule === "limit_reset") return refuse("only_if needs a schedule that repeats (interval, daily, weekly or cron): it checks at each occurrence until the automation is paused.");
-    if (!deps.mayRun(owner)) return refuse("only_if runs a shell command unasked, so the bot must be at Full access.");
+    if (theirs) return refuse("This automation already runs checks of its own (calendar, mail or runs), and only_if does not go with them.");
+    if (!fromFull || !deps.mayRun(botId)) return refuse("only_if runs a shell command unasked, so the bot and this conversation must be at Full access.");
   }
 
   let rest: string | undefined;
@@ -122,7 +128,7 @@ export function takeRunWith(proposal: Proposal, botId: string, deps: RunWithDeps
 
   let selection: ModelSelection | null = exact ? exact as unknown as ModelSelection : null;
   if (runWith === "haiku" || runWith === "sonnet") {
-    const engine = deps.engine(owner);
+    const engine = deps.engine(botId);
     const model = engine?.models.find((candidate) => candidate.id.toLowerCase().includes(runWith));
     if (!engine || !model) return refuse(`This bot's engine offers no ${runWith} model, so run_with ${runWith} cannot apply. Leave run_with out to run on the bot's own model, or use none for a plain reminder.`);
     selection = { instanceId: engine.instanceId, model: model.id };
@@ -136,16 +142,16 @@ export function takeRunWith(proposal: Proposal, botId: string, deps: RunWithDeps
     runWith === undefined ? null : deps.setModel(id, selection),
     check === undefined ? null : deps.setCheck(id, check),
   ].filter(Boolean).join(" ");
-  if (existing && !Object.values(fields).some((value) => value !== undefined)) {
-    const refused = set(existing.id);
-    return refused ? refuse(refused) : { applied: () => {}, done: { resultId: existing.id, summary: said } };
-  }
+  // run_with alone still goes through upstream as a change: the instructions, sent as they stand.
+  if (existing && !Object.values(fields).some((value) => value !== undefined)) fields.instructions = existing.prompt;
   return {
-    applied: (result) => {
+    applied: (result, threadId) => {
       const answer = fieldsOf(result), went = answer?.state === "applied" || answer?.state === undefined;
       const id = went ? existing?.id ?? resultId(result) : undefined;
-      const refused = id ? set(id) : "";
-      if (answer && id) answer.summary = [typeof answer.summary === "string" ? answer.summary : "", refused ? `Not all of it was set: ${refused}` : said].filter(Boolean).join("\n");
+      if (!id) return;
+      const refused = set(id);
+      if (typeof answer?.messageId === "string") deps.undoFollows(threadId, answer.messageId, id);
+      if (answer) answer.summary = [typeof answer.summary === "string" ? answer.summary : "", refused ? `Not all of it was set: ${refused}` : said].filter(Boolean).join("\n");
     },
   };
 }

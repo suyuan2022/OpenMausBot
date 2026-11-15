@@ -2,20 +2,27 @@ import { describe, expect, it } from "vitest";
 
 import { CHECK_MARK } from "../../shared/suyuan/check-first.ts";
 import { PLAIN_MARK } from "../../shared/suyuan/plain-reminder.ts";
-import { takeRunWith, type RunWithDeps } from "./run-with.ts";
+import { takeRunWith as take, type RunWithDeps } from "./run-with.ts";
+
+/** As server/index.ts calls it, from a conversation at Full access unless a test says otherwise. */
+function takeRunWith(proposal: Parameters<typeof take>[0], botId: string, made: RunWithDeps, fromFull = true) {
+  const step = take(proposal, botId, made, fromFull);
+  return { ...step, applied: (result: unknown) => step.applied(result, "thread-1") };
+}
 
 const MODELS = [{ id: "claude-fable-5-2" }, { id: "claude-opus-5-5" }, { id: "claude-sonnet-5-5" }, { id: "claude-sonnet-5" }, { id: "claude-haiku-5-5" }, { id: "claude-haiku-4-5" }];
 
-function deps(routines: Array<{ id: string; botId: string; prompt: string; schedule?: { type: string } }> = [], models = MODELS, full = true) {
-  const set: Array<{ id: string; model: string | null }> = [], checks: Array<{ id: string; on: boolean }> = [];
+function deps(routines: Array<{ id: string; botId: string; prompt: string; schedule?: { type: string }; checks?: string[] }> = [], models = MODELS, full = true) {
+  const set: Array<{ id: string; model: string | null }> = [], checks: Array<{ id: string; on: boolean }> = [], followed: string[] = [];
   const made: RunWithDeps = {
     routine: (id) => routines.find((routine) => routine.id === id),
     engine: () => ({ instanceId: "claude", models }),
     setModel: (id, selection) => { set.push({ id, model: selection?.model ?? null }); return null; },
     mayRun: () => full,
     setCheck: (id, on) => { checks.push({ id, on }); return null; },
+    undoFollows: (threadId, messageId, id) => { followed.push(`${threadId}/${messageId}/${id}`); },
   };
-  return { made, set, checks };
+  return { made, set, checks, followed };
 }
 
 describe("run_with on a schedule the trigger tool sends", () => {
@@ -63,13 +70,26 @@ describe("run_with on a schedule the trigger tool sends", () => {
     expect(takeRunWith({ action: "create", routine: { name: "a", instructions: " ", runWith: "none" } }, "bot-1", made).error).toMatch(/must be that message/);
   });
 
-  it("an update of run_with alone applies at once, with nothing left for the routine request", () => {
-    const { made, set } = deps([{ id: "r-1", botId: "bot-1", prompt: "查证书到期日" }]);
+  it("an update of run_with alone still goes through the routine request, as the instructions sent as they stand", () => {
+    const { made, set, followed } = deps([{ id: "r-1", botId: "bot-1", prompt: "查证书到期日" }]);
     const changes: Record<string, unknown> = { runWith: "haiku" };
-    const step = takeRunWith({ action: "update", routineId: "r-1", changes }, "bot-9", made);
-    expect(step.done).toEqual({ resultId: "r-1", summary: "Each run uses claude-haiku-5-5." });
+    const step = takeRunWith({ action: "update", routineId: "r-1", changes }, "bot-1", made);
+    expect(changes).toEqual({ instructions: "查证书到期日" });
+    expect(set).toEqual([]);
+    const answer: Record<string, unknown> = { state: "applied", summary: "Updated", messageId: "m-1" };
+    step.applied(answer);
     expect(set).toEqual([{ id: "r-1", model: "claude-haiku-5-5" }]);
+    expect(answer.summary).toBe("Updated\nEach run uses claude-haiku-5-5.");
+    // The routine changed once more after the request applied: its Undo is told, so it still works.
+    expect(followed).toEqual(["thread-1/m-1/r-1"]);
+  });
+
+  it("sets nothing on another bot's routine: the request goes on without run_with, for upstream to refuse", () => {
+    const { made, set, checks } = deps([{ id: "r-1", botId: "bot-1", prompt: "查证书到期日", schedule: { type: "interval" } }]);
+    const changes: Record<string, unknown> = { runWith: "haiku", onlyIf: "true" };
+    takeRunWith({ action: "update", routineId: "r-1", changes }, "bot-9", made).applied({ state: "applied", messageId: "m-1" });
     expect(changes).toEqual({});
+    expect([set, checks]).toEqual([[], []]);
   });
 
   it("an update to none marks the instructions it has; back to the bot's model unmarks them and clears the model", () => {
@@ -86,7 +106,7 @@ describe("run_with on a schedule the trigger tool sends", () => {
   it("new instructions for a plain reminder stay plain, and a request without run_with is left alone otherwise", () => {
     const { made, set } = deps([{ id: "r-2", botId: "bot-1", prompt: `${PLAIN_MARK}\n记得带伞` }, { id: "r-3", botId: "bot-1", prompt: "查证书" }]);
     const reworded: Record<string, unknown> = { instructions: "记得带伞和外套" };
-    expect(takeRunWith({ action: "update", routineId: "r-2", changes: reworded }, "bot-1", made).done).toBeUndefined();
+    takeRunWith({ action: "update", routineId: "r-2", changes: reworded }, "bot-1", made);
     expect(reworded).toEqual({ instructions: `${PLAIN_MARK}\n记得带伞和外套` });
     const plainEdit: Record<string, unknown> = { instructions: "查证书和域名" };
     takeRunWith({ action: "update", routineId: "r-3", changes: plainEdit }, "bot-1", made).applied({ result: { resultId: "r-3" } });
@@ -151,6 +171,15 @@ describe("only_if on a schedule the trigger tool sends", () => {
     expect(takeRunWith({ action: "create", routine: { name: "a", instructions: "b", schedule: every, onlyIf: "true\nrm -rf x" } }, "bot-1", made).error).toMatch(/one shell command on one line/);
     expect(takeRunWith({ action: "create", routine: { name: "a", instructions: " ", schedule: every, onlyIf: "true" } }, "bot-1", made).error).toMatch(/needs instructions/);
     expect(takeRunWith({ action: "create", routine: { name: "a", instructions: "b", schedule: every, onlyIf: "true" } }, "bot-1", deps([], MODELS, false).made).error).toMatch(/Full access/);
+    // The bot is at Full access, the conversation asking is not (a guest's, say).
+    expect(takeRunWith({ action: "create", routine: { name: "a", instructions: "b", schedule: every, onlyIf: "true" } }, "bot-1", made, false).error).toMatch(/Full access/);
+  });
+
+  it("does not go with upstream's own checks: a briefing keeps them, and an empty only_if leaves them alone", () => {
+    const { made, checks } = deps([{ id: "r-5", botId: "bot-1", prompt: "看邮件", schedule: every, checks: ["mail", "calendar"] }]);
+    expect(takeRunWith({ action: "update", routineId: "r-5", changes: { onlyIf: "true" } }, "bot-1", made).error).toMatch(/checks of its own/);
+    takeRunWith({ action: "update", routineId: "r-5", changes: { onlyIf: "" } }, "bot-1", made).applied({ state: "applied" });
+    expect(checks).toEqual([]);
   });
 
   it("does not set the check when the request did not apply", () => {
