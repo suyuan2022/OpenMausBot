@@ -90,7 +90,7 @@ const ALL_DAYS = [0, 1, 2, 3, 4, 5, 6];
 const WEEKDAYS = [1, 2, 3, 4, 5];
 const INTERVAL_PRESETS = [5, 10, 15, 30, 60];
 const EVENT_DURATION_OPTIONS = Array.from({ length: 240 / CALENDAR_SLOT_MINUTES }, (_, index) => (index + 1) * CALENDAR_SLOT_MINUTES);
-import { BOT_DRAG_TYPE, EVENT_DRAG_TYPE, LimitResetMarker, type ResetDrop } from "./routines/LimitResetMarkers";
+import { BOT_DRAG_TYPE, EVENT_DRAG_TYPE, LimitResetMarker, type ResetDrop } from "./routines/LimitResetMarkers"; import { RunWithSelect } from "@/suyuan/RunWithSelect"; import { commandOf, runWithFields, runWithOf, shownText } from "@/suyuan/run-with"; // suyuan fork
 
 export type EventKind = "routine" | "call";
 export type RoutinesLayout = "day" | "week" | "list";
@@ -307,7 +307,7 @@ export function EventEditor({
   const [kind, setKind] = useState<EventKind>(routinesOnly ? "routine" : seed.kind);
   const [editorOpenedAt] = useState(() => Date.now());
   const [name, setName] = useState(existingRoutine?.name ?? existingCall?.name ?? seed.name ?? "");
-  const [description, setDescription] = useState(existingRoutine?.prompt ?? existingCall?.description ?? seed.description ?? "");
+  const [description, setDescription] = useState(shownText(existingRoutine?.prompt ?? existingCall?.description ?? seed.description ?? "")); const [runWith, setRunWith] = useState(() => runWithOf(existingRoutine)); // suyuan fork: run with
   const initialAt = existingRoutine?.schedule.type === "once"
     ? existingRoutine.schedule.at
     : existingRoutine?.schedule.type === "daily"
@@ -492,7 +492,7 @@ export function EventEditor({
         if (!nextSchedule) throw new Error(cron?.error || t("routines.error.invalidSchedule"));
         const input: RoutineInput = {
           name,
-          prompt: description,
+          ...(routineTarget === "bot" ? runWithFields(runWith, description, state.instances.find((instance) => instance.instanceId === bots.find((bot) => bot.id === (lockedBotId ?? botIds[0]))?.modelSelection.instanceId), existingRoutine?.prompt) : { prompt: description }), // suyuan fork: run with
           target: routineTarget,
           botId: lockedBotId ?? botIds[0] ?? "",
           groupId: routineTarget === "room-goal" && groupId ? groupId : null,
@@ -962,7 +962,7 @@ export function EventEditor({
             <FileText size={18} className="mt-2.5 shrink-0 text-ink-secondary" />
             <textarea value={description} onChange={(event) => setDescription(event.target.value)} rows={5} aria-label={t("routines.editor.descriptionLabel")} placeholder={isRoomGoal ? t("routines.goal.instructionsPlaceholder") : kind === "routine" ? (advanced ? t("routines.event.instructionsPlaceholder") : t("routines.editor.instructionsPlaceholder")) : t("routines.event.agendaPlaceholder")} className="min-w-0 flex-1 resize-y rounded-xl border border-hairline/50 bg-inset px-3.5 py-3 text-[13px] leading-relaxed text-ink outline-none placeholder:text-ink-tertiary focus:border-accent" />
           </div>
-          {continuityControl}
+          {continuityControl}{kind === "routine" && !isRoomGoal && recurrence !== "limit_reset" && <RunWithSelect indent={advanced} command={commandOf(existingRoutine)} value={runWith} onChange={setRunWith} engine={state.instances.find((instance) => instance.instanceId === bots.find((bot) => bot.id === (lockedBotId ?? botIds[0]))?.modelSelection.instanceId)} />}{/* suyuan fork */}
 
           {advanced && attachmentsRow}
 

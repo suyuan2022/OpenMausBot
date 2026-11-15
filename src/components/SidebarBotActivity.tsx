@@ -8,7 +8,7 @@ import { isArchived, orderedSidebarThreads, orderedThreadList, threadRecency, th
 import type { SidebarDensity } from "@/lib/sidebar-preferences";
 import { localizedTaskTitle } from "@/lib/task-title";
 import { busyInOwnChats } from "@/suyuan/own-work";
-import { foreground } from "@/suyuan/home";
+import { foreground, oneConversation } from "@/suyuan/home";
 
 export function sidebarBotActivityTasks(bot: Bot, queued: Record<string, unknown[]>, archivedApprovals = false): Array<Task & { queued: boolean }> {
   const tasks = foreground(bot).tasks ?? [{
@@ -24,7 +24,7 @@ export function sidebarBotActivityTasks(bot: Bot, queued: Record<string, unknown
 
 /** A routine run's thread stays out of the thread tree, but gets an activity row while it runs, so the person can open it and watch. */
 export function runningRoutineRun(task: Task): boolean {
-  return Boolean(task.routineRunId) && !isArchived(task) && (task.busy === true || task.activity === "working");
+  return !oneConversation() && Boolean(task.routineRunId) && !isArchived(task) && (task.busy === true || task.activity === "working"); // suyuan fork: a background run has no row
 }
 
 export function runningRoutineRuns(bot: Bot): Array<Task & { queued: boolean }> {

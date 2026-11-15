@@ -590,7 +590,7 @@ import { createBotSettingsRoutes } from "./routes/bot-settings.ts";
 import { createBotPatchRoutes } from "./routes/bot-patch.ts";
 import { createBotOrderRoutes } from "./routes/bot-order.ts";
 import { createBotLifecycleRoutes } from "./routes/bot-lifecycle.ts";
-import { createBotSkillsRoutes } from "./routes/bot-skills.ts"; import { noteTurnVolatile, volatileHookReply } from "./suyuan/compact-volatile.ts"; // suyuan fork
+import { createBotSkillsRoutes } from "./routes/bot-skills.ts"; import { noteTurnVolatile, volatileHookReply } from "./suyuan/compact-volatile.ts"; import { deliverPlainReminder } from "./suyuan/plain-reminder.ts"; import { takeRunWith, type RunWithDeps } from "./suyuan/run-with.ts"; import { commandChecks } from "./suyuan/check-first.ts"; // suyuan fork
 import { createSkillShareRoutes } from "./routes/skill-share.ts";
 import { createTeamContextRoutes } from "./routes/team-context.ts";
 import { createDeciderRoutes } from "./routes/decider.ts"; import { createCloudSendRoutes } from "./routes/cloud-send.ts"; import { claudeCodeSkillInputs } from "./setup-import.ts"; import { createCloudConnectionsHost } from "./cloud-connections-host.ts";
@@ -8796,9 +8796,9 @@ const limitFailovers = new LimitFailovers({ file: join(DATA_DIR, "limit-failover
   } });
 const automationDestinations = createAutomationDestinations({ store, mainThread: botMainThread, runs: () => routines?.listRuns() ?? [],
   cloud: CLOUD_HOME ? { owner: CLOUD_OWNER_KEY!, opener: routineOpener, reportFromOthers: cloudReportFromOthers, opened: (threadId, person) => threadStarters.set(threadId, person), outside: (threadId) => outsideLineage.mark(threadId) } : null });
-const routineModelChecks: RoutineModelChecks = { check: (raw) => checkedModelSelection(raw), bot: (botId) => store.bot(botId), engineSwitchNeedsAsk };
+const routineModelChecks: RoutineModelChecks = { check: (raw) => checkedModelSelection(raw), bot: (botId) => store.bot(botId), engineSwitchNeedsAsk }; const runWithDeps: RunWithDeps = { routine: (id) => routines?.listRoutines().find((routine) => routine.id === id), engine: (botId) => { const instanceId = store.bot(botId)?.modelSelection.instanceId, options = instanceId ? registry.get(instanceId)?.models.options : undefined; return instanceId && options ? { instanceId, models: options } : undefined; }, setModel: (id, modelSelection) => { const body = { modelSelection }, refused = routineModelRefusal(body, routineModelChecks, runWithDeps.routine(id) as Routine | undefined); if (!refused) routines!.update(id, body); return refused?.error ?? null; }, mayRun: (botId) => { const bot = store.bot(botId); return Boolean(bot && approvalModeFor(bot) === "full"); }, setCheck: (id, on) => { try { routines!.update(id, { checks: on ? ["command"] : null }); return null; } catch (error) { return error instanceof Error ? error.message : String(error); } } }; // suyuan fork
 routines = new RoutineManager({
-  emit: broadcast, limitResetAt: (engine) => limitClock.resetAt(engine), checks: proactive.checks,
+  emit: broadcast, limitResetAt: (engine) => limitClock.resetAt(engine), checks: commandChecks(proactive.checks, { mayRun: runWithDeps.mayRun, cwd: (botId) => store.bot(botId)?.cwd || workspaceDir(botId) }), // suyuan fork: a command check
   limitBackup: (botId, scope) => { const bot = store.bot(botId); return quotaSwitchEnabled() ? Boolean(bot && limitTakeover.backups(botId, bot.modelSelection, scope, approvalModeFor(bot)).length) : Boolean(bot && startupBackups(bot, cfg.automaticRecovery).length); },
   launchId: DESKTOP_MANAGED && /^[\w-]{1,100}$/.test(process.env.OMB_DESKTOP_LAUNCH_ID ?? "")
     ? process.env.OMB_DESKTOP_LAUNCH_ID : undefined,
@@ -8856,7 +8856,7 @@ routines = new RoutineManager({
     }
   },
   startTurn: async (botId, threadId, prompt, runOn, triggerSource, onDispatchError) => {
-    if (!companyShutdown) await startTurn(botId, prompt, { threadId, runOn, automationSource: triggerSource, onDispatchError });
+    if (!companyShutdown && !deliverPlainReminder(threadId, { run: (id) => routines!.runForThread(id), say: (id, text) => { store.appendMessage(id, { role: "bot", kind: "text", text, turnTerminal: true }); }, settle: (event) => routines!.handleRuntimeEvent(event), report: (run) => { if (!routineSourceThread(run)) store.patchTask(run.botId, run.threadId!, { unread: true }); automationReports.runSettled(run); } })) await startTurn(botId, prompt, { threadId, runOn, automationSource: triggerSource, onDispatchError }); // suyuan fork: a plain reminder is posted as it is, with no turn
   },
   startGoal: async (groupId, threadId, prompt, coordinatorBotId, runId, _onDispatchError) => {
     if (!groupId) {
@@ -13399,7 +13399,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           const hookOwner = store.bot(forBot?.botId ?? from.id);
           return json(res, 201, { ...applied, ...(applied.action === "create" && hookOwner ? addressFor({ from, owner: hookOwner, guestDriven: false, outsideDriven: outsideDrivenThread(fromThreadId) }, webhooks, applied.resultId, webhookIngressStatus().baseUrl) : {}) });
         }
-        const proposedInput = { ...request.proposal, forBot };
+        const runWith = takeRunWith(request.proposal, forBot?.botId ?? from.id, runWithDeps); if (runWith.error || runWith.done) return json(res, runWith.error ? 400 : 201, runWith.error ? { error: runWith.error } : runWith.done); const proposedInput = { ...request.proposal, forBot }; // suyuan fork: run_with
         if (proposedInput.action !== "create" && (proposedInput.action === "update" ? outsideWorkStaysHere(fromThreadId) : cloudGuestDriven(fromThreadId)) && !outsideLineage.routineRunsConfined(String(proposedInput.routineId))) return json(res, 403, { error: OUTSIDE_STAYS_HERE });
         const wasOwners = proposedInput.action !== "create" && typeof proposedInput.routineId === "string" ? cloudRoutineIsOwners(proposedInput.routineId) : false;
         const run = activeRoutineRunForThread(fromThreadId);
@@ -13437,7 +13437,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           decision: "auto-approved",
           source: proposed.appliedBy ?? "routine",
         });
-        return json(res, 201, proposed);
+        runWith.applied(proposed); return json(res, 201, proposed); // suyuan fork
       }
       if (method === "POST" && path === "/api/internal/team-memory") {
         const parsed = z.object({
