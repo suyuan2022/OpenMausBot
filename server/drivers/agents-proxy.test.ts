@@ -971,7 +971,7 @@ describe("agents-proxy MCP surface", () => {
     const list = await rpc("tools/list");
     const start = list.result.tools.find((tool: { name: string }) => tool.name === "start_thread");
     expect(start.inputSchema.required).toEqual(["title", "message"]);
-    expect(Object.keys(start.inputSchema.properties)).toEqual(["title", "message", "folder", "model_selection"]);
+    expect(Object.keys(start.inputSchema.properties)).toEqual(["title", "message", "folder", "model_selection", "report"]); // suyuan fork: report (suyuan/self-thread.ts)
     expect(start.description).toContain("Open a separate job on yourself");
     expect(start.description).toContain('use coordinate_bots for teammates (thread "new" opens a fresh thread on them)');
     expect(start.description).toContain("do not retry it");
@@ -1009,7 +1009,7 @@ describe("agents-proxy MCP surface", () => {
       fromThreadId: "thread-asker-routine",
       title: "QA: PR #1",
       message: "Review the login fix.",
-      depth: 0,
+      depth: 0, report: "resume", // suyuan fork: the tool asks for the result back (suyuan/self-thread.ts)
     });
     threadResponse = { threadId: "thread-two", title: "QA: PR #2", botId: "bot-asker", botName: "Asker", self: true, state: "queued", position: 2, limit: 3 };
     const queued = await callTool("start_thread", { title: "QA: PR #2", message: "Review the signup fix.", folder: "QA" });

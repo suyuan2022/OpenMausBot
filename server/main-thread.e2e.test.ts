@@ -48,7 +48,7 @@ it("stamps askedAt where a person writes, never for a routine, a webhook, start_
     const { bot: teammate } = await cli("new-bot", "--name", "Teammate");
     writeFileSync(join(dataDir, "room-plan.json"), JSON.stringify({
       [bot.id]: { turns: [
-        { steps: [{ tool: "start_thread", arguments: { title: "Side job", message: "Check the side job." } }], reply: "Opened a side job." },
+        { steps: [{ tool: "start_thread", arguments: { title: "Side job", message: "Check the side job.", report: "none" } }], reply: "Opened a side job." },
         { reply: "Side job checked." },
         { reply: "Relayed line handled." },
         { reply: "Routine report." },
@@ -119,7 +119,7 @@ it("moves no main thread for a teammate's work or results or a team incident; re
     writeFileSync(join(dataDir, "room-plan.json"), JSON.stringify({
       [asker.id]: { script: [
         { key: "open", match: ["Open a side job that asks Teammate."],
-          steps: [{ tool: "start_thread", arguments: { title: "Side job", message: "Ask Teammate to check the books." } }], reply: "Opened a side job." },
+          steps: [{ tool: "start_thread", arguments: { title: "Side job", message: "Ask Teammate to check the books.", report: "none" } }], reply: "Opened a side job." },
         { key: "ask", match: ["Ask Teammate to check the books."], steps: [{ arguments: { bot_ids: [teammate.id], message: "BOOKS: check the books." } }], reply: "Asked Teammate." },
         { key: "review", match: ["Your downstream room requests have settled."], reply: "Side job done: the books balance." },
       ] },

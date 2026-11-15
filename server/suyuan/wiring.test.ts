@@ -396,6 +396,44 @@ describe("the fork's hooks into upstream files", () => {
     expect(index).toContain("...(awaiting.has(bot.threadId) && !threadBusy(bot.id, bot.threadId) ? waitingOnWire(teammatesAwaited(bot.threadId)) : {})");
     expect(index).toContain("teammatesAwaited = (threadId) => coordinator.outstandingDirect(threadId).map((handoff) => handoff.botId);");
   });
+  it("a thread a bot opens on itself is work in the runtime: it reports back and takes more messages", () => {
+    // The one exception to "never hand work to an ancestor", in the three places upstream refuses it.
+    const coordinator = source("server/runtime-coordinator.ts");
+    expect(coordinator).toContain('import { ownOtherThreadRow } from "./suyuan/self-thread.ts";');
+    expect(coordinator).toContain("const ownThread = ownOtherThreadRow(parent, target);");
+    expect(coordinator).toContain("if (!answersSender(parent, mode, target) && !ownThread && lineage.some(n => ancestorOf(address(n), target))) throw new Error(ANCESTOR);");
+    expect(coordinator).toContain('const waiting = mode === "notify" || target.groupId !== undefined || ownThread ? undefined : this.waitingOn(source.botId, target.botId);');
+    expect(source("server/runtime/runtime.ts")).toContain("if (!answersSender(parent, mode, { botId: target.botId, ...target.destination }) && !ownOtherThreadRow(parent, { botId: target.botId, ...target.destination }) && lineage.some(");
+    expect(source("server/host/room-access.ts")).toContain("if (from.id !== bot.id && !peerAllowed(from, bot)) return reachRefusal(from, bot, lookedAfterBy)!;");
+    // What the thread and the opening conversation read.
+    const envelope = source("server/runtime/envelope.ts");
+    expect(envelope).toContain("`${selfBriefLine(a, names, person, (text) => quote(text, NAME_MAX))}${lineage(a, names, person)} ${levelLine(a)}");
+    expect(envelope).toContain("const own = selfReportLine(a); if (own) lines.push(own);");
+    // coordinate_bots: who may target itself, no approval card for it, an archived thread comes back, a second message is rework, and the row names the thread.
+    const index = source("server/index.ts");
+    expect(index).toContain("const coordinateBots = async (call: CoordinateBotsCall & { self?: SelfThreadOpening })");
+    expect(index).toContain("return selfTargetRefusal({ opening: Boolean(sent.self), answers: Boolean(sent.answers), answeringBack: back?.botId === internalSender.id && back.threadId === sent.thread, consult: sent.consult, thread: sent.thread,");
+    expect(index).toContain("handoff: handedTurn(internalCapability.roomHandoffId, (id) => coordinator.node(id)), requestLine: store.activePath(address.threadId)");
+    expect(index).toContain('target.botId === internalSender.id && target.groupId ? "Choose a teammate, not yourself"');
+    expect(index).toContain(": target.botId === internalSender.id && ownTargetRefusal(call) ? ownTargetRefusal(call)");
+    expect(index).toContain("if (peerReviewRequired(internalSender, address.threadId) && targets.some(target => target.botId !== internalSender.id)) {");
+    expect(index).toContain('const verdicts = await Promise.all(targets.map(target => target.botId === internalSender.id ? "allow" as const :');
+    expect(index).toContain("if (!room && !fresh) reopenOwnThread(store, target.botId, call.thread, internalSender.id);");
+    expect(index).toContain("false, call.projectId, opened, call.self?.approvalMode, call.self?.modelSelection, folder.cwd)");
+    expect(index).toContain("rework: call.rework || target.botId === internalSender.id,");
+    expect(index).toContain("store.appendMessage(address.threadId, ownThreadRow({ sender: internalSender, recipient, threadId: node.threadId,");
+    // start_thread on yourself: only a conversation's own turn; the tool asks for the result back unless the bot says none, and the route alone keeps upstream's one-way thread.
+    expect(index).toContain("const selfRefused = selfThreadRefusal({ handoff: handedTurn(internalCapability.roomHandoffId, (id) => coordinator.node(id)), requestLine: store.activePath(fromThreadId)");
+    expect(index).toContain('const report = body.report === undefined ? "none" : body.report;');
+    expect(index).toContain('if (report === "resume") { if (message.length > SELF_BRIEF_MAX) return json(res, 400, { error: selfBriefTooLong(message.length) });');
+    expect(index).toContain('const own = await coordinateBots({ botIds: [from.id], message, rework: true, thread: "new", reply: "resume", consult: false, title, projectId, inMyFolder: false, self: inherited });');
+    expect(index).toContain("self: true, report,");
+    // The tool passes report on and answers with where the result goes.
+    const call = source("server/drivers/agents-call.ts");
+    expect(call).toContain('if (!toBotId) body.report = args.report ?? "resume";');
+    expect(call).toContain('if (r.self === true && r.report === "resume") return { text: selfThreadOpenedText({ opened, title: threadTitle, threadId, botId: String(r.botId ?? BOT_ID), assignmentId: handoffIds(r)[0] ?? "" }) };');
+  });
+
   it("folds the New messages divider once it is on screen at the bottom", () => {
     const hook = source("src/hooks/use-unread-divider.ts");
     expect(hook).toContain("const onScreen = useDividerSeen(messageId, following, messages.length);");

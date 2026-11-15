@@ -3,6 +3,7 @@ import { randomUUID } from "node:crypto";
 
 import { composeEnvelope } from "./envelope.ts";
 import { assignmentLevel } from "./level.ts";
+import { ownOtherThreadRow } from "../suyuan/self-thread.ts";
 import type { RuntimeStore } from "./store.ts";
 import { answersSender, asking, awaited, childrenSince, settledSince, clip, continuations, CUT_TWICE, duration, isTerminal, loopStop, nextGuard, outwardDetail, ownsConversation, path, restartNote, wakeOwner } from "./tree.ts";
 import { DEFAULT_LIMITS, type Answerer, type Assignment, type Assignee, type Clock, type EndResult, type EnqueueRequest, type EnqueueResult, type EnvelopeNames,
@@ -192,7 +193,7 @@ export class Runtime {
     const lineage = parent ? path(this.store, parent) : [];
     const root = lineage[0];
     const target = req.assignee;
-    if (!answersSender(parent, mode, { botId: target.botId, ...target.destination }) && lineage.some(a => a.assignee.botId === target.botId &&
+    if (!answersSender(parent, mode, { botId: target.botId, ...target.destination }) && !ownOtherThreadRow(parent, { botId: target.botId, ...target.destination }) && lineage.some(a => a.assignee.botId === target.botId &&
       (!a.assignee.destination.groupId || !target.destination.groupId || a.assignee.destination.groupId === target.destination.groupId))) {
       return refuse("Cannot assign work back to an ancestor; results return automatically");
     }
