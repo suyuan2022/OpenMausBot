@@ -1,0 +1,10 @@
+/* suyuan fork: while the keyboard is up (keyboard-fit.ts) the app is the height it leaves, so iOS has nothing to push up.
+   The home indicator's inset is under the keyboard then, so the box sits right on it. */
+html[data-keyboard],
+html[data-keyboard] body,
+html[data-keyboard] #root {
+  height: var(--keyboard-room);
+}
+html[data-keyboard] #root {
+  padding-bottom: 0;
+}
