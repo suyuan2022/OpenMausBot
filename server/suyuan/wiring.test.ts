@@ -408,6 +408,8 @@ describe("the fork's hooks into upstream files", () => {
     const coordinator = source("server/runtime-coordinator.ts");
     expect(coordinator).toContain('import { ownOtherThreadRow } from "./suyuan/self-thread.ts";');
     expect(coordinator).toContain("const ownThread = ownOtherThreadRow(parent, target);");
+    // The same words to two threads of its own are two requests: upstream's duplicate check does not look at the thread.
+    expect(coordinator).toContain("&& c.brief === brief && c.mode === mode && (!ownThread || c.assignee.destination.threadId === target.threadId));");
     expect(coordinator).toContain("if (!answersSender(parent, mode, target) && !ownThread && lineage.some(n => ancestorOf(address(n), target))) throw new Error(ANCESTOR);");
     expect(coordinator).toContain('const waiting = mode === "notify" || target.groupId !== undefined || ownThread ? undefined : this.waitingOn(source.botId, target.botId);');
     expect(source("server/runtime/runtime.ts")).toContain("if (!answersSender(parent, mode, { botId: target.botId, ...target.destination }) && !ownOtherThreadRow(parent, { botId: target.botId, ...target.destination }) && lineage.some(");

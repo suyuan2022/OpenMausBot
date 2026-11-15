@@ -243,7 +243,7 @@ export class RuntimeCoordinator implements Coordinator {
     if (!answersSender(parent, mode, target) && !ownThread && lineage.some(n => ancestorOf(address(n), target))) throw new Error(ANCESTOR);
     if (this.stoppedFor(root, target.botId)) throw new Error(STOPPED_AGAIN);
     const siblings = this.store.children(parent.id);
-    const existing = siblings.findLast(c => c.assignee.botId === target.botId && c.assignee.destination.groupId === target.groupId && c.brief === brief && c.mode === mode);
+    const existing = siblings.findLast(c => c.assignee.botId === target.botId && c.assignee.destination.groupId === target.groupId && c.brief === brief && c.mode === mode && (!ownThread || c.assignee.destination.threadId === target.threadId));
     if (existing && !(rework && isTerminal(existing))) return { node: view(existing, parent), duplicate: true };
     const limited = this.handoffLimit?.refusal(target.botId, () => this.live().filter(a => a.parentId !== undefined).length);
     if (limited) throw new Error(limited);

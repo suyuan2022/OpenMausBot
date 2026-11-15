@@ -9,7 +9,7 @@
 // question for the person, work handed to a teammate, a wait, an open card).
 //
 // The sweep works from saved timestamps (the newest message of each thread), never from timers armed at turn end, so a
-// restart changes nothing. A message that later arrives in an archived thread brings it back: the turn that starts there
+// restart loses nothing; it only waits out its first hour, because who looked at what is not saved. A message that later arrives in an archived thread brings it back: the turn that starts there
 // clears the archive mark (reopenIdleArchived, called where server/index.ts clears closedBy).
 import type { TaskClosedBy, WireMessage } from "../../shared/wire.ts";
 import type { BotRecord, Message, Store, TaskRecord } from "../store.ts";
@@ -95,6 +95,9 @@ export interface IdleArchiveDeps {
   /** Something will still wake this thread without the person: a question it asked, work it handed on or was handed, a wait. */
   waiting(botId: string, threadId: string): boolean;
   now?(): number;
+  /** When the server came up. Who looked at what is kept in memory (thread-presence.ts), so for the first hour after a
+   * restart nobody knows whether the person had a thread open just before it: nothing is archived until then. */
+  startedAt?: number;
   env?: NodeJS.ProcessEnv;
   log?(line: string): void;
 }
@@ -105,6 +108,7 @@ export function idleArchiveHold(deps: IdleArchiveDeps, bot: Pick<BotRecord, "id"
   if (!botOpenedJob(task)) return "not a job a bot opened";
   if (task.archivedAt !== undefined) return "already archived";
   if (task.pinned === true) return "pinned";
+  if (deps.startedAt !== undefined && now - deps.startedAt < afterMs) return "the server has not been up long enough to know who looked";
   if (task.unread === true) return "the person has not read it";
   // The saved stamp first: most threads are settled here without reading their messages or asking who waits on what.
   if (now - Math.max(task.createdAt, task.updatedAt ?? 0) < afterMs) return "not idle long enough";
@@ -153,10 +157,11 @@ export function reopenIdleArchived(store: Pick<Store, "taskByThread" | "patchTas
 /** Starts the sweep: first a while after the server came up, then on an interval. Off entirely when the threshold is 0. */
 export function startIdleArchive(deps: IdleArchiveDeps): { stop(): void } {
   if (idleArchiveAfterMs(deps.env) <= 0) return { stop: () => undefined };
+  const live: IdleArchiveDeps = { ...deps, startedAt: deps.startedAt ?? (deps.now ?? Date.now)() };
   let interval: ReturnType<typeof setInterval> | undefined;
   const sweep = () => {
     try {
-      archiveIdleThreads(deps);
+      archiveIdleThreads(live);
     } catch (error) {
       deps.log?.(`idle archive: sweep failed: ${error instanceof Error ? error.message : String(error)}`);
     }

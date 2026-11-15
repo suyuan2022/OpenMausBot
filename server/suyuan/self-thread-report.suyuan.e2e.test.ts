@@ -259,6 +259,29 @@ it("S7 a message sent into a thread that was closed and archived brings it back,
   expect(f.told("C3")).toContain("K2-RESULT: notes extended.");
 }), hostTimeout(180_000));
 
+it("S9 the same words sent to two threads of its own in one turn reach both: each thread is its own request", () => scenario(async (f) => {
+  f.script(f.clive.id,
+    { key: "C0", match: ["S9-JOB"], steps: [
+      { tool: "start_thread", arguments: { title: "S9 A", message: "S9-A-CHILD: review A." } },
+      { tool: "start_thread", arguments: { title: "S9 B", message: "S9-B-CHILD: review B." } }], reply: "C0: opened two." },
+    { key: "KA", match: ["S9-A-CHILD", OWN], gateFile: f.gate("ka"), reply: "KA-RESULT: A is fine." },
+    { key: "KB", match: ["S9-B-CHILD", OWN], reply: "KB-RESULT: B is fine." },
+    { key: "M", match: ["S9-MORE", OWN], reply: "M-RESULT: went on." },
+    { key: "C2", match: ["M-RESULT"], reply: "C2: all done." });
+  await f.say(f.clive.id, f.job, "S9-JOB: review A and B, each in a thread of your own.");
+  await expect.poll(() => f.keys(f.clive.id), { timeout: 60_000 }).toContain("C0");
+  const [a, b] = [openedThread(f, "C0", 0), openedThread(f, "C0", 1)];
+  f.script(f.clive.id, { key: "C1", match: ["KA-RESULT", "KB-RESULT"], steps: [
+    { arguments: { bot_ids: [f.clive.id], message: "S9-MORE: go on.", thread: a } },
+    { arguments: { bot_ids: [f.clive.id], message: "S9-MORE: go on.", thread: b } }], reply: "C1: told both to go on." });
+  f.open("ka");
+  await expect.poll(() => [...f.keys(f.clive.id)].sort(), { timeout: 120_000 }).toEqual(["C0", "C1", "C2", "KA", "KB", "M", "M"]);
+  const receipts = f.stepTexts("C1").map((text: string) => JSON.parse(text).receipts[0]);
+  expect(receipts.map((receipt: any) => receipt.threadId).sort()).toEqual([a, b].sort());
+  expect(new Set(receipts.map((receipt: any) => receipt.requestId)).size, "two requests, not one answered twice").toBe(2);
+  expect(f.turns(f.clive.id).filter((turn: any) => turn.planKey === "M").map((turn: any) => turn.threadId).sort()).toEqual([a, b].sort());
+}), hostTimeout(180_000));
+
 // The hour is twelve seconds here, and the 55 idle minutes before a summary about seven (OMB_WARM_SUMMARY_TIME_SCALE), so a
 // thread that would be summarized is due well before it is archived. The fake's conversations are 110k tokens and up, past
 // the point where an idle one is summarized.

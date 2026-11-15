@@ -189,7 +189,14 @@ describe("the idle sweep", () => {
     const running = startIdleArchive(f.deps);
     vi.advanceTimersByTime(119_000);
     expect(f.task(f.self).archivedAt).toBeUndefined();
+    // The first sweep runs, 50 s after the server came up: who looked just before the restart is not known for the first
+    // "hour" (60 s here), so it archives nothing yet. The next one, past that, does.
+    f.later(50_000);
     vi.advanceTimersByTime(1_000);
+    expect(f.task(f.self).archivedAt).toBeUndefined();
+    expect(idleArchiveHold({ ...f.deps, startedAt: f.now() - 50_000 }, f.maus, f.task(f.self), f.now(), 60_000)).toBe("the server has not been up long enough to know who looked");
+    f.later(15_000);
+    vi.advanceTimersByTime(30_000);
     expect(f.task(f.self).archivedAt).toBeDefined();
     reopenIdleArchived(f.store, f.maus.id, f.self.threadId);
     f.store.setTaskClosedBy(f.maus.id, f.self.threadId, null);
