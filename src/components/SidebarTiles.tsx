@@ -18,7 +18,7 @@ import { openBotContextMenu, useVisibleMessages, type BotRowProps } from "./Side
 import { sidebarBotStatus } from "./SidebarBotActivity";
 import { SIMPLE_ROW_FOCUS } from "./SidebarSimpleTop";
 import { useBotUnread } from "./unread-notice";
-import { unreadTone, workingDotShown } from "@/suyuan/quiet-dots"; // suyuan fork: no dot on a working bot in Simple, unread is green
+import { unreadTone, workingDotShown } from "@/suyuan/quiet-dots"; import { waitingOnLine } from "@/suyuan/waiting-on"; // suyuan fork: no dot on a working bot in Simple, unread is green
 
 const RING = "ring-2 ring-[var(--tile)]";
 
@@ -35,7 +35,7 @@ export const SidebarBotTile = memo(function SidebarBotTile({ primary = false, dr
   const { unread, noticing } = useBotUnread(bot);
   const onLiveCall = liveBadgeFor(bot.id, liveMedia, liveCall);
   const tooltip = botTooltip(bot, instances);
-  const status = waiting ? t("sidebar.preview.waiting") : working ? t("chat.activity.working") : teammateWait ? t("sidebar.preview.waitingOnTeammate") : queued ? t("task.queued") : "";
+  const status = waiting ? t("sidebar.preview.waiting") : working ? t("chat.activity.working") : teammateWait ? waitingOnLine(bot) : queued ? t("task.queued") : "";
   const label = [bot.name, bot.chiefOfStaff ? t("sidebar.bot.chiefOfStaff") : "", onLiveCall ? t("call.live.badge") : "", status, unread ? t("task.unread") : ""].filter(Boolean).join(" · ");
   const reorder = pinnedCircleDragHandlers(bot.id, { drag, dragging, prevId, nextId });
   const open = () => openBotRow(dispatch, bot, showThreads, selected);
@@ -107,7 +107,7 @@ export const SidebarBotTile = memo(function SidebarBotTile({ primary = false, dr
         ) : unread ? dot("unread-dot", unreadTone())
           : null}
         {working ? (workingDotShown() ? corner("working-dot", "bg-success") : null)
-          : teammateWait ? corner("teammate-wait-dot", "bg-accent")
+          : teammateWait ? null // suyuan fork: its line says whose answer it waits for (src/suyuan/waiting-on.ts)
           : queued && !waiting ? corner("queued-dot", "bg-ink-tertiary")
           : null}
         {deleting && (

@@ -72,9 +72,7 @@ describe("BotListItem", () => {
     expect(icons).not.toContain("size-2.5");
 
     const teammate = renderRow(bot({ waitingForTeammates: true }));
-    const teammateDot = opening(teammate, "teammate-wait-dot");
-    expect(teammateDot).toContain("size-2.5");
-    expect(teammateDot).not.toContain("size-4");
+    expect(teammate).not.toContain('data-testid="teammate-wait-dot"'); // suyuan fork: the line says it, no dot (src/suyuan/waiting-on.ts)
     expect(teammate).toContain('class="truncate">Waiting on a teammate…</span>');
     expect(teammate).toContain("truncate text-[13px] leading-[18px] text-ink-secondary");
     expect(teammate).not.toContain("font-semibold text-warning");
@@ -347,7 +345,7 @@ describe("BotListItem", () => {
 
   it("marks an idle bot waiting on a teammate with a quiet dot, never the work signals", () => {
     const markup = renderRow(bot({ waitingForTeammates: true, busy: false, activity: "idle" }));
-    expect(markup).toContain('data-testid="teammate-wait-dot"');
+    expect(markup).not.toContain('data-testid="teammate-wait-dot"'); // suyuan fork: the line says it, no dot (src/suyuan/waiting-on.ts)
     expect(markup).not.toContain('data-testid="working-dot"');
     expect(markup).not.toContain("animate-status-pulse");
     expect(markup).toContain("Waiting on a teammate…");

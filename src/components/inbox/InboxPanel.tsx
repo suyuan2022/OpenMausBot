@@ -10,8 +10,8 @@ import { InboxActive } from "./InboxActive";
 import { InboxReading } from "./InboxReading";
 import { InboxRowItem } from "./InboxRow";
 import { matchesSearch, nextAfter } from "./inbox-answer";
-import { listedRows, waitingCount } from "./inbox-view";
-import { useInboxActions } from "./use-inbox-actions";
+import { waitingCount } from "./inbox-view";
+import { useInboxActions } from "./use-inbox-actions"; import { useUnreadRows } from "@/suyuan/inbox-unread"; // suyuan fork: read news leaves the list
 
 const BAR_BUTTON = "flex size-7 shrink-0 items-center justify-center rounded-md text-ink-secondary hover:bg-raised hover:text-ink pointer-coarse:size-9";
 
@@ -34,7 +34,8 @@ export function InboxPanel() {
   };
   const reading = panel.reading ? view?.rows.find((row) => row.id === panel.reading) : undefined;
   const open = (row: InboxRow) => { readInboxRow(row); readInboxLine(row.id); };
-  const rows = listedRows(view).filter((row) => matchesSearch(row, query));
+  const listed = useUnreadRows(view);
+  const rows = listed.filter((row) => matchesSearch(row, query));
   const ids = rows.map((row) => row.id);
   const at = reading ? ids.indexOf(reading.id) : -1;
 
@@ -91,7 +92,7 @@ export function InboxPanel() {
               </label>
               <div role="list" data-inbox-list aria-label={t("inbox.panel.title")} className="space-y-0.5 px-1.5 pb-1.5">
                 {rows.length === 0
-                  ? <p className="px-4 py-8 text-center text-[13px] text-ink-secondary">{t(query.trim() && listedRows(view).length ? "inbox.noMatch" : "inbox.empty")}</p>
+                  ? <p className="px-4 py-8 text-center text-[13px] text-ink-secondary">{t(query.trim() && listed.length ? "inbox.noMatch" : "inbox.empty")}</p>
                   : rows.map((row) => <InboxRowItem key={row.id} row={row} now={now} onOpen={open} onAction={run} />)}
               </div>
               {!query.trim() && <InboxActive view={view} />}

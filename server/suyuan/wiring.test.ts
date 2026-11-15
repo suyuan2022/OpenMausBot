@@ -299,7 +299,7 @@ describe("the fork's hooks into upstream files", () => {
     const sidebar = source("src/components/Sidebar.tsx");
     expect(sidebar).toContain('import { QuietRowLine, quietRow } from "@/suyuan/quiet-row";');
     expect(sidebar).toContain("{working && !quietRow(simpleRow) ? (\n                <SidebarWorkingStep bot={bot} last={last} />");
-    expect(sidebar).toContain("{quietRow(simpleRow) ? <QuietRowLine bot={bot} visible={visible} instances={instances} waiting={waiting} /> : waiting ?");
+    expect(sidebar).toContain("{quietRow(simpleRow) ? (teammateWait ? waitingOnLine(bot) : <QuietRowLine bot={bot} visible={visible} instances={instances} waiting={waiting} />) : waiting ?");
     expect(chat).toContain('import { quietChat } from "@/suyuan/quiet-english";');
     expect(chat).toContain("messages = useMemo(() => quietChat(visibleMessages({ messages: allMessages, activeLeafId }), advanced, turnRuns)");
     // No other conversation is offered: a bot's and a room's ⋯ menu list no threads and start none, the bot's menu has no
@@ -373,5 +373,27 @@ describe("the fork's hooks into upstream files", () => {
     expect(source("src/components/SidebarRowMarkers.tsx")).toContain('waiting ? "bg-warning" : unreadTone())');
     expect(source("src/components/SidebarTiles.tsx")).toContain('unread ? dot("unread-dot", unreadTone())');
     expect(source("src/components/SidebarTiles.tsx")).toContain('working ? (workingDotShown() ? corner("working-dot", "bg-success") : null)');
+  });
+
+  it("keeps the inbox to what waits on the person: no work dot, read news gone, background runs read with their conversation", () => {
+    const sidebar = source("src/components/Sidebar.tsx");
+    expect(sidebar).toContain("running={false /* suyuan fork: the inbox lights only for what waits on the person */}");
+    expect(sidebar).not.toContain('data-testid="teammate-wait-dot"');
+    expect(sidebar).toContain(': queued && !waiting && !teammateWait ? "queued" : null} />}');
+    expect(sidebar).toContain("teammateWait ? ` · ${waitingOnLine(bot)}`");
+    const tiles = source("src/components/SidebarTiles.tsx");
+    expect(tiles).toContain("teammateWait ? waitingOnLine(bot)");
+    expect(tiles).toContain(": teammateWait ? null // suyuan fork");
+    expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("noteBotNames(state.bots);");
+    expect(functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan")).toContain("useInboxCatchUp(inboxCatchUpKey(state), loaded);");
+    const panel = source("src/components/inbox/InboxPanel.tsx");
+    expect(panel).toContain("const listed = useUnreadRows(view);");
+    expect(panel).toContain("const rows = listed.filter((row) => matchesSearch(row, query));");
+    expect(source("server/host/place-inbox.ts")).toContain("if (!line.seen && (line.threadId === threadId || deps.readsWith?.(line.threadId, threadId)) && lineFor(auth, line))");
+    const index = source("server/index.ts");
+    expect(index).toContain("createPlaceInbox({ dataDir: DATA_DIR, readsWith: (lineThread, opened) => suyuanReadsWith(store, lineThread, opened, (id) => delegatorOf(id)?.threadId ?? null),");
+    expect(index).toContain("...(awaiting.has(task.threadId) && !task.busy ? waitingOnWire(teammatesAwaited(task.threadId)) : {})");
+    expect(index).toContain("...(awaiting.has(bot.threadId) && !threadBusy(bot.id, bot.threadId) ? waitingOnWire(teammatesAwaited(bot.threadId)) : {})");
+    expect(index).toContain("teammatesAwaited = (threadId) => coordinator.outstandingDirect(threadId).map((handoff) => handoff.botId);");
   });
 });

@@ -16,7 +16,7 @@ import { cn } from "@/lib/cn";
 import { searchMatchesThreads, useSearchDisclosure } from "@/lib/search-disclosure";
 import { useHeldMenuMotion, useMenuMotion } from "./MenuMotion";
 import { lastNonReceipt } from "@/lib/receipts";
-import { botPreview, groupPreview } from "./sidebar-preview"; import { QuietRowLine, quietRow } from "@/suyuan/quiet-row"; import { workingDotShown } from "@/suyuan/quiet-dots"; // suyuan fork: a simple row quotes its own conversation, never narrates
+import { botPreview, groupPreview } from "./sidebar-preview"; import { QuietRowLine, quietRow } from "@/suyuan/quiet-row"; import { workingDotShown } from "@/suyuan/quiet-dots"; import { waitingOnLine } from "@/suyuan/waiting-on"; // suyuan fork: a simple row quotes its own conversation, never narrates
 import { activeLocale, t } from "@/lib/i18n";
 import { copyText } from "@/lib/copy-text";
 import type { LocaleKey } from "@/locales";
@@ -86,7 +86,7 @@ import { isSidebarToggle } from "@/lib/keyboard-shortcuts";
 import { SidebarRailSeparator, SimpleRailFooter } from "./SidebarSimpleRail";
 import { useShowThreads } from "@/lib/thread-preferences";
 import { useBotUnread } from "./unread-notice";
-import { attentionHasRunningWork, attentionJumpAction, attentionUnpinAction, crossBotAttentionThreads, crossBotPinnedThreads, runningRoutineRun, SidebarBotActivity, sidebarBotActivityTasks, sidebarBotStatus } from "./SidebarBotActivity";
+import { attentionJumpAction, attentionUnpinAction, crossBotAttentionThreads, crossBotPinnedThreads, runningRoutineRun, SidebarBotActivity, sidebarBotActivityTasks, sidebarBotStatus } from "./SidebarBotActivity";
 import { SidebarNoBots, SidebarTileGrid } from "./SidebarTiles";
 import { BotContextMenu } from "./SidebarBotMenu";
 export { BotContextMenu };
@@ -743,7 +743,7 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
         />
         {/* Bottom-left, clear of the status dots on the right and of the row's hover actions. */}
         {(iconOnly || !simpleList) && <BotModelBadge bot={bot} instances={instances} avatarSize={avatarSize} />}
-        {simpleRow && <AvatarActivityDot activity={working ? (workingDotShown() ? "working" : null) : teammateWait ? "teammate" : queued && !waiting ? "queued" : null} />}
+        {simpleRow && <AvatarActivityDot activity={working ? (workingDotShown() ? "working" : null) : queued && !waiting && !teammateWait ? "queued" : null} />}
         {!simpleRow && working && (
           <span
             data-testid="working-dot"
@@ -755,8 +755,6 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
         )}
         {!simpleRow && waiting && <span data-testid="waiting-dot" role="status" aria-label={t("sidebar.preview.waiting")} title={t("sidebar.preview.waiting")}
           className={cn("absolute -right-0.5 -bottom-0.5 flex items-center justify-center overflow-hidden rounded-full border-2 border-panel bg-warning font-black text-panel", iconOnly ? "size-5 text-[14px]" : "size-4 text-[12px]")}><span aria-hidden="true">!</span></span>}
-        {!simpleRow && teammateWait && <span data-testid="teammate-wait-dot" role="status" aria-label={t("sidebar.preview.waitingOnTeammate")} title={t("sidebar.preview.waitingOnTeammate")}
-          className={cn("absolute -right-0.5 -bottom-0.5 rounded-full border-2 border-panel bg-accent", iconOnly ? "size-3" : "size-2.5")} />}
         {!simpleRow && !teammateWait && !waiting && !working && queued && <span data-testid="queued-dot" role="status" aria-label={t("task.queued")} title={t("task.queued")}
           className={cn("absolute -right-0.5 -bottom-0.5 rounded-full border-2 border-panel bg-ink-secondary", iconOnly ? "size-3" : "size-2.5")} />}
         {bot.chiefOfStaff && (iconOnly || simpleRow) && (
@@ -831,7 +829,7 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
               {working && !quietRow(simpleRow) ? (
                 <SidebarWorkingStep bot={bot} last={last} />
               ) : (
-                <span dir="auto" className="truncate">{quietRow(simpleRow) ? <QuietRowLine bot={bot} visible={visible} instances={instances} waiting={waiting} /> : waiting ? t("sidebar.preview.waiting") : teammateWait ? t("sidebar.preview.waitingOnTeammate") : queued ? t("task.queued") : botPreview(bot, visible, instances, advanced)}</span>
+                <span dir="auto" className="truncate">{quietRow(simpleRow) ? (teammateWait ? waitingOnLine(bot) : <QuietRowLine bot={bot} visible={visible} instances={instances} waiting={waiting} />) : waiting ? t("sidebar.preview.waiting") : teammateWait ? waitingOnLine(bot) : queued ? t("task.queued") : botPreview(bot, visible, instances, advanced)}</span>
               )}
             </span>
           )}
@@ -865,7 +863,7 @@ export const BotListItem = memo(function BotListItem(props: BotRowProps) {
           !renaming && iconOnly
             ? deleting
               ? t("sidebar.bot.deletingAria", { name: bot.name })
-              : `${bot.name}${bot.title?.trim() ? ` · ${bot.title.trim()}` : ""}${bot.chiefOfStaff ? ` · ${t("sidebar.bot.chiefOfStaff")}` : ""}${onLiveCall ? ` · ${t("call.live.badge")}` : ""}${waiting ? ` · ${t("sidebar.preview.waiting")}` : working ? ` · ${t("chat.activity.working")}` : teammateWait ? ` · ${t("sidebar.preview.waitingOnTeammate")}` : queued ? ` · ${t("task.queued")}` : ""}${unread ? ` · ${t("task.unread")}` : ""}`
+              : `${bot.name}${bot.title?.trim() ? ` · ${bot.title.trim()}` : ""}${bot.chiefOfStaff ? ` · ${t("sidebar.bot.chiefOfStaff")}` : ""}${onLiveCall ? ` · ${t("call.live.badge")}` : ""}${waiting ? ` · ${t("sidebar.preview.waiting")}` : working ? ` · ${t("chat.activity.working")}` : teammateWait ? ` · ${waitingOnLine(bot)}` : queued ? ` · ${t("task.queued")}` : ""}${unread ? ` · ${t("task.unread")}` : ""}`
             : undefined
         }
         aria-busy={deleting || undefined} aria-keyshortcuts={drag ? "Alt+ArrowUp Alt+ArrowDown" : undefined}
@@ -1326,7 +1324,7 @@ export function Sidebar({ open, onClose, collapseToIcons = false }: {
           />
         </div>
       </div>}
-      {!q && !phone && <SidebarInboxRow icons={density === "icons"} large={!advanced} running={attentionHasRunningWork(attention)} onOpened={phone ? onClose : undefined} />}
+      {!q && !phone && <SidebarInboxRow icons={density === "icons"} large={!advanced} running={false /* suyuan fork: the inbox lights only for what waits on the person */} onOpened={phone ? onClose : undefined} />}
       {universalPins && pinnedBots.length > 0 && !tiled && (
         <div
           data-sidebar-universal-pins=""
