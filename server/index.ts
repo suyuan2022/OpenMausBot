@@ -590,11 +590,11 @@ import { createBotSettingsRoutes } from "./routes/bot-settings.ts";
 import { createBotPatchRoutes } from "./routes/bot-patch.ts";
 import { createBotOrderRoutes } from "./routes/bot-order.ts";
 import { createBotLifecycleRoutes } from "./routes/bot-lifecycle.ts";
-import { createBotSkillsRoutes } from "./routes/bot-skills.ts"; import { noteTurnVolatile, volatileHookReply } from "./suyuan/compact-volatile.ts"; import { deliverPlainReminder } from "./suyuan/plain-reminder.ts"; import { takeRunWith, type RunWithDeps } from "./suyuan/run-with.ts"; import { commandChecks } from "./suyuan/check-first.ts"; // suyuan fork
+import { createBotSkillsRoutes } from "./routes/bot-skills.ts"; import { noteTurnVolatile, volatileHookReply } from "./suyuan/compact-volatile.ts"; import { deliverPlainReminder } from "./suyuan/plain-reminder.ts"; import { takeRunWith, type RunWithDeps } from "./suyuan/run-with.ts"; import { commandChecks } from "./suyuan/check-first.ts"; import { reopenIdleArchived, startIdleArchive, unattendedBotJob } from "./suyuan/idle-archive.ts"; // suyuan fork
 import { createSkillShareRoutes } from "./routes/skill-share.ts";
 import { createTeamContextRoutes } from "./routes/team-context.ts";
 import { createDeciderRoutes } from "./routes/decider.ts"; import { createCloudSendRoutes } from "./routes/cloud-send.ts"; import { claudeCodeSkillInputs } from "./setup-import.ts"; import { createCloudConnectionsHost } from "./cloud-connections-host.ts";
-import { createUpdateCheckRoutes, serverUpdateChecker } from "./routes/update-check.ts"; import { createTimeZoneRoutes } from "./routes/time-zone.ts"; import { relayGate } from "./suyuan/relay-gate.ts"; import { suyuanFrame } from "./suyuan/register.ts"; import { homeThread, isHome } from "./suyuan/home.ts"; import { engineCompactsItself } from "./suyuan/native-compact.ts"; import { roomRoutingReady, routedText, withRoomRouter, withRoomRouterStatus } from "./suyuan/room-router.ts"; import { readsWith as suyuanReadsWith, waitingOnWire } from "./suyuan/inbox-read.ts"; // suyuan fork
+import { createUpdateCheckRoutes, serverUpdateChecker } from "./routes/update-check.ts"; import { createTimeZoneRoutes } from "./routes/time-zone.ts"; import { relayGate } from "./suyuan/relay-gate.ts"; import { suyuanFrame } from "./suyuan/register.ts"; import { homeThread, isHome } from "./suyuan/home.ts"; import { engineCompactsItself } from "./suyuan/native-compact.ts"; import { roomRoutingReady, routedText, withRoomRouter, withRoomRouterStatus } from "./suyuan/room-router.ts"; import { readsWith as suyuanReadsWith, waitingOnWire } from "./suyuan/inbox-read.ts"; import { watchConfigFile } from "./suyuan/config-reload-host.ts"; // suyuan fork
 import { createBrowserSiteRoutes } from "./routes/browser-sites.ts";
 import { createInternalSignInRoutes } from "./routes/sign-in.ts";
 import { createInternalMcpRoutes } from "./routes/internal-mcp.ts";
@@ -640,7 +640,7 @@ import { personKey, relayedPersonKey } from "./person-key.ts";
 import { createOutsideLineage, OUTSIDE_STAYS_HERE } from "./host/outside-lineage.ts"; import { OUTSIDE_REFUSAL, outsideRouteRefused } from "./host/outside-fence.ts"; import { createOutsideWrites } from "./host/outside-writes.ts";
 import { teamAiOwner } from "./host/team-ai-owner.ts"; import { createTeamOwners, type AskViewer } from "./host/team-owners.ts"; import { createTeamMessages } from "./host/team-messages.ts"; import { createPlaceInbox, guestNameIn, placeInboxViewer } from "./host/place-inbox.ts"; import { relayedTurn } from "./host/relayed-turn.ts"; import { createPersonCalendar } from "./host/person-calendar.ts";
 import { createDevsReports } from "./host/devs-reports.ts"; import { bugReportEndpoint, devsReportSender, devsStatusAsker } from "./devs-report-send.ts"; import { captureRecentLog } from "./recent-log.ts"; import { createShareAnswer } from "./host/share-answer.ts";
-import { createCardRequester, linePersonKey } from "./host/thread-person.ts"; import { selfThreadRefusal } from "./host/self-threads.ts"; import { lookedAfterBy } from "./host/looked-after.ts"; import { createActingPeople, HANDED_PEOPLE_FILE, HandedPeople, type HandedRun, keptPrivate, privateHandBack, withPerson } from "./host/acting-person.ts";
+import { createCardRequester, linePersonKey } from "./host/thread-person.ts"; import { selfThreadRefusal } from "./host/self-threads.ts"; import { handedTurn, ownThreadRow, reopenOwnThread, SELF_BRIEF_MAX, selfBriefTooLong, selfTargetRefusal, type SelfThreadOpening } from "./suyuan/self-thread.ts"; import { lookedAfterBy } from "./host/looked-after.ts"; import { createActingPeople, HANDED_PEOPLE_FILE, HandedPeople, type HandedRun, keptPrivate, privateHandBack, withPerson } from "./host/acting-person.ts";
 import { createThreadRoutes } from "./routes/threads.ts";
 import { createWebhookRoutes } from "./routes/webhooks.ts";
 import { withScopeHint } from "./connector-scope-hint.ts";
@@ -5253,7 +5253,7 @@ const warmSummaries = createWarmSummaryHost({ store, instance: (id) => registry.
   fold: async ({ botId, threadId, instanceId }, idle) => { const bot = store.projectBotForTask(botId, threadId), model = store.taskByThread(botId, threadId)?.lastContextModel, instance = registry.get(instanceId), before = latestCompaction(store.activePath(threadId))?.id;
     if (bot && instance && model?.startsWith(`${instanceId}:`)) await compactConversation({ bot, threadId, generation: `idle:${randomUUID()}`, instance, model: model.slice(instanceId.length + 1), excludedIds: new Set(), manual: false, idle });
     return latestCompaction(store.activePath(threadId))?.id !== before; } });
-onThreadSeen((threadId) => warmSummaries.sawThread(threadId));
+onThreadSeen((threadId) => warmSummaries.sawThread(threadId)); startIdleArchive({ store, busy: (botId, threadId) => threadBusy(botId, threadId) || queuedThreadPosition(botId, threadId) !== null || hasQueuedSteeredMessages(botId, threadId), waiting: (botId, threadId) => coordinator.awaitingAnswer(threadId) || Boolean(coordinator.parkedDirect(threadId)) || coordinator.activeDirect(threadId) || coordinator.awaitingTeammateThreads().has(threadId) || botWaits.all().some((wait) => wait.botId === botId && wait.threadId === threadId), log: (line) => console.info(line) }); // suyuan fork
 onConfigSaved((before, after) => {
   if (JSON.stringify(before.cacheKeepWarm ?? null) !== JSON.stringify(after.cacheKeepWarm ?? null)) setImmediate(() => cacheKeepWarm.refresh());
 });
@@ -5273,7 +5273,7 @@ bus.subscribe((event: RuntimeEvent) => {
       keepWarmTargets.delete(event.threadId);
       keepWarmContext.delete(event.threadId);
       if (!target || routines?.runForThread(event.threadId)) return;
-      cacheKeepWarm.noteTurnCompleted(target, { ok: event.ok, stopReason: event.stopReason, contextTokens }); warmSummaries.turnCompleted(target, { ok: event.ok, contextTokens });
+      cacheKeepWarm.noteTurnCompleted(target, { ok: event.ok, stopReason: event.stopReason, contextTokens }); if (!unattendedBotJob(store, target.botId, target.threadId)) warmSummaries.turnCompleted(target, { ok: event.ok, contextTokens });
     }
   } catch (error) {
     console.warn(`cache keep-warm: ${(error as Error).message}`);
@@ -7782,7 +7782,7 @@ async function beginTurn(
   store.setTaskActivity(bot.id, threadId, "working");
   // Watch from admission, not dispatch: a turn can wedge in setup long before any provider event exists.
   watchdog.watch(threadId, bot.id);
-  store.setTaskClosedBy(bot.id, threadId, null);
+  reopenIdleArchived(store, bot.id, threadId); store.setTaskClosedBy(bot.id, threadId, null);
   // Only a person's turn clears unread: the fold never re-marks an internal turn.
   if (commsDepth === 0) store.patchTask(bot.id, threadId, { unread: false });
   turnUsage.delete(threadId);
@@ -12071,7 +12071,7 @@ async function reloadProviders(before: Record<string, unknown>) {
 // Config writes replace the engines they change. Single-flight, so two settings requests cannot drop each other's changes.
 let providerConfigBusy = false;
 const providerInstancesChanging = new Set<string>();
-let mcpConfigBusy = false;
+let mcpConfigBusy = false; if (!hostedModels) watchConfigFile({ cfg, engines: () => engineLaunches(providerConfigs()), working: () => store.bots.some((bot) => botHasActiveTurn(bot.id)) || store.groups.some(groupIsWorking) || Boolean(routines?.hasActiveRuns()), reloadEngines: reloadProviders, settings: { get: () => providerConfigBusy, set: (busy) => { providerConfigBusy = busy; } }, changed: (keys) => { registry.forgetSnapshots(); if (keys.includes("signIn")) { sessions.membershipChanged(); sessions.revalidateEmailSessions(); } if (keys.includes("cacheKeepWarm")) cacheKeepWarm.refresh(); broadcast({ kind: "config", ...configStatus() }); if (keys.includes("threads")) drainQueuedSends(); } });
 
 const workspaceBackupAccess = {
   authorized: (req: IncomingMessage, original: RequestAuth) => {
@@ -13726,7 +13726,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         });
       }
       const EXTERNAL = internalCapability.generation === EXTERNAL_RUNTIME_GENERATION;
-      const coordinateBots = async (call: CoordinateBotsCall): Promise<{ status: number; body: Record<string, unknown> }> => {
+      const coordinateBots = async (call: CoordinateBotsCall & { self?: SelfThreadOpening }): Promise<{ status: number; body: Record<string, unknown> }> => {
         const refuse = (status: number, error: string, more: Record<string, unknown> = {}) => ({ status, body: { error, ...more } });
         const source = store.groupByThread(internalCapability.threadId);
         if (source && (source.dm || !source.memberIds.includes(internalSender.id))) {
@@ -13755,20 +13755,20 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         if (folder.error) return refuse(400, folder.error);
         if (fresh && !EXTERNAL && internalCapability.openedThreads >= MAX_THREADS_OPENED_PER_TURN) {
           return refuse(429, `You have already opened ${MAX_THREADS_OPENED_PER_TURN} threads this turn, which is the limit. Do not retry — finish your turn and tell the person which threads you still wanted to open, so they can open them or ask you again.`);
-        }
+        } const ownTargetRefusal = (sent: typeof call) => { const back = sent.reply === "none" ? coordinator.answersTo(internalCapability.roomHandoffId ?? internalCapability.generation) : undefined; return selfTargetRefusal({ opening: Boolean(sent.self), answers: Boolean(sent.answers), answeringBack: back?.botId === internalSender.id && back.threadId === sent.thread, consult: sent.consult, thread: sent.thread, botId: internalSender.id, fromThreadId: address.threadId, handoff: handedTurn(internalCapability.roomHandoffId, (id) => coordinator.node(id)), requestLine: store.activePath(address.threadId).findLast((line) => line.role === "user" && line.kind === "text"), task: store.taskByThread(internalSender.id, sent.thread) }); };
         for (const target of targets) {
             // Echo only the id the caller sent, never a bot's name.
           const addressed = store.bot(target.botId);
           const eligibility =
-            target.botId === internalSender.id ? "Choose a teammate, not yourself"
+            target.botId === internalSender.id && target.groupId ? "Choose a teammate, not yourself" : target.botId === internalSender.id && ownTargetRefusal(call) ? ownTargetRefusal(call)
             : !addressed ? `No bot with id "${target.botId}" — call list_bots and copy the exact id from the result`
             : addressed.hidden ? `The bot with id "${target.botId}" is no longer available — call list_bots for the ones you can reach`
             : roomHandoffProblem(target, address);
           if (eligibility) return refuse(403, eligibility);
         }
         let approvalGranted = false;
-        if (peerReviewRequired(internalSender, address.threadId)) {
-          const verdicts = await Promise.all(targets.map(target =>
+        if (peerReviewRequired(internalSender, address.threadId) && targets.some(target => target.botId !== internalSender.id)) {
+          const verdicts = await Promise.all(targets.map(target => target.botId === internalSender.id ? "allow" as const :
             requestPeerApproval(approvalBus, internalSender, store.bot(target.botId)!, call.message, call.consult ? "ask_bot" : "delegate_bot", address.threadId)));
           requireActiveInternalCapability();
           const blocked = verdicts.flatMap((verdict, index) => verdict === "allow" ? []
@@ -13805,7 +13805,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
             const opener = (room ? null : handOnFor) ?? openerFrom(address.threadId);
             // A Chief answers, for the person, the question a teammate it manages waits on in a thread the Chief did not open.
             const forPerson = EXTERNAL || room || fresh || call.answers || mode !== "work" || call.thread === "standing" || !teammatePrompts.actsForPerson(internalSender, internalCapability.threadId) || !canManage(internalSender, recipient) || !threadReadableFrom(internalCapability.threadId)(call.thread) || !asksActingPerson(internalCapability.threadId, store.groupByThread(internalCapability.threadId) ? internalCapability.generation : undefined)(call.thread, recipient.id) ? undefined : await questionRouting.answerForPerson({ sender: internalSender, senderThreadId: address.threadId, target: recipient, threadId: call.thread, message: call.message });
-            if (forPerson) { if (forPerson.outcome === "failed") refused.push(forPerson.detail); else answeredForPerson.add(forPerson); receipts.push(forPerson); continue; }
+            if (forPerson) { if (forPerson.outcome === "failed") refused.push(forPerson.detail); else answeredForPerson.add(forPerson); receipts.push(forPerson); continue; } if (!room && !fresh) reopenOwnThread(store, target.botId, call.thread, internalSender.id);
             const continued = room || fresh ? undefined : workThreadFor(store, { botId: target.botId, botName: recipient.name, fromBotId: internalSender.id, fromThreadId: address.threadId, thread: call.thread, notice: mode === "notify",
               answering: coordinator.answersTo(internalCapability.roomHandoffId ?? generation), also: (task) => !CLOUD_TEAM || threadStarters.get(task.threadId) === opener, reach: (task) => outsideLineage.mayReach(address.threadId, task.threadId), others: EXTERNAL ? undefined : relayGate({ personBehind: teammatePrompts.personBehind, outside: outsideLineage.handsNoLevel, readableFrom: threadReadableFrom, openPersonCard }, internalSender.id, internalCapability.threadId), home: (task) => isHome(store, target.botId, task.threadId) });
             const relayed = EXTERNAL || (!call.answers && (room || fresh || mode === "consult")) ? undefined : await questionRouting.relay({ sender: internalSender, senderThreadId: address.threadId,
@@ -13819,7 +13819,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
             if (!room) {
               const opened = { botId: internalSender.id, name: internalSender.name, threadId: address.threadId, at: Date.now() };
               const task = continued ?? (fresh
-                ? store.createTask(target.botId, call.title ?? (call.message.replace(/\s+/g, " ").trim().slice(0, 60) || `From ${internalSender.name}`), false, call.projectId, opened, undefined, undefined, folder.cwd)
+                ? store.createTask(target.botId, call.title ?? (call.message.replace(/\s+/g, " ").trim().slice(0, 60) || `From ${internalSender.name}`), false, call.projectId, opened, call.self?.approvalMode, call.self?.modelSelection, folder.cwd)
                 : store.createTask(target.botId, `@${internalSender.name} · work`, false, undefined, { ...opened, kind: "work" }, undefined, undefined, folder.cwd));
               if (!task) throw new Error("The recipient no longer exists");
               target.threadId = task.threadId;
@@ -13829,7 +13829,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
             const routed = lane ? { botId: target.botId, threadId: lane.threadId } : target;
             outsideLineage.carry(address.threadId, routed.threadId);
             const { node, duplicate } = coordinator.enqueue(address, generation, internalCapability.roomHandoffId, routed, call.message, {
-              mode, reply, thread: lane || fresh ? "new" : "standing", approvalGranted, rework: call.rework, ...(lane ? {} : { requestBatchKey }),
+              mode, reply, thread: lane || fresh ? "new" : "standing", approvalGranted, rework: call.rework || target.botId === internalSender.id, ...(lane ? {} : { requestBatchKey }),
               ...(call.doneWhen ? { doneWhen: call.doneWhen } : {}),
             });
             usageTrace.link(node.id, node.parentId, { threadId: internalCapability.threadId, turnId: liveTurnByThread.get(internalCapability.threadId) ?? "" }); if (!duplicate) actingPeople.handOn(internalCapability, node);
@@ -13862,7 +13862,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
             }));
             if (!duplicate) {
               if (!EXTERNAL) delegatedThisTurn(node.id);
-              store.appendMessage(address.threadId, sentRow({ sender: internalSender, recipient, threadId: node.threadId, room: addressedRoom, via, language: threadLanguage(address.threadId),
+              store.appendMessage(address.threadId, ownThreadRow({ sender: internalSender, recipient, threadId: node.threadId, title: store.taskByThread(recipient.id, node.threadId)?.title, opening: Boolean(call.self), inRoom: Boolean(source), line: (key, vars) => serverLine(threadLanguage(address.threadId), key, vars) }) ?? sentRow({ sender: internalSender, recipient, threadId: node.threadId, room: addressedRoom, via, language: threadLanguage(address.threadId),
                 reason: call.reason, doneWhen: call.doneWhen ? redactSecretsInText(call.doneWhen) : undefined, title: store.taskByThread(recipient.id, node.threadId)?.title }));
             }
           } catch (error) {
@@ -14167,8 +14167,8 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         }
         const sourceTitle = owner.group ? owner.group.name : (store.taskByThread(from.id, fromThreadId)?.title ?? "");
         const picked = body.modelSelection === undefined ? null : checkedModelSelection(body.modelSelection, undefined, true); const refused = !picked ? null : target.id !== from.id ? "model_selection is only for threads on yourself" : !picked.ok ? picked.error : validateModelProposal(picked.selection, from); if (refused) return json(res, 400, { error: refused });
-        if (target.id === from.id) { const selfRefused = selfThreadRefusal({ handoff: Boolean(internalCapability.roomHandoffId), requestLine: store.activePath(fromThreadId).findLast((line) => line.role === "user" && line.kind === "text") }); if (selfRefused) return json(res, 409, { error: selfRefused });
-          const inherited = picked?.ok ? { modelSelection: picked.selection, approvalMode: undefined } : parentThreadModel(from.id, fromThreadId);
+        if (target.id === from.id) { const selfRefused = selfThreadRefusal({ handoff: handedTurn(internalCapability.roomHandoffId, (id) => coordinator.node(id)), requestLine: store.activePath(fromThreadId).findLast((line) => line.role === "user" && line.kind === "text") }); if (selfRefused) return json(res, 409, { error: selfRefused });
+          const inherited = picked?.ok ? { modelSelection: picked.selection, approvalMode: undefined } : parentThreadModel(from.id, fromThreadId); /* suyuan fork: with report "resume", which the start_thread tool sends unless the bot says "none", a thread on yourself is work in the runtime like a teammate's, so its result returns here (self-thread.ts). Without it, upstream's path below. */ const report = body.report === undefined ? "none" : body.report; if (report !== "resume" && report !== "none") return json(res, 400, { error: "report is resume or none" }); if (report === "resume") { if (message.length > SELF_BRIEF_MAX) return json(res, 400, { error: selfBriefTooLong(message.length) }); const own = await coordinateBots({ botIds: [from.id], message, rework: true, thread: "new", reply: "resume", consult: false, title, projectId, inMyFolder: false, self: inherited }); const receipt = (own.body.receipts as Array<{ threadId?: string }> | undefined)?.[0]; return json(res, own.status, { ...own.body, self: true, report, botId: from.id, botName: from.name, title, ...(receipt?.threadId ? { threadId: receipt.threadId } : {}), limit: maxConcurrentBotThreads(cfg, botThreadsHost(cloudPlanTier.starter())) }); }
           const task = store.createTask(from.id, title, false, projectId, { botId: from.id, name: from.name, at: Date.now() }, inherited.approvalMode, inherited.modelSelection);
           if (!task) return json(res, 500, { error: "couldn't create that thread" });
           threadStarters.set(task.threadId, (CLOUD_TEAM ? teamConnections.handOnFor(internalCapability.threadId, internalCapability.generation) : null) ?? openerFrom(fromThreadId));
@@ -14189,7 +14189,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
             title: task.title,
             botId: from.id,
             botName: from.name,
-            self: true,
+            self: true, report,
             limit: maxConcurrentBotThreads(cfg, botThreadsHost(cloudPlanTier.starter())),
             ...outcome,
           });

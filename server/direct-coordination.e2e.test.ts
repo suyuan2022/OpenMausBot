@@ -419,7 +419,7 @@ it("does not treat self-opened work or an abandoned human branch as new human au
   const room = (await f.cli("new-channel", "--name", "Updates", "--members", f.chief.id, "--section", "Leadership")).channel;
   const post = (message: string, expectError = false) => ({ tool: "post_to_room", arguments: { group_id: room.id, message }, expectError });
   f.plan[f.chief.id] = { turns: [
-    { steps: [post("First update"), post("Second update"), { tool: "start_thread", arguments: { title: "Independent job", message: "Continue the separate check." } }], reply: "Opened the independent job" },
+    { steps: [post("First update"), post("Second update"), { tool: "start_thread", arguments: { title: "Independent job", message: "Continue the separate check.", report: "none" } }], reply: "Opened the independent job" },
     { steps: [post("A self-opened job is not another human answer", true), { tool: "request_credential", arguments: { credential_id: "ttsKey", reason: "Fixture continuation" } }], reply: "Waiting for the fixture credential decision" },
     { reply: "This alternative human branch will be abandoned" },
     { reply: "Continuing only the original self-opened job" },
@@ -912,7 +912,7 @@ it("runs the owed direct follow-up while the same bot works in another thread", 
   f.plan[f.chief.id] = { script: [
     { key: "assign", match: ["Assign the check, then open an independent job"], steps: [
       { tool: "coordinate_bots", arguments: { bot_ids: [f.specialist.id], message: "Independently verify the CSV export" } },
-      { tool: "start_thread", arguments: { title: "Independent hold", message: "Run the long independent check." } },
+      { tool: "start_thread", arguments: { title: "Independent hold", message: "Run the long independent check.", report: "none" } },
     ], reply: "Assigned the check and opened the hold" },
     { key: "hold", match: ["Run the long independent check."], gateFile: gate, reply: "The hold finished" },
     { key: "resume", match: ["Your downstream room requests have settled."], reply: "The follow-up ran while the hold worked" },

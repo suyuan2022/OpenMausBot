@@ -19,6 +19,7 @@ import { callResearchTool, RESEARCH_TOOL_NAMES } from "./agents-research-tools.t
 import { callHelperTool, HELPER_TOOL_NAMES } from "./agents-helper-tools.ts";
 import { callChiefReadTool, CHIEF_READ_TOOL_NAMES } from "../suyuan/chief-read-tools.ts";
 import { threadFacts } from "../suyuan/thread-facts.ts";
+import { selfThreadOpenedText } from "../suyuan/self-thread.ts";
 import { callUsageLimitsTool, USAGE_LIMITS_TOOL } from "./agents-usage-tool.ts";
 import { callWaitTool, WAIT_TOOL_NAMES } from "./agents-wait-tools.ts";
 import { callComputerAskTool, COMPUTER_ASK_TOOL_NAMES } from "./agents-computer-ask-tool.ts";
@@ -443,6 +444,7 @@ export async function callTool(called: string, input: Json, context: ToolCallCon
     const body: Record<string, unknown> = { fromBotId: BOT_ID, fromThreadId: THREAD_ID, title, message, depth: DEPTH };
     if (toBotId) body.toBotId = toBotId;
     if (folder) body.folder = folder;
+    if (!toBotId) body.report = args.report ?? "resume"; // suyuan fork: a thread on yourself reports back unless the bot says "none" (suyuan/self-thread.ts)
     if (args.model_selection !== undefined) {
       const fields = jsonRecord(args.model_selection) ? args.model_selection : null;
       if (!fields || typeof fields.instanceId !== "string" || !fields.instanceId.trim() || typeof fields.model !== "string" || !fields.model.trim()) {
@@ -457,6 +459,7 @@ export async function callTool(called: string, input: Json, context: ToolCallCon
     const threadId = String(r.threadId ?? receipt?.threadId ?? "");
     const where = r.self === true ? "on yourself" : `on @${String(r.botName ?? receipt?.botName ?? "that bot")}`;
     const opened = `Opened thread #${threadTitle} ${where} [thread id: ${threadId}].`;
+    if (r.self === true && r.report === "resume") return { text: selfThreadOpenedText({ opened, title: threadTitle, threadId, botId: String(r.botId ?? BOT_ID), assignmentId: handoffIds(r)[0] ?? "" }) };
     if (r.self === true) {
       if (r.state === "running") {
         return { text: `${opened} It is running now, in parallel with this conversation, and its result stays in that thread — it will not be delivered here. Mention it to the person as #${threadTitle}; use list_threads in a later turn to see how it is going.` };

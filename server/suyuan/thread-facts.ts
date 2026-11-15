@@ -4,6 +4,8 @@
 // its chip or a #Title link, read-only (checked on an isolated instance, closed threads too). Every sentence here holds with
 // the list shown too. Each pair swaps one upstream
 // phrase; wiring.test.ts goes red when upstream rewords one, so a swap never quietly stops applying.
+import { SELF_THREAD_REPORT_PARAM } from "./self-thread.ts";
+
 export const THREAD_FACTS: ReadonlyArray<readonly [upstream: string, fork: string]> = [
   // server/system-prompt.ts THREADS_PROMPT
   [
@@ -34,13 +36,29 @@ export const THREAD_FACTS: ReadonlyArray<readonly [upstream: string, fork: strin
     "With thread \"new\": the new thread's sidebar name, short and specific",
     "With thread \"new\": the new thread's title, shown at the top of the thread and used by list_threads and #Title links; short and specific",
   ],
+  // suyuan fork: a thread on yourself reports back and takes more messages (self-thread.ts).
+  // server/system-prompt.ts THREADS_PROMPT
+  [
+    "Use start_thread to open one on yourself for separate work;",
+    "Use start_thread to open one on yourself for separate work: its result returns to the conversation that opened it and resumes you there, and coordinate_bots with your own bot id and its thread id sends it another message;",
+  ],
+  // server/drivers/agents-catalog.ts start_thread
+  [
+    "This is not a teammate handoff: use coordinate_bots for teammates (thread \"new\" opens a fresh thread on them) and their automatic replies.",
+    "Its result returns to this conversation and resumes you, unless report is \"none\". To send it another message later, while it runs or after it answered, use coordinate_bots with your own bot id and its thread id as thread. This is not a teammate handoff: use coordinate_bots for teammates (thread \"new\" opens a fresh thread on them).",
+  ],
+  // coordinate_bots
+  [
+    "a thread id picks one you opened,",
+    "a thread id picks one you opened (with your own bot id, one you opened on yourself with start_thread: that sends it another message),",
+  ],
 ];
 
 export function threadFacts(text: string): string {
   return THREAD_FACTS.reduce((out, [upstream, fork]) => out.replace(upstream, fork), text);
 }
 
-type Tool = { description: string; inputSchema: { properties?: Record<string, unknown> } };
+type Tool = { name?: string; description: string; inputSchema: { properties?: Record<string, unknown> } };
 
 /** A catalog tool with the thread facts in its description and its parameters' descriptions; any other tool comes back as
  * the same object. */
@@ -56,5 +74,6 @@ export function withThreadFacts<T extends Tool>(tool: T): T {
     const text = (value as { description?: unknown } | null)?.description;
     return [key, typeof text === "string" ? { ...(value as object), description: fix(text) } : value];
   }));
+  if (tool.name === "start_thread") return { ...tool, description, inputSchema: { ...tool.inputSchema, properties: { ...properties, report: SELF_THREAD_REPORT_PARAM } } };
   return changed ? { ...tool, description, inputSchema: { ...tool.inputSchema, ...(properties ? { properties } : {}) } } : tool;
 }

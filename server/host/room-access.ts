@@ -51,7 +51,7 @@ export function createRoomAccess({ store, privateTo = () => null, lookedAfterBy 
       const source = parent.groupId ? store.group(parent.groupId) : undefined;
       if (!from || from.hidden || (parent.groupId ? !source || !source.memberIds.includes(from.id) || !store.groupTaskByThread(source.id, parent.threadId) : !store.taskByThread(from.id, parent.threadId))) return "Source membership or task was removed";
       if (source && group && source.id === group.id && parent.threadId !== node.threadId) return "Same-room work must stay in the originating conversation";
-      if (!peerAllowed(from, bot)) return reachRefusal(from, bot, lookedAfterBy)!;
+      if (from.id !== bot.id && !peerAllowed(from, bot)) return reachRefusal(from, bot, lookedAfterBy)!;
     }
   }
 

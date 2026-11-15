@@ -1,6 +1,6 @@
 import type { Store, TaskRecord } from "../store.ts";
 import { OUTSIDE_STAYS_HERE } from "./outside-lineage.ts";
-import { homeTakesNoWork } from "../suyuan/home.ts";
+import { homeTakesNoWork } from "../suyuan/home.ts"; import { idleArchived } from "../suyuan/idle-archive.ts";
 
 /** Where coordinate_bots sends to a teammate outside a room, by its `thread`: "standing" is the sender conversation's one
  * work thread with that teammate (undefined until it is opened), "new" opens one (undefined), and any other value is the id
@@ -21,7 +21,7 @@ export function workThreadFor(store: Pick<Store, "workThread" | "taskByThread">,
   if (thread === "standing") return store.workThread(botId, input.fromBotId, input.fromThreadId, false, (task) => also(task) && reach(task) && !(input.home?.(task) && !input.notice));
   const task = store.taskByThread(botId, thread);
   if (task && !reach(task)) throw new Error(OUTSIDE_STAYS_HERE);
-  const usable = task !== undefined && task.archivedAt === undefined && also(task);
+  const usable = task !== undefined && (task.archivedAt === undefined || idleArchived(task)) && also(task);
   if (usable && task.openedBy?.botId === input.fromBotId && !task.openedBy.roomLane && !input.notice && input.home?.(task)) throw new Error(homeTakesNoWork(input.botName));
   if (usable && task.openedBy?.botId === input.fromBotId && !task.openedBy.roomLane) return task;
   const handedWork = usable && input.answering?.botId === botId && input.answering.threadId === thread;

@@ -179,7 +179,8 @@ describe("Runtime: one tree, one lane", () => {
     const w = world(undefined, { depth: 2, requests: 3 });
     const root = w.runtime.begin(beginReq());
     expect(w.runtime.enqueue(toBot("builder", "nope"))).toMatchObject({ ok: false, outcome: "refused", reason: /no longer exists/ });
-    expect(w.runtime.enqueue(toBot("chief", root.id))).toMatchObject({ ok: false, outcome: "refused", reason: /ancestor/ });
+    // suyuan fork: the root's own conversation; another conversation of the same bot is a thread on itself (suyuan/self-thread.ts).
+    expect(w.runtime.enqueue(toBot("chief", root.id, undefined, { assignee: chief }))).toMatchObject({ ok: false, outcome: "refused", reason: /ancestor/ });
     const lead = ok(w.runtime.enqueue(toBot("lead", root.id)));
     expect(w.runtime.enqueue(toBot("builder", lead.id))).toMatchObject({ ok: false, outcome: "refused", reason: /not running/ });
     w.runtime.tick();
