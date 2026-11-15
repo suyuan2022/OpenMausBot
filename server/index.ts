@@ -590,7 +590,7 @@ import { createBotSettingsRoutes } from "./routes/bot-settings.ts";
 import { createBotPatchRoutes } from "./routes/bot-patch.ts";
 import { createBotOrderRoutes } from "./routes/bot-order.ts";
 import { createBotLifecycleRoutes } from "./routes/bot-lifecycle.ts";
-import { createBotSkillsRoutes } from "./routes/bot-skills.ts"; import { noteTurnVolatile, volatileHookReply } from "./suyuan/compact-volatile.ts"; // suyuan fork
+import { createBotSkillsRoutes } from "./routes/bot-skills.ts"; import { noteTurnVolatile, volatileHookReply } from "./suyuan/compact-volatile.ts"; import { reopenIdleArchived, startIdleArchive, unattendedBotJob } from "./suyuan/idle-archive.ts"; // suyuan fork
 import { createSkillShareRoutes } from "./routes/skill-share.ts";
 import { createTeamContextRoutes } from "./routes/team-context.ts";
 import { createDeciderRoutes } from "./routes/decider.ts"; import { createCloudSendRoutes } from "./routes/cloud-send.ts"; import { claudeCodeSkillInputs } from "./setup-import.ts"; import { createCloudConnectionsHost } from "./cloud-connections-host.ts";
@@ -5253,7 +5253,7 @@ const warmSummaries = createWarmSummaryHost({ store, instance: (id) => registry.
   fold: async ({ botId, threadId, instanceId }, idle) => { const bot = store.projectBotForTask(botId, threadId), model = store.taskByThread(botId, threadId)?.lastContextModel, instance = registry.get(instanceId), before = latestCompaction(store.activePath(threadId))?.id;
     if (bot && instance && model?.startsWith(`${instanceId}:`)) await compactConversation({ bot, threadId, generation: `idle:${randomUUID()}`, instance, model: model.slice(instanceId.length + 1), excludedIds: new Set(), manual: false, idle });
     return latestCompaction(store.activePath(threadId))?.id !== before; } });
-onThreadSeen((threadId) => warmSummaries.sawThread(threadId));
+onThreadSeen((threadId) => warmSummaries.sawThread(threadId)); startIdleArchive({ store, busy: (botId, threadId) => threadBusy(botId, threadId) || queuedThreadPosition(botId, threadId) !== null || hasQueuedSteeredMessages(botId, threadId), waiting: (botId, threadId) => coordinator.awaitingAnswer(threadId) || Boolean(coordinator.parkedDirect(threadId)) || coordinator.activeDirect(threadId) || coordinator.awaitingTeammateThreads().has(threadId) || botWaits.all().some((wait) => wait.botId === botId && wait.threadId === threadId), log: (line) => console.info(line) }); // suyuan fork
 onConfigSaved((before, after) => {
   if (JSON.stringify(before.cacheKeepWarm ?? null) !== JSON.stringify(after.cacheKeepWarm ?? null)) setImmediate(() => cacheKeepWarm.refresh());
 });
@@ -5273,7 +5273,7 @@ bus.subscribe((event: RuntimeEvent) => {
       keepWarmTargets.delete(event.threadId);
       keepWarmContext.delete(event.threadId);
       if (!target || routines?.runForThread(event.threadId)) return;
-      cacheKeepWarm.noteTurnCompleted(target, { ok: event.ok, stopReason: event.stopReason, contextTokens }); warmSummaries.turnCompleted(target, { ok: event.ok, contextTokens });
+      cacheKeepWarm.noteTurnCompleted(target, { ok: event.ok, stopReason: event.stopReason, contextTokens }); if (!unattendedBotJob(store, target.botId, target.threadId)) warmSummaries.turnCompleted(target, { ok: event.ok, contextTokens });
     }
   } catch (error) {
     console.warn(`cache keep-warm: ${(error as Error).message}`);
@@ -7782,7 +7782,7 @@ async function beginTurn(
   store.setTaskActivity(bot.id, threadId, "working");
   // Watch from admission, not dispatch: a turn can wedge in setup long before any provider event exists.
   watchdog.watch(threadId, bot.id);
-  store.setTaskClosedBy(bot.id, threadId, null);
+  reopenIdleArchived(store, bot.id, threadId); store.setTaskClosedBy(bot.id, threadId, null);
   // Only a person's turn clears unread: the fold never re-marks an internal turn.
   if (commsDepth === 0) store.patchTask(bot.id, threadId, { unread: false });
   turnUsage.delete(threadId);

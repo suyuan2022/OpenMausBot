@@ -434,6 +434,15 @@ describe("the fork's hooks into upstream files", () => {
     expect(call).toContain('if (r.self === true && r.report === "resume") return { text: selfThreadOpenedText({ opened, title: threadTitle, threadId, botId: String(r.botId ?? BOT_ID), assignmentId: handoffIds(r)[0] ?? "" }) };');
   });
 
+
+  it("archives a bot-opened thread left idle, brings it back when a turn starts there, and skips its idle summary", () => {
+    const index = source("server/index.ts");
+    expect(index).toContain("onThreadSeen((threadId) => warmSummaries.sawThread(threadId)); startIdleArchive({ store, busy: (botId, threadId) => threadBusy(botId, threadId) || queuedThreadPosition(botId, threadId) !== null || hasQueuedSteeredMessages(botId, threadId),");
+    expect(index).toContain("waiting: (botId, threadId) => coordinator.awaitingAnswer(threadId) || Boolean(coordinator.parkedDirect(threadId)) || coordinator.activeDirect(threadId) || coordinator.awaitingTeammateThreads().has(threadId) || botWaits.all().some((wait) => wait.botId === botId && wait.threadId === threadId),");
+    expect(index).toContain("  reopenIdleArchived(store, bot.id, threadId); store.setTaskClosedBy(bot.id, threadId, null);");
+    expect(index).toContain("if (!unattendedBotJob(store, target.botId, target.threadId)) warmSummaries.turnCompleted(target, { ok: event.ok, contextTokens });");
+    expect(source("server/host/work-thread.ts")).toContain("const usable = task !== undefined && (task.archivedAt === undefined || idleArchived(task)) && also(task);");
+  });
   it("folds the New messages divider once it is on screen at the bottom", () => {
     const hook = source("src/hooks/use-unread-divider.ts");
     expect(hook).toContain("const onScreen = useDividerSeen(messageId, following, messages.length);");
