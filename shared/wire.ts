@@ -137,6 +137,7 @@ export interface BotMovedTo {
 export interface WireTask extends InboxTask {
   /** Outstanding handoffs, not an active provider turn. */
   waitingForTeammates?: boolean;
+  /** suyuan fork: the teammates it waits on, by bot id. */ waitingOn?: string[];
   threadId: string;
   title: string;
   createdAt: number;
@@ -276,6 +277,7 @@ export const helperModelAllowed = (bot: { helperModel?: unknown }): boolean => b
  * bot has none). */
 export interface WireBot extends DefaultBotFields, BotAccessFields {
   waitingForTeammates?: boolean;
+  /** suyuan fork: the teammates its selected conversation waits on, by bot id. */ waitingOn?: string[];
   id: string;
   /** The task selected in the UI; running turns keep their own thread id. */
   threadId: string;

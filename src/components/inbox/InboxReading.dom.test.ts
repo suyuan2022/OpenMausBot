@@ -42,7 +42,8 @@ const why: InboxRow = {
   card: { title: "A question", subtitle: "Why are we doing it?", options: ["Trust and data control", "Open-source adoption"], requestId: "req-q2", requestType: "question" },
 };
 const news: InboxRow = {
-  id: "n1", kind: "result", tab: "info", unread: false, at: AT - 2, from: { name: "Reporter", botId: "reporter" },
+  id: "n1", kind: "result", tab: "info", unread: true, // suyuan fork: read news leaves the list (src/suyuan/inbox-unread.ts)
+  at: AT - 2, from: { name: "Reporter", botId: "reporter" },
   origin: { botId: "reporter", threadId: "rep-daily", title: "Daily digest", messageId: "n1" }, text: "Daily digest: 3 new leads.",
 };
 const placeView = (rows: InboxRow[]): InboxView => ({ botId: null, threadId: null, rows, anchor: null });
@@ -110,7 +111,7 @@ describe("the inbox tab", () => {
     await mount();
     const chip = document.querySelector("[data-inbox-tab-chip]")!;
     expect(chip.textContent).toContain("Inbox");
-    expect(chip.querySelector("[data-inbox-tab-count]")!.textContent).toBe("2");
+    expect(chip.querySelector("[data-inbox-tab-count]")!.textContent).toBe("3"); // suyuan fork: the news line is unread here
     expect(listed()).toEqual(["q1", "q2", "n1"]);
     const first = document.querySelector('[data-inbox-row="q1"]')!;
     expect(first.querySelector("[data-inbox-from]")!.textContent).toBe("Planner");

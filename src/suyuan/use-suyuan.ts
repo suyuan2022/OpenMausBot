@@ -23,6 +23,7 @@ import { installTrayAtFinger } from "./tray-at-finger";
 import { installTablePlate } from "./table-plate";
 import { installTileMenu } from "./tile-menu";
 import { useWebPush } from "./use-web-push";
+import { noteBotNames } from "./waiting-on";
 import "./wide-replies.css";
 
 /** Long enough for the live chat to lay out and scroll before the frozen copy over it goes. */
@@ -31,6 +32,7 @@ const SETTLE_MS = 150;
 export function useSuyuan(state: AppState, dispatch: (action: Action) => void): void {
   // During render, not in an effect: the sidebar and the chat render right after and read it (./home.ts).
   noteThreadsShown(useShowThreads());
+  noteBotNames(state.bots);
   useWebPush(state, dispatch);
   const loaded = state.hydrated === true;
   const alone = chatAlone(state, { inboxOpen: useInboxPanel().open, roomOpen: useRoomPanel() !== null });

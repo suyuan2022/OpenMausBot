@@ -54,8 +54,9 @@ describe("the inbox panel", () => {
     await mount(createElement(InboxPanel));
     expect(document.querySelector("[role=tablist], [data-inbox-tab]")).toBeNull();
     const listed = () => [...document.querySelectorAll<HTMLElement>("[data-inbox-row]")].map((row) => row.dataset.inboxRow);
-    expect(listed()).toEqual([approvalRow.id, questionRow.id, messageRow.id, reportRow.id]);
+    expect(listed()).toEqual([approvalRow.id, questionRow.id, messageRow.id]);
     expect(listed(), "a settled line is not listed again").not.toContain(settledRow.id);
+    expect(listed(), "suyuan fork: news already read is not listed either").not.toContain(reportRow.id);
     expect([...document.querySelectorAll<HTMLElement>("[data-inbox-row] [data-inbox-waits]")].map((dot) => dot.closest<HTMLElement>("[data-inbox-row]")!.dataset.inboxRow)).toEqual([approvalRow.id, questionRow.id]);
     expect(document.querySelector(`[data-inbox-row="${approvalRow.id}"]`)!.hasAttribute("data-unread")).toBe(true);
     await click(`[data-inbox-row="${messageRow.id}"] button`);
@@ -63,7 +64,7 @@ describe("the inbox panel", () => {
     expect(server.calls).toContainEqual({ path: `/api/inbox/${messageRow.id}/read`, method: "POST" });
     expect(document.querySelector("textarea"), "a message that waits on an answer takes a reply").not.toBeNull();
     await click('[aria-label="Back to the list"]');
-    expect(listed()).toEqual([approvalRow.id, questionRow.id, messageRow.id, reportRow.id]);
+    expect(listed(), "suyuan fork: a line read here stays while the panel is open").toEqual([approvalRow.id, questionRow.id, messageRow.id]);
   });
 
   it("answers an ask from its row through the copy's own card, as the chat's buttons do, and marks news done", async () => {
@@ -73,9 +74,9 @@ describe("the inbox panel", () => {
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "decideRequest", threadId: "inbox", requestId: "req-approval", behavior: "allow" }));
     await click(`[data-inbox-row="${questionRow.id}"] [data-inbox-action="close"]`);
     expect(dispatch).toHaveBeenCalledWith(expect.objectContaining({ type: "decideRequest", threadId: "inbox", requestId: "req-question", behavior: "answer" }));
-    await click(`[data-inbox-row="${reportRow.id}"] [data-inbox-action="done"]`);
-    expect(server.calls).toContainEqual({ path: `/api/inbox/${reportRow.id}/done`, method: "POST" });
-    expect(document.querySelector(`[data-inbox-row="${reportRow.id}"]`), "it leaves the list at once").toBeNull();
+    await click(`[data-inbox-row="${messageRow.id}"] [data-inbox-action="done"]`); // suyuan fork: the read report is not listed
+    expect(server.calls).toContainEqual({ path: `/api/inbox/${messageRow.id}/done`, method: "POST" });
+    expect(document.querySelector(`[data-inbox-row="${messageRow.id}"]`), "it leaves the list at once").toBeNull();
   });
 
   it("is a sheet at phone width", async () => {
