@@ -482,4 +482,13 @@ describe("the fork's hooks into upstream files", () => {
     expect(form).toContain("existingRoutine?.prompt) : { prompt: description }),");
     expect(functionBody(source("src/components/SidebarBotActivity.tsx"), "runningRoutineRun")).toContain("return !oneConversation() && Boolean(task.routineRunId)");
   });
+  it("a bot with the person's own screen server (lcu) gets the reworded Surface section and no auto pin to the built-in browser", () => {
+    const index = source("server/index.ts");
+    expect(functionBody(index, "turnSurfacePlan")).toContain("withoutAutoBrowserPin(store.taskByThread(bot.id, threadId), screenMcpNames(cfg, mcpServersHost.mounted(bot)))");
+    expect(index).toContain("const autoPin = autoPinPatch(used, screenMcpNames(cfg, integrations.custom), store.taskByThread(bot.id, threadId)); if (autoPin) store.patchTask(bot.id, threadId, autoPin);");
+    expect(index).not.toContain('if (used) store.patchTask(bot.id, threadId, { surface: used, surfaceSource: "auto" });');
+    expect(index.split('text: screenMcpWording(surfacePrompt(').length - 1).toBe(2); // a bot's own turn, and its turn in a room
+    expect(index).toContain('{ names: screenMcpNames(cfg, integrations.custom), browser: Boolean(integrations.browser), chose: plan.pinned === "browser" || bot.computer === "browser" }) },');
+    expect(source("server/config.ts")).toContain("screenMcpServers: z.array(z.string().max(64)).max(16).optional(),");
+  });
 });
