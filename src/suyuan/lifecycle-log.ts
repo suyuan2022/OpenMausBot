@@ -1,12 +1,12 @@
-// suyuan fork, temporary (FORK.md): hunting the black screen the home-screen app sometimes shows when the person comes back
-// from WeChat's voice input. The relay sees no request at all while it is black, so the page is stopped by then and can say
-// nothing itself. This keeps a short log of what the page did around going out of sight and coming back in localStorage,
-// and every start sends the last session's log along: whether it came back, painted, or was started afresh. Each line also
-// goes out as it happens. Both travel as the address of a beacon, which the relay's access log keeps; the server answers
-// 404 and keeps nothing. Remove once the cause is found.
-// A drawn frame does not mean a seen one: at 22:36 on 11/14 the page came back, drew within 41ms and fetched, and the screen
-// stayed black. So each trip also notes what was on screen (./wake-paint.ts repaints on return) and the first touch after
-// coming back: a touch on a black screen that reaches the page says the page is there and iOS shows none of it.
+// suyuan fork, temporary (FORK.md): kept a short log of what the page did around going out of sight and coming back, to
+// hunt the black screen the home-screen app showed after WeChat's voice input. The cause was found on 11/16 in the phone's
+// own log, and it is not in the page: WeChat's keyboard asks iOS to reopen the app that drew the page for the web app
+// (SafariViewService) instead of the web app, and iOS shows that app's own empty window. The page sits in the background
+// meanwhile, which is why the relay saw no request while it was black.
+// The log stays for now because it also notes, on every return and every change of the keyboard, how far iOS has pushed the
+// page and how much of it shows: the numbers that tell whether ./keyboard-fit.ts holds on the phone. Remove after that.
+// It lives in localStorage, and every start sends the last session's log along. Each line also goes out as it happens. Both
+// travel as the address of a beacon, which the relay's access log keeps; the server answers 404 and keeps nothing.
 // It also notes where the open chat sits, and where a chat opened from the list settles.
 
 const KEY = "suyuan:lifecycle-log";

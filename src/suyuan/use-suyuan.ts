@@ -16,6 +16,8 @@ import "./phone-header.css";
 import "./quiet-status.css";
 import "./steady-tables.css";
 import "./no-zoom.css";
+import "./keyboard-fit.css";
+import { installKeyboardFit } from "./keyboard-fit";
 import { installNoZoom } from "./no-zoom";
 import { installPreviewZoom } from "./preview-zoom";
 import { hideBackButton, installSwipeBack } from "./swipe-back";
@@ -44,6 +46,7 @@ export function useSuyuan(state: AppState, dispatch: (action: Action) => void): 
   useEffect(() => installSwipeBack(), []);
   useEffect(() => installTrayAtFinger(), []);
   useEffect(() => installNoZoom(), []);
+  useEffect(() => installKeyboardFit(), []);
   useEffect(() => installPreviewZoom(), []);
   useEffect(() => installTablePlate(), []);
   useEffect(() => installTileMenu(), []);
