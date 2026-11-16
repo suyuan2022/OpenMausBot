@@ -48,15 +48,20 @@ function rewrites(tools: string): ReadonlyArray<readonly [RegExp | string, strin
     ["You cannot open apps, click, or inspect a screen through OpenMausBot. If asked for screen work,",
       `OpenMausBot's own tools cannot open apps, click, or inspect a screen this turn. If asked for screen work that ${tools} cannot do,`],
     ["use the selected OpenMausBot browser when a search service is unavailable", `use ${tools} or the selected OpenMausBot browser when a search service is unavailable`],
+    [" No computer or browser tools are mounted yet; select_computer is the way to connect them before screen work,",
+      ` None of OpenMausBot's own computer or browser tools are mounted yet; select_computer is the way to connect them before screen work that ${tools} cannot do,`],
   ];
 }
+
+const MAY_WORK_A_SCREEN = [" For browser and computer tasks,", " No computer or built-in browser tools are mounted this turn.", " For a screen task, use select_computer "];
 
 /** The Surface section of a turn that has these servers. `browser`: the built-in browser is mounted this turn.
  * `chose`: the person picked the built-in browser themselves (a pin in the Screen panel, or Works on), which stands. */
 export function screenMcpWording(text: string, opts: { names: readonly string[]; browser: boolean; chose?: boolean }): string {
   if (!opts.names.length || opts.chose) return text;
-  // Only the two shapes surfacePrompt gives a turn that may do screen work; Off and the other notes stay as they are.
-  if (!text.includes(" For browser and computer tasks,") && !text.includes(" No computer or built-in browser tools are mounted this turn.")) return text;
+  // Only the shapes surfacePrompt gives a turn that may do screen work (something mounted, nothing mounted, nothing
+  // mounted yet but select_computer at hand); Off and the other notes stay as they are.
+  if (!MAY_WORK_A_SCREEN.some((phrase) => text.includes(phrase))) return text;
   const tools = list(opts.names), many = opts.names.length > 1;
   let out = text;
   for (const [from, to] of rewrites(tools)) out = out.replace(from, to);

@@ -15,6 +15,7 @@ const SHUTS_OUT = [
   "Web tasks → the built-in browser.",
   "You cannot open apps, click, or inspect a screen through OpenMausBot",
   "use the selected OpenMausBot browser when",
+  "No computer or browser tools are mounted yet; select_computer is the way to connect them before screen work,",
 ];
 
 /** One turn of a bot on Auto, as server/index.ts builds it: the plan from the stored pin, then the reworded section. */
@@ -80,6 +81,7 @@ describe("a bot on Auto with lcu", () => {
     ["this computer alone", { computer: "local", browser: false }, {}],
     ["a cloud computer alone", { computer: "cloud", browser: false }, {}],
     ["nothing mounted", { computer: null, browser: false }, {}],
+    ["nothing mounted yet, with select_computer", { computer: null, browser: false }, { canSelect: true }],
   ])("has no sentence that shuts lcu out with %s", (_name, mounted, opts) => {
     const upstream = surfacePrompt(mounted, opts);
     const text = screenMcpWording(upstream, { names: LCU, browser: mounted.browser });
@@ -92,6 +94,13 @@ describe("a bot on Auto with lcu", () => {
   it("with nothing mounted, is sent to the person only for what lcu cannot do", () => {
     const text = screenMcpWording(surfacePrompt({ computer: null, browser: false }), { names: LCU, browser: false });
     expect(text).toContain("If asked for screen work that lcu cannot do, explain this and ask the user to choose where this conversation works");
+  });
+
+  it("with nothing mounted yet and select_computer at hand, is sent to select_computer only for what lcu cannot do", () => {
+    // 荔枝's own turns: her built-in browser is off, and a message from the person offers select_computer.
+    const text = screenMcpWording(surfacePrompt({ computer: null, browser: false }, { canSelect: true }), { names: LCU, browser: false });
+    expect(text.startsWith(" The person added the lcu MCP server")).toBe(true);
+    expect(text).toContain("select_computer is the way to connect them before screen work that lcu cannot do, not a reason to claim you already performed it.");
   });
 
   it("names every listed server", () => {
