@@ -1,7 +1,8 @@
 #!/bin/zsh
 # Installs a suyuan-v* release of suyuan2022/OpenMausBot on lizhi-vm and restarts the server, never while a bot works.
 # Runs on the MacBook: gh fetches the tarball here because the VM's reach to GitHub comes and goes; the install itself
-# is deploy-vm-remote.sh, run on the VM, whose output streams back here. It can wait up to 10 minutes for busy bots.
+# is deploy-vm-remote.sh, run on the VM, whose output streams back here. It can wait up to 10 minutes for busy bots;
+# still busy then, this exits 3 and the VM goes on waiting on its own (12 hours at most), installing once they are idle.
 #   deploy-vm.sh                 newest release
 #   deploy-vm.sh suyuan-v<x>     that release
 #   deploy-vm.sh path/to/x.tgz   that tarball

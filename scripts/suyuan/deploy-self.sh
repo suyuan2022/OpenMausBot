@@ -1,7 +1,8 @@
 #!/bin/zsh
 # deploy-vm.sh for a bot that works on lizhi-vm itself (Maus 工程师): the same install by deploy-vm-remote.sh, run in a
 # session of its own so the restart it ends with does not end it too. The bot running this is busy until its turn
-# ends, and the install waits for every bot to be idle (up to 10 minutes), this one included: end the turn right after.
+# ends, and the install waits for every bot to be idle, this one included: end the turn right after. Still busy after
+# 10 minutes, it goes on waiting on its own (12 hours at most) and installs at the first idle moment.
 #   deploy-self.sh                 newest release
 #   deploy-self.sh suyuan-v<x>     that release
 #   deploy-self.sh path/to/x.tgz   that tarball
@@ -53,5 +54,5 @@ null = os.open(os.devnull, os.O_RDONLY)
 os.dup2(null, 0); os.dup2(log, 1); os.dup2(log, 2)
 os.execvp("zsh", ["zsh", "deploy-vm-remote.sh", "0", sys.argv[1]])
 ' "$target"
-echo "the deploy waits in the background until every bot is idle, you included: end this turn now."
+echo "the deploy waits in the background until every bot is idle, you included (12 hours at most): end this turn now."
 echo "after the restart, read the end of ~/$STORE/deploy.log: it ends 'openmausbot <old> -> <new>' when it installed."

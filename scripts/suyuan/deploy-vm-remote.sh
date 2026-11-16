@@ -2,6 +2,8 @@
 # The half of deploy-vm.sh that runs on lizhi-vm. deploy-vm.sh copies it over and runs it under nohup, appending to
 # deploy.log, so a dropped ssh never leaves a deploy half done.
 #   deploy-vm-remote.sh <force 0|1> <tarball under $HOME | rollback>
+# Bots still busy after 10 minutes: this exits 3 as before, and leaves a copy of itself behind that goes on waiting for
+# idle (12 hours at most) and installs then. Nobody's turn is cut short, and nobody has to remember to rerun it.
 set -euo pipefail
 
 force=$1 target=$2
@@ -9,10 +11,31 @@ export PATH="$HOME/.hermes/node/bin:$HOME/.npm-global/bin:$PATH"
 LABEL=com.openmausbot.serve
 STORE=$HOME/.openmausbot-releases
 
-# One deploy at a time; the lock goes with this process, however it ends.
-zmodload zsh/system
+# The copy left waiting (see the top): set to the time it stops trying. It writes to deploy.log whoever started it.
+retry_until=${OMB_DEPLOY_RETRY_UNTIL:-}
+RETRY_PID=$STORE/retry.pid
+
+# One deploy at a time; the lock goes with this process, however it ends. The waiting copy takes it only once the bots
+# are idle, so a newer deploy is never turned away by an older one that is still waiting.
+zmodload zsh/system zsh/datetime
 touch "$STORE/deploy.lock"
-zsystem flock -t 0 "$STORE/deploy.lock" 2>/dev/null || { echo "another deploy is still running on the VM; its output is in $STORE/deploy.log" >&2; exit 4; }
+lock() { zsystem flock -t 0 "$STORE/deploy.lock" 2>/dev/null; }
+if [[ -z $retry_until ]]; then
+  lock || { echo "another deploy is still running on the VM; its output is in $STORE/deploy.log" >&2; exit 4; }
+  # This deploy replaces whatever an earlier one is still waiting to install.
+  waiting=$(cat "$RETRY_PID" 2>/dev/null || true)
+  if [[ $waiting == <-> && $(ps -p $waiting -o command= 2>/dev/null) == *deploy-vm-remote.sh* ]]; then
+    kill $waiting 2>/dev/null && echo "stopped the earlier deploy that was still waiting for idle; this one replaces it"
+  fi
+  rm -f "$RETRY_PID"
+else
+  # The deploy that left this copy behind wrote its pid to $RETRY_PID before letting go of the lock, so no newer deploy
+  # can miss it. Without that entry this copy has been replaced, and the loop below ends it.
+  for _ in {1..50}; do
+    [[ $(cat "$RETRY_PID" 2>/dev/null) == $$ ]] && break
+    sleep 0.1
+  done
+fi
 
 # Prints who is working. Exit 0: idle, or no server is listening (nothing to cut short); 1: busy; 2: can't tell.
 busy() {
@@ -69,7 +92,36 @@ if [[ $before == "$wanted" && $force == 0 ]] && answering; then
 fi
 
 # Wait for idle before touching anything: once npm replaces the files, a turn still running would mix two versions.
-if (( force == 0 )); then
+if [[ -n $retry_until ]]; then
+  # The waiting copy. It says nothing until it installs or stops: each wake_engineer is a turn of a busy bot.
+  calm=0
+  while true; do
+    if [[ $(cat "$RETRY_PID" 2>/dev/null) != $$ ]]; then exit 0; fi  # a newer deploy took over
+    if [[ $(openmausbot --version 2>/dev/null) == "$wanted" ]] && answering; then rm -f "$RETRY_PID"; exit 0; fi
+    who=$(busy) && code=0 || code=$?
+    # Idle twice in a row, with the server answering: one turn ending just before the next starts is not idle, and a
+    # server that is down is somebody else's restart, not a moment to change the files under it.
+    if (( code == 0 )) && answering; then
+      if (( ++calm >= 2 )); then
+        lock && break
+        echo "another deploy is running; the one waiting to install ${target:t} stops here"
+        rm -f "$RETRY_PID"
+        exit 0
+      fi
+    else
+      calm=0
+    fi
+    if (( EPOCHSECONDS >= retry_until )); then
+      echo "still busy at $(strftime %H:%M $EPOCHSECONDS) ($who). Gave up; nothing was installed, rerun later" >&2
+      rm -f "$RETRY_PID"
+      wake_engineer not-installed
+      exit 3
+    fi
+    sleep ${WAIT_SECONDS:-5}
+  done
+  rm -f "$RETRY_PID"
+  echo "the bots are idle at $(strftime %H:%M $EPOCHSECONDS); installing ${target:t}"
+elif (( force == 0 )); then
   for attempt in {1..${WAIT_TRIES:-120}}; do
     who=$(busy) && code=0 || code=$?
     (( code == 0 )) && break
@@ -80,8 +132,10 @@ if (( force == 0 )); then
     fi
     (( attempt == 1 )) && echo "waiting until this is done: $who"
     if (( attempt == ${WAIT_TRIES:-120} )); then
-      echo "still busy after 10 minutes ($who). Nothing was installed; rerun later" >&2
-      wake_engineer not-installed
+      until=$(( EPOCHSECONDS + ${RETRY_FOR:-43200} ))
+      echo "still busy after 10 minutes ($who). Nothing is installed yet; it goes on waiting in the background and installs once every bot is idle, until $(strftime %H:%M $until) at the latest" >&2
+      OMB_DEPLOY_RETRY_UNTIL=$until zsh ${0:A} 0 "$2" </dev/null >>"$STORE/deploy.log" 2>&1 &!
+      echo $! > "$RETRY_PID"
       exit 3
     fi
     sleep ${WAIT_SECONDS:-5}
