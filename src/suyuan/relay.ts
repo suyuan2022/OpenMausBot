@@ -16,9 +16,10 @@ type Owner = {
 
 export type PassedOn = { botId: string; name: string; threadId?: string };
 
-/** The bot that passed the thread on screen to this one, while the app offers one conversation per bot; null otherwise. */
+/** The bot that passed the thread on screen to this one, while the app offers one conversation per bot; null otherwise.
+ * The bot's home names nobody, even when another bot once opened the thread the person later made the home. */
 export function passedOnBy(bot: Owner): PassedOn | null {
-  if (!oneConversation()) return null;
+  if (!oneConversation() || bot.threadId === homeOf(bot)) return null;
   const opener = bot.tasks?.find((task) => task.threadId === bot.threadId)?.openedBy;
   if (!opener?.botId || opener.botId === bot.id || !opener.name) return null;
   return { botId: opener.botId, name: opener.name, ...(opener.threadId ? { threadId: opener.threadId } : {}) };
