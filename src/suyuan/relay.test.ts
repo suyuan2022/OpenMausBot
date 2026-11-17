@@ -37,6 +37,13 @@ describe("a run another bot passed on", () => {
     expect(passedOnBy(shopping)).toBeNull();
   });
 
+  it("names nobody on a home another bot once opened: 深度研究's home began as a thread 荔枝 opened on it", () => {
+    noteThreadsShown(false);
+    const research = { ...shopping, mainThreadId: "jd" };
+    expect(passedOnBy(research)).toBeNull();
+    expect(backFrom(research, [lizhi, research])).toEqual({ bot: research });
+  });
+
   it("goes back to the passing bot's conversation it came from", () => {
     noteThreadsShown(false);
     expect(backFrom(shopping, [lizhi, shopping])).toEqual({ bot: lizhi });
