@@ -31,6 +31,13 @@ describe("the fork's hooks into upstream files", () => {
     expect(index).toContain('changed: (keys) => { registry.forgetSnapshots(); if (keys.includes("signIn")) { sessions.membershipChanged(); sessions.revalidateEmailSessions(); } if (keys.includes("cacheKeepWarm")) cacheKeepWarm.refresh(); broadcast({ kind: "config", ...configStatus() }); if (keys.includes("threads")) drainQueuedSends(); } });');
   });
 
+  it("Codex bare ids and the picker follow a provider marked replaces_official in ~/.codex", () => {
+    const catalog = source("server/drivers/codex-catalog.ts");
+    expect(functionBody(catalog, "decodeCodexSelection")).toContain("aliasProviderForBare(id) ?? OFFICIAL_CODEX_PROVIDER");
+    expect(functionBody(catalog, "catalogAround")).toContain("if (codexOfficialAlias(env)) {");
+    expect(source("server/index.ts")).toContain('if (registry.get(selection.instanceId)?.driverKind === "codex") selection.model = qualifyBareCodexModel(selection.model);');
+  });
+
   it("the app runs the fork's hook, shows the push switch, and leaves notifications to push where it is on", () => {
     expect(functionBody(source("src/App.tsx"), "Shell")).toContain("useSuyuan(state, dispatch)");
     expect(functionBody(source("src/components/NotificationSettingsRows.tsx"), "NotificationRows")).toContain("<WebPushRow />");
