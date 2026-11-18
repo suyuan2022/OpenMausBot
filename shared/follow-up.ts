@@ -6,7 +6,8 @@ export type FollowUp = (typeof FOLLOW_UPS)[number];
 /** What Enter does while a turn runs (the person's setting); Ctrl/⌘+Enter does the other one. */
 export type FollowUpDefault = Exclude<FollowUp, "restart">;
 
-export const DEFAULT_FOLLOW_UP: FollowUpDefault = "steer";
+// suyuan fork: a message sent while the bot works waits for its turn to end; 插话 on the queued message, or the setting, steers.
+export const DEFAULT_FOLLOW_UP: FollowUpDefault = "queue";
 
 /** undefined when absent, null when present but not a follow-up. */
 export function parseFollowUp(value: unknown): FollowUp | null | undefined {

@@ -108,6 +108,13 @@ describe("the fork's hooks into upstream files", () => {
     expect(source("server/routes/threads.ts")).toContain('"cache-control": attachmentCacheControl(attachment.mime, viewerFor(auth).kind === "all" && !member && !deps.memberDefaultBot && !workspaceAccess),');
   });
 
+  it("a message sent while the bot works queues by default, and the Simple room header floats like a bot's", () => {
+    expect(source("shared/follow-up.ts")).toContain('export const DEFAULT_FOLLOW_UP: FollowUpDefault = "queue";');
+    const room = source("src/components/RoomHeader.tsx");
+    expect(room).toContain('className={cn("group flex min-w-0 max-w-full items-center gap-1 rounded-full px-[13.5px] py-[9.5px]", ELEVATED_FLOAT, ELEVATED_HOVER)}');
+    expect(room).toContain('className={cn("flex items-center rounded-full p-[7.5px]", ELEVATED_FLOAT, ELEVATED_HOVER)}');
+  });
+
   it("the phone's bot list keeps the button and the drawer the left-edge swipe opens it by", () => {
     const hook = functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan");
     expect(hook).toContain("useEffect(() => installSwipeBack(), []);");

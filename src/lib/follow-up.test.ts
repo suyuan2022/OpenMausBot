@@ -58,7 +58,7 @@ describe("the other follow-up's key", () => {
 describe("the follow-up setting", () => {
   it("steers until the person picks queue, and remembers the pick on this device", async () => {
     let setting = await import("./follow-up");
-    expect(setting.useFollowUpDefault()).toBe("steer");
+    expect(setting.useFollowUpDefault()).toBe("queue"); // suyuan fork: queue by default
     setting.setFollowUpDefault("queue");
     expect(local.getItem(setting.FOLLOW_UP_KEY)).toBe("queue");
     expect(setting.useFollowUpDefault()).toBe("queue");
@@ -72,9 +72,9 @@ describe("the follow-up setting", () => {
   it("falls back to steering on a stored value it does not know, or storage it cannot read", async () => {
     local.setItem("omb-follow-up", "restart");
     const setting = await import("./follow-up");
-    expect(setting.readFollowUpDefault()).toBe("steer");
+    expect(setting.readFollowUpDefault()).toBe("queue"); // suyuan fork
     vi.resetModules();
     vi.stubGlobal("localStorage", { getItem: () => { throw new Error("blocked"); }, setItem: () => {} });
-    expect((await import("./follow-up")).readFollowUpDefault()).toBe("steer");
+    expect((await import("./follow-up")).readFollowUpDefault()).toBe("queue"); // suyuan fork
   });
 });
