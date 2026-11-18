@@ -154,9 +154,12 @@ export function RoomHeader({
   if (simple) {
     const more = members.length - SIMPLE_FACES;
     return (
-      <div {...headerDragProps} className="@container/roomhead px-5 py-3 pl-11 md:pl-5">
-        <div data-roomhead-row className="flex items-center justify-between gap-3">
-          <div data-roomhead-identity className="flex min-w-0 flex-1 justify-center" style={headerNoDragStyle}>
+      <div {...headerDragProps} className="@container/roomhead px-5 pt-2.5 pb-2.5 max-md:px-3">
+        {/* suyuan fork: two equal side columns centre the name on the screen, as in a bot's chat; on a phone the left
+            one keeps the bot-list button's room. */}
+        <div data-roomhead-row className="grid grid-cols-[minmax(max-content,1fr)_minmax(0,auto)_minmax(max-content,1fr)] items-center gap-3">
+          <span aria-hidden="true" className="max-md:w-10" />
+          <div data-roomhead-identity className="flex min-w-0 justify-center" style={headerNoDragStyle}>
             <button
               type="button"
               data-room-name
@@ -173,7 +176,7 @@ export function RoomHeader({
               <ChevronRight size={14} aria-hidden="true" className="-ml-1 w-0 shrink-0 text-ink-secondary opacity-0 transition-[width,margin,opacity] duration-150 group-hover:ml-0 group-hover:w-3.5 group-hover:opacity-100 group-focus-visible:ml-0 group-focus-visible:w-3.5 group-focus-visible:opacity-100" />
             </button>
           </div>
-          <div data-roomhead-controls className="flex shrink-0 items-center">
+          <div data-roomhead-controls className="flex shrink-0 items-center justify-self-end">
             <button
               ref={membersTriggerRef}
               type="button"
