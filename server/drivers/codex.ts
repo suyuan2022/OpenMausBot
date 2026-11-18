@@ -40,7 +40,7 @@ import type {
   TextGenerationOptions,
 } from "../contracts.ts";
 import { newEventId, newId } from "../contracts.ts";
-import { codexSelectedProviderArgs, decodeCodexSelection, OFFICIAL_CODEX_PROVIDER, readCodexModelCatalog, STATIC_CODEX_MODELS } from "./codex-catalog.ts";
+import { codexSelectedProviderArgs, decodeCodexSelection, OFFICIAL_CODEX_PROVIDER, readCodexModelCatalog, STATIC_CODEX_MODELS } from "./codex-catalog.ts"; import { aliasProviderArgs } from "../suyuan/codex-official-alias.ts"; // suyuan fork
 import { codexLocalProviderArgs } from "./local-inject.ts";
 import { codexBackgroundRoute, runCodexBackgroundRoute, runCodexOneShot } from "./codex-background-text.ts";
 import { augmentedPath } from "../env-path.ts";
@@ -1614,7 +1614,7 @@ export const CodexDriver: ProviderDriver<CodexConfig> = {
         spawn: spawnCli, kill: killCliTree, cli: config.cli, env, prompt, options,
         model: selection.model ?? id,
         modelProvider: selection.modelProvider,
-        providerArgs: planAuth || routed ? providerArgs : codexLocalProviderArgs(env, id),
+        providerArgs: planAuth || routed ? providerArgs : [...codexLocalProviderArgs(env, id), ...aliasProviderArgs(selection.modelProvider, env)], // suyuan fork: server/suyuan/codex-official-alias.ts
         describeError: (message) => {
           const route: CodexRoute = planAuth ? "plan" : selection.modelProvider === OFFICIAL_CODEX_PROVIDER ? "own" : "other";
           hidePlanRefusedModel(selection.model ?? id, message, route);

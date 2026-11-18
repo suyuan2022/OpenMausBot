@@ -10,6 +10,7 @@ import { killCliTree, spawnCli } from "../procs.ts";
 import { codexHome } from "./codex-identity.ts";
 import { unconfirmedModelCatalog } from "../startup-model-catalog.ts";
 import { codexLocalProviderArgs, mergeLocalInject } from "./local-inject.ts";
+import { aliasProviderForBare, codexOfficialAlias } from "../suyuan/codex-official-alias.ts";
 
 export const STATIC_CODEX_MODELS: ModelCatalog = {
   default: "gpt-5.6-sol",
@@ -49,7 +50,9 @@ export function decodeCodexSelection(id: string | null | undefined): {
     return { model: id.slice(sep + SEP.length), modelProvider: id.slice(0, sep) };
   }
   // A bare id is official: a new cloud model must not fall through to the user's local provider.
-  return { model: id, modelProvider: MODEL_ID.test(id) ? OFFICIAL_CODEX_PROVIDER : null };
+  if (!MODEL_ID.test(id)) return { model: id, modelProvider: null };
+  // suyuan fork: unless ~/.codex marks a provider as replacing the official one (server/suyuan/codex-official-alias.ts).
+  return { model: id, modelProvider: aliasProviderForBare(id) ?? OFFICIAL_CODEX_PROVIDER };
 }
 
 /** Starts Codex on the chosen model's provider. codex-cli 0.167.0 refuses a turn whose thread provider differs from its
@@ -431,6 +434,12 @@ async function catalogAround(
     });
   }
 
+  // suyuan fork: with an alias provider set, the official rows need a ChatGPT sign-in this machine does not keep.
+  if (codexOfficialAlias(env)) {
+    for (let i = options.length - 1; i >= 0; i--) if (!options[i].custom) options.splice(i, 1);
+  }
+  const visible = new Set(options.map((option) => option.id));
+
   const configured = main.model && main.modelProvider
     ? main.modelProvider === OFFICIAL_CODEX_PROVIDER &&
       official.options.some((option) => option.id === main.model)
@@ -442,7 +451,7 @@ async function catalogAround(
 
   return mergeLocalInject(
     {
-      default: configured && seen.has(configured) ? configured : official.default,
+      default: configured && visible.has(configured) ? configured : visible.has(official.default) ? official.default : options[0]?.id ?? official.default,
       options,
     },
     env,

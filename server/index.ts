@@ -594,7 +594,7 @@ import { createBotSkillsRoutes } from "./routes/bot-skills.ts"; import { noteTur
 import { createSkillShareRoutes } from "./routes/skill-share.ts";
 import { createTeamContextRoutes } from "./routes/team-context.ts";
 import { createDeciderRoutes } from "./routes/decider.ts"; import { createCloudSendRoutes } from "./routes/cloud-send.ts"; import { claudeCodeSkillInputs } from "./setup-import.ts"; import { createCloudConnectionsHost } from "./cloud-connections-host.ts";
-import { createUpdateCheckRoutes, serverUpdateChecker } from "./routes/update-check.ts"; import { createTimeZoneRoutes } from "./routes/time-zone.ts"; import { relayGate } from "./suyuan/relay-gate.ts"; import { suyuanFrame } from "./suyuan/register.ts"; import { homeThread, isHome } from "./suyuan/home.ts"; import { engineCompactsItself } from "./suyuan/native-compact.ts"; import { roomRoutingReady, routedText, withRoomRouter, withRoomRouterStatus } from "./suyuan/room-router.ts"; import { readsWith as suyuanReadsWith, waitingOnWire } from "./suyuan/inbox-read.ts"; import { watchConfigFile } from "./suyuan/config-reload-host.ts"; // suyuan fork
+import { createUpdateCheckRoutes, serverUpdateChecker } from "./routes/update-check.ts"; import { createTimeZoneRoutes } from "./routes/time-zone.ts"; import { relayGate } from "./suyuan/relay-gate.ts"; import { suyuanFrame } from "./suyuan/register.ts"; import { homeThread, isHome } from "./suyuan/home.ts"; import { engineCompactsItself } from "./suyuan/native-compact.ts"; import { roomRoutingReady, routedText, withRoomRouter, withRoomRouterStatus } from "./suyuan/room-router.ts"; import { readsWith as suyuanReadsWith, waitingOnWire } from "./suyuan/inbox-read.ts"; import { watchConfigFile } from "./suyuan/config-reload-host.ts"; import { qualifyBareCodexModel } from "./suyuan/codex-official-alias.ts"; // suyuan fork
 import { createBrowserSiteRoutes } from "./routes/browser-sites.ts";
 import { createInternalSignInRoutes } from "./routes/sign-in.ts";
 import { createInternalMcpRoutes } from "./routes/internal-mcp.ts";
@@ -2601,7 +2601,7 @@ function checkedModelSelection(
   const selection: ModelSelection = {
     instanceId: value.instanceId.trim(),
     model: value.model.trim(),
-  };
+  }; if (registry.get(selection.instanceId)?.driverKind === "codex") selection.model = qualifyBareCodexModel(selection.model); // suyuan fork: server/suyuan/codex-official-alias.ts
   if (hostedModels && !hostedModels.allows(selection)) return { ok: false, status: 400, error: hostedModels.error() };
   if (value.effort !== undefined) {
     if (!isEffortLevel(value.effort)) {
