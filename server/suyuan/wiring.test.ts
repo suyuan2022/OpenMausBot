@@ -119,7 +119,8 @@ describe("the fork's hooks into upstream files", () => {
     const hook = functionBody(source("src/suyuan/use-suyuan.ts"), "useSuyuan");
     expect(hook).toContain("useEffect(() => installSwipeBack(), []);");
     expect(hook).toContain("useEffect(() => hideBackButton(backLabel), [backLabel]);");
-    expect(source("src/components/RoomHeader.tsx")).toContain('className="@container/roomhead px-5 py-3 pl-11 md:pl-5"');
+    expect(source("src/components/RoomHeader.tsx")).toContain('className="@container/roomhead px-5 pt-2.5 pb-2.5 max-md:px-3"');
+    expect(source("src/components/RoomHeader.tsx")).toContain('<span aria-hidden="true" className="max-md:w-10" />');
     expect(source("src/components/RoomHeader.tsx")).toContain('"@container/roomhead px-5 py-3",\n          "pl-11 md:pl-5",');
     const app = source("src/App.tsx");
     expect(app).toContain('aria-label={t("app.openBotList")}');
