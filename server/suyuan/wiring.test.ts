@@ -36,6 +36,7 @@ describe("the fork's hooks into upstream files", () => {
     expect(functionBody(catalog, "decodeCodexSelection")).toContain("aliasProviderForBare(id) ?? OFFICIAL_CODEX_PROVIDER");
     expect(functionBody(catalog, "catalogAround")).toContain("if (codexOfficialAlias(env)) {");
     expect(source("server/index.ts")).toContain('if (registry.get(selection.instanceId)?.driverKind === "codex") selection.model = qualifyBareCodexModel(selection.model);');
+    expect(source("server/drivers/codex.ts")).toContain("...aliasProviderArgs(selection.modelProvider, env)]");
   });
 
   it("the app runs the fork's hook, shows the push switch, and leaves notifications to push where it is on", () => {

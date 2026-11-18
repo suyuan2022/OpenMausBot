@@ -5,7 +5,7 @@ import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { decodeCodexSelection, readCodexModelCatalog } from "../drivers/codex-catalog.ts";
-import { codexOfficialAlias, qualifyBareCodexModel } from "./codex-official-alias.ts";
+import { aliasProviderArgs, codexOfficialAlias, qualifyBareCodexModel } from "./codex-official-alias.ts";
 
 const homes: string[] = [];
 afterEach(() => {
@@ -16,7 +16,7 @@ function codexHomeWith(replaces: boolean): string {
   const home = mkdtempSync(join(tmpdir(), "codex-alias-"));
   homes.push(home);
   mkdirSync(join(home, "model-catalogs"));
-  writeFileSync(join(home, "config.toml"), 'model = "gpt-6-astra"\nmodel_provider = "her"\n\n[model_providers.her]\nname = "her-gateway"\n');
+  writeFileSync(join(home, "config.toml"), 'model = "gpt-6-astra"\nmodel_provider = "her"\n\n[model_providers.her]\nname = "her-gateway"\nbase_url = "https://gw.example/v1"\nenv_key = "OPENAI_API_KEY"\nwire_api = "responses"\n\n[model_providers.custom]\nname = "OpenAI"\n');
   writeFileSync(join(home, "model-catalogs", "her.json"), JSON.stringify({
     ...(replaces ? { replaces_official: true } : {}),
     models: [
@@ -67,5 +67,17 @@ describe("codex official alias", () => {
     const env = { CODEX_HOME: codexHomeWith(false) };
     const catalog = await readCodexModelCatalog(env, noFetch);
     expect(catalog.options.some((option) => !option.custom)).toBe(true);
+  });
+
+  it("spells out the alias provider for runs that ignore config.toml", () => {
+    const env = { CODEX_HOME: codexHomeWith(true) };
+    expect(aliasProviderArgs("her", env)).toEqual([
+      "-c", 'model_providers.her.name="her-gateway"',
+      "-c", 'model_providers.her.base_url="https://gw.example/v1"',
+      "-c", 'model_providers.her.env_key="OPENAI_API_KEY"',
+      "-c", 'model_providers.her.wire_api="responses"',
+    ]);
+    expect(aliasProviderArgs("openai", env)).toEqual([]);
+    expect(aliasProviderArgs("her", { CODEX_HOME: codexHomeWith(false) })).toEqual([]);
   });
 });

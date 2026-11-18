@@ -59,3 +59,32 @@ export function qualifyBareCodexModel(model: string, env?: Record<string, string
   const provider = aliasProviderForBare(model, env);
   return provider ? `${provider}::${model}` : model;
 }
+
+/** `[model_providers.<id>]` from config.toml as `-c` flags, for Codex runs started with `--ignore-user-config` (the
+ * background one-shots): without them a model moved onto the alias provider names a provider that run never defined. */
+export function aliasProviderArgs(provider: string | null | undefined, env: Record<string, string | undefined> = process.env): string[] {
+  if (!provider) return [];
+  const alias = codexOfficialAlias(env);
+  const home = codexHome(env);
+  if (!alias || alias.provider !== provider || !home) return [];
+  let text: string;
+  try {
+    text = readFileSync(join(home, "config.toml"), "utf8");
+  } catch {
+    return [];
+  }
+  const keys = new Set(["name", "base_url", "env_key", "wire_api"]);
+  const args: string[] = [];
+  let inside = false;
+  for (const line of text.split(/\r?\n/)) {
+    const stripped = line.trim();
+    if (stripped.startsWith("[")) {
+      inside = stripped === `[model_providers.${provider}]` || stripped === `[model_providers."${provider}"]`;
+      continue;
+    }
+    if (!inside) continue;
+    const match = /^([a-z_]+)\s*=\s*"([^"]*)"\s*(?:#.*)?$/.exec(stripped);
+    if (match && keys.has(match[1])) args.push("-c", `model_providers.${provider}.${match[1]}=${JSON.stringify(match[2])}`);
+  }
+  return args;
+}
