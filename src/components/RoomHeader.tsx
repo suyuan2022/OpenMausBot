@@ -1,5 +1,5 @@
 import type { RefObject } from "react";
-import { ChevronRight, Pause, Plus, Search } from "lucide-react";
+import { Pause, Plus, Search } from "lucide-react";
 
 import { cn } from "@/lib/cn";
 import { roomContextWarnings } from "@/lib/context-warning";
@@ -14,7 +14,7 @@ import { useStore, type Bot, type Group } from "@/state/store";
 import { BotAvatar } from "./Avatar";
 import { RoomContextBadge } from "./ContextWarning";
 import { ConversationTurnLimit } from "./ConversationTurnLimit";
-import { ELEVATED_FLOAT, ELEVATED_HOVER } from "./elevated"; // suyuan fork
+import { ELEVATED_FLOAT } from "./elevated"; // suyuan fork
 import { useCaptionChrome } from "./DesktopCapabilities";
 import { ExportTranscriptMenu } from "./ExportTranscriptMenu";
 import { RoomHeaderCallButton } from "./GroupCallView";
@@ -159,44 +159,47 @@ export function RoomHeader({
             one keeps the bot-list button's room. */}
         <div data-roomhead-row className="grid grid-cols-[minmax(max-content,1fr)_minmax(0,auto)_minmax(max-content,1fr)] items-center gap-3">
           <span aria-hidden="true" className="max-md:w-10" />
+          {/* suyuan fork: one floating pill as in a bot's chat, the faces left of the name: up to three faces and +N, a
+              long name cut short, the description only where there is room for it. The faces open Manage members,
+              the name the Room panel. */}
           <div data-roomhead-identity className="flex min-w-0 justify-center" style={headerNoDragStyle}>
-            <button
-              type="button"
-              data-room-name
-              onClick={(event) => openRoomPanel(group.id, event.currentTarget)}
-              title={t("room.panel.open")}
-              aria-label={t("room.panel.openAria", { name: group.name })}
-              aria-haspopup="dialog"
-              style={headerNoDragStyle}
-              className={cn("group flex min-w-0 max-w-full items-center gap-1 rounded-full px-[13.5px] py-[9.5px]", ELEVATED_FLOAT, ELEVATED_HOVER)} // suyuan fork: the floating pill of a bot's chat
-            >
-              <span className="truncate text-[14px] font-medium leading-5 text-ink">{group.name}</span>
-              {group.description && <span aria-hidden="true" className="shrink-0 text-ink-tertiary">·</span>}
-              {group.description && <span className="min-w-0 max-w-[180px] truncate text-[14px] font-medium leading-5 text-ink-secondary">{group.description}</span>}
-              <ChevronRight size={14} aria-hidden="true" className="-ml-1 w-0 shrink-0 text-ink-secondary opacity-0 transition-[width,margin,opacity] duration-150 group-hover:ml-0 group-hover:w-3.5 group-hover:opacity-100 group-focus-visible:ml-0 group-focus-visible:w-3.5 group-focus-visible:opacity-100" />
-            </button>
+            <div data-room-pill className={cn("flex min-w-0 max-w-full items-center gap-2 rounded-full py-[7.5px] pl-[7.5px] pr-[13.5px]", ELEVATED_FLOAT)}>
+              <button
+                ref={membersTriggerRef}
+                type="button"
+                data-room-faces
+                onClick={onOpenMembers}
+                title={t("room.members.manage")}
+                aria-label={membersLabel}
+                style={headerNoDragStyle}
+                className="flex shrink-0 items-center rounded-full"
+              >
+                <span className="flex items-center -space-x-1.5">
+                  {faces.slice(0, SIMPLE_FACES)}
+                  {more > 0 && (
+                    <span className="relative flex h-6 min-w-6 items-center justify-center rounded-full border border-app bg-raised px-1 text-[11px] font-medium tabular-nums text-ink-secondary">
+                      +{more}
+                    </span>
+                  )}
+                </span>
+              </button>
+              <button
+                type="button"
+                data-room-name
+                onClick={(event) => openRoomPanel(group.id, event.currentTarget)}
+                title={t("room.panel.open")}
+                aria-label={t("room.panel.openAria", { name: group.name })}
+                aria-haspopup="dialog"
+                style={headerNoDragStyle}
+                className="flex min-w-0 items-center gap-1"
+              >
+                <span className="truncate text-[14px] font-medium leading-5 text-ink">{group.name}</span>
+                {group.description && <span aria-hidden="true" className="shrink-0 text-ink-tertiary max-md:hidden">·</span>}
+                {group.description && <span className="min-w-0 max-w-[180px] truncate text-[14px] font-medium leading-5 text-ink-secondary max-md:hidden">{group.description}</span>}
+              </button>
+            </div>
           </div>
-          <div data-roomhead-controls className="flex shrink-0 items-center justify-self-end">
-            <button
-              ref={membersTriggerRef}
-              type="button"
-              data-room-faces
-              onClick={onOpenMembers}
-              title={t("room.members.manage")}
-              aria-label={membersLabel}
-              style={headerNoDragStyle}
-              className={cn("flex items-center rounded-full p-[7.5px]", ELEVATED_FLOAT, ELEVATED_HOVER)} // suyuan fork
-            >
-              <span className="flex items-center -space-x-1.5">
-                {faces.slice(0, SIMPLE_FACES)}
-                {more > 0 && (
-                  <span className="relative flex h-6 min-w-6 items-center justify-center rounded-full border border-app bg-raised px-1 text-[11px] font-medium tabular-nums text-ink-secondary">
-                    +{more}
-                  </span>
-                )}
-              </span>
-            </button>
-          </div>
+          <div data-roomhead-controls aria-hidden="true" className="max-md:w-10" />
         </div>
       </div>
     );
