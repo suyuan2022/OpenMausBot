@@ -505,4 +505,17 @@ describe("the fork's hooks into upstream files", () => {
     expect(index).toContain('{ names: screenMcpNames(cfg, integrations.custom), browser: Boolean(integrations.browser), chose: plan.pinned === "browser" || bot.computer === "browser" }) },');
     expect(source("server/config.ts")).toContain("screenMcpServers: z.array(z.string().max(64)).max(16).optional(),");
   });
+  it("a person's Stop, a message that goes first and a restart cut only the running turn; a typed stop (Chinese too) still ends all", () => {
+    const index = source("server/index.ts");
+    expect(functionBody(index, "interruptDirectThread")).toContain('if (scope === "turn") coordinator.stopTurnDirect(threadId, cause); else coordinator.stopAwaitingDirect(threadId, cause);');
+    expect(index).toContain('await interruptDirectThread(bot.id, threadId, line, "turn"); } });');
+    expect(index).toContain("turnRunning: threadBusy, asking:");
+    const stop = source("server/host/person-stop.ts");
+    expect(stop).toContain("const scope = deps.turnRunning ? personStopScope(how, deps.turnRunning(botId, threadId)) : undefined;");
+    expect(stop).toContain('for (const id of stopping) await stopThreadForPerson(botId, id, "typed");');
+    expect(stop).toContain('await stopThreadForPerson(botId, threadId, "restart");');
+    expect(source("server/runtime-coordinator.ts")).toContain("this.runtime.stopRequesterTurn({ threadId }, reason);");
+    expect(source("server/runtime/runtime.ts")).toContain("this.withBatch(() => stopTurnOnly(this.store, owner, reason, {");
+    expect(source("server/room-holds.ts")).toContain("|| isChineseStopWords(words);");
+  });
 });

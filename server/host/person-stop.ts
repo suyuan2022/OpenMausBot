@@ -1,17 +1,18 @@
 // What a person's Stop does to a direct thread: the Stop button (POST /api/bots/:id/interrupt), a typed "stop"
-// while the bot works (acceptDirectSend), and "Restart turn" from the send menu. A stop ends what the request handed out too.
+// while the bot works (acceptDirectSend), and "Restart turn" from the send menu. Upstream: a stop ends what the request handed out too; suyuan fork: see suyuan/stop-turn-only.ts.
 import type { Handoffs } from "../delta-context.ts";
 import { addressesEveryone, isStopCommand } from "../room-holds.ts";
 import type { RoutineManager } from "../routines.ts";
 import { serverLine } from "../server-lines.ts";
 import type { Message, Store } from "../store.ts";
 import type { UsageTrigger } from "../usage-ledger.ts";
+import { personStopScope, type StopScope } from "../suyuan/stop-turn-only.ts";
 
 export interface PersonStopDeps {
   store: Pick<Store, "appendMessage" | "bot" | "botByThread" | "groupByThread" | "taskByThread" | "tasks">;
   routines(): Pick<RoutineManager, "activeBotRunForBot" | "cancelRun"> | null;
   handoffs(): Pick<Handoffs, "stoppedByPerson">;
-  interruptDirectThread(botId: string, threadId: string): Promise<void>;
+  interruptDirectThread(botId: string, threadId: string, cause?: string, scope?: StopScope): Promise<void>;
   clearUnattended(threadId: string): void;
   /** Remembers that the person stopped the turn running in this thread, so it ends as their stop. */
   markStopped(threadId: string): void;
@@ -19,6 +20,8 @@ export interface PersonStopDeps {
   stopGoal(threadId: string): void;
   /** A turn runs, or teammates are at work, for this thread. */
   working(botId: string, threadId: string): boolean;
+  /** suyuan fork: the bot's own turn runs (or is being dispatched) in this thread, teammates aside. */
+  turnRunning?(botId: string, threadId: string): boolean;
   /** The bot waits for the person's answer here: a parked question or an open card. */
   asking(threadId: string): boolean;
   language(threadId: string): string | undefined;
@@ -41,7 +44,8 @@ export interface TypedStop {
 export function createPersonStop(deps: PersonStopDeps) {
   const { store } = deps;
 
-  async function stopThreadForPerson(botId: string, threadId: string): Promise<void> {
+  async function stopThreadForPerson(botId: string, threadId: string, how: "button" | "typed" | "restart" = "button"): Promise<void> {
+    const scope = deps.turnRunning ? personStopScope(how, deps.turnRunning(botId, threadId)) : undefined;
     const routines = deps.routines();
     const routine = routines?.activeBotRunForBot(botId);
     if (routine?.threadId === threadId) {
@@ -51,7 +55,7 @@ export function createPersonStop(deps: PersonStopDeps) {
     deps.handoffs().stoppedByPerson(threadId);
     deps.markStopped(threadId);
     deps.stopGoal(threadId);
-    await deps.interruptDirectThread(botId, threadId);
+    await deps.interruptDirectThread(botId, threadId, undefined, scope);
   }
 
   /** Only a message made of stop words, from a person, acts as Stop: it is recorded, and never reaches the turn it ends. With no
@@ -65,7 +69,7 @@ export function createPersonStop(deps: PersonStopDeps) {
     if (input.personPresent) deps.clearUnattended(threadId);
     const message = store.appendMessage(threadId, { role: "user", kind: "text", text, ...input.row });
     const stopping = (everyone ? store.tasks(botId).map((task) => task.threadId) : [threadId]).filter((id) => (id === threadId && busy) || deps.working(botId, id));
-    for (const id of stopping) await stopThreadForPerson(botId, id);
+    for (const id of stopping) await stopThreadForPerson(botId, id, "typed");
     if (!stopping.length) store.appendMessage(threadId, { role: "bot", kind: "activity", tool: { name: serverLine(deps.language(threadId), "server.stop.nothingRunning"), ok: true } });
     return { ok: true as const, threadId, message };
   }
@@ -75,7 +79,7 @@ export function createPersonStop(deps: PersonStopDeps) {
    * person's own send may end the turn. */
   async function restartForPerson(botId: string, threadId: string, trigger: UsageTrigger): Promise<void> {
     if (trigger.kind !== "user" && trigger.kind !== "owner") return;
-    await stopThreadForPerson(botId, threadId);
+    await stopThreadForPerson(botId, threadId, "restart");
   }
 
   return { stopThreadForPerson, stopOnTypedCommand, restartForPerson };

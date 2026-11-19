@@ -427,6 +427,12 @@ export class RuntimeCoordinator implements Coordinator {
     for (const { root, work } of trees) if (root) this.rememberStop(root, work);
   }
 
+  /** suyuan fork (suyuan/stop-turn-only.ts): only the conversation's running turn ends; what it handed out goes on. */
+  stopTurnDirect(threadId: string, reason = STOPPED_BY_USER): void {
+    this.ready();
+    this.runtime.stopRequesterTurn({ threadId }, reason);
+  }
+
   /** The person's stop, remembered (scoped to that request): the bots whose work on it the stop ended don't take the same
    * request from another bot again, unless the person asked again after the stop. In memory only, for a day. */
   private rememberStop(root: Assignment, work: readonly Assignment[]): void {
