@@ -5,6 +5,7 @@
 import { isMentionBoundary, isMentionNameContinuation } from "../shared/mention-boundary.ts";
 import type { RoomHold, RoomHeldMessage } from "../shared/wire.ts";
 import { isServerLine, serverLine } from "./server-lines.ts";
+import { isChineseStopWords } from "./suyuan/chinese-stop.ts";
 
 const STOP_WINDOW = 2;
 const STOP_WORDS = new Set(["stop", "halt", "pause"]);
@@ -96,7 +97,7 @@ export function isStopCommand(text: string, ownName?: string): boolean {
   const line = maskQuotedAndCode(text).normalize("NFC").toLowerCase();
   const untagged = ["everyone", ...(ownName ? [ownName.normalize("NFC").toLowerCase()] : [])].reduce((rest, name) => rest.split(`@${name}`).join(" "), line);
   const words = untagged.match(/[\p{L}\p{M}\p{N}_-]+/gu) ?? [];
-  return words.some((word) => STOP_COMMANDS.has(word)) && words.every((word) => STOP_COMMANDS.has(word) || STOP_FILLERS.has(word));
+  return (words.some((word) => STOP_COMMANDS.has(word)) && words.every((word) => STOP_COMMANDS.has(word) || STOP_FILLERS.has(word))) || isChineseStopWords(words);
 }
 
 /** A stop word far from every mention changes nothing: re-dispatching a bot the person just stopped is the one mistake to avoid. */
