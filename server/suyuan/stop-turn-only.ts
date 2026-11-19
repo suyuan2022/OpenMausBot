@@ -5,7 +5,7 @@
 // to the conversation as usual. Work in other states (an earlier turn already waiting on results, a queued request, a
 // parked question) is not touched. A typed "stop" still ends everything (Runtime.stopRequester).
 import type { RuntimeStore } from "../runtime/store.ts";
-import { awaited, isTerminal, ownsConversation } from "../runtime/tree.ts";
+import { awaited, childrenSince, isTerminal, ownsConversation } from "../runtime/tree.ts";
 import type { Assignment, Owner } from "../runtime/types.ts";
 
 export interface StopTurnOnlyDeps {
@@ -29,7 +29,9 @@ export function stopTurnOnly(store: RuntimeStore, owner: Owner, reason: string, 
     if (!n || n.status !== "running") continue;
     deps.drop(n.id);
     const carried = n.carrying ?? [];
-    const handedOut = awaited(store.children(n.id)).some((child) => !isTerminal(child));
+    // As at a turn's own end (Runtime.settleTurn): work still running, or anything this turn handed out, finished or not,
+    // whose result the cut turn may never have read.
+    const handedOut = awaited(store.children(n.id)).some((child) => !isTerminal(child)) || awaited(childrenSince(store, n)).length > 0;
     if (!handedOut) {
       deps.settle(n, reason);
       deps.decideCarried(carried);

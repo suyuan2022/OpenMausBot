@@ -107,6 +107,20 @@ describe("stopping only a conversation's running turn", () => {
     expect(checkInvariants(w.store, w.live())).toEqual([]);
   });
 
+  it("still hands back work that finished before the turn was cut", async () => {
+    const w = world();
+    const root = w.runtime.begin(begin());
+    const side = ok(w.runtime.enqueue(to("lychee", "lychee-collage", root.id)));
+    w.tick();
+    await w.finish(side.id, "Collage done");
+    expect(w.store.get(side.id)?.status).toBe("completed");
+    w.runtime.stopRequesterTurn({ threadId: "lychee-home" }, "Stopped by user");
+    expect(w.store.get(root.id)?.status).not.toBe("cancelled");
+    w.tick();
+    expect(w.runs.filter((run) => run.a.id === root.id), "the conversation is resumed with the result").toHaveLength(1);
+    expect(checkInvariants(w.store, w.live())).toEqual([]);
+  });
+
   it("keeps work that has not started yet queued", () => {
     const w = world();
     const root = w.runtime.begin(begin());
