@@ -404,7 +404,7 @@ describe("official Antigravity runtime", () => {
   it("pins Google's release metadata for this supported host", () => {
     const asset = resolveAntigravityReleaseAsset();
     if (!asset) return;
-    expect(ANTIGRAVITY_RELEASE_VERSION).toBe("1.4.3");
+    expect(ANTIGRAVITY_RELEASE_VERSION).toBe("1.5.0");
     expect(asset.version).toBe(ANTIGRAVITY_RELEASE_VERSION);
     expect(asset.url).toMatch(/^https:\/\/dl\.google\.com\/agy-extensions\/releases\//u);
     expect(asset.sha256).toMatch(/^[a-f0-9]{64}$/u);
@@ -473,16 +473,28 @@ describe("official Antigravity runtime", () => {
 
   it("validates ACP initialize results from official Antigravity releases", testValidatesAcpInitializeResults);
 
-  // Captured from the SHA-256-pinned Google 1.4.3 Windows x64 binary, unauthenticated: optional operations are objects.
+  // Captured from the SHA-256-pinned Google 1.5.0 macOS arm64 binary, unauthenticated: optional operations are objects.
   const officialInitialize = {
     protocolVersion: 1,
-    agentInfo: { name: "antigravity-acp", title: "Google Antigravity", version: "1.4.3" },
+    agentInfo: { name: "antigravity-acp", title: "Google Antigravity", version: "1.5.0" },
     agentCapabilities: {
       loadSession: true,
-      sessionCapabilities: { list: {}, resume: {} },
+      promptCapabilities: { image: true, audio: true, embeddedContext: true },
+      mcpCapabilities: { http: true, sse: true },
+      sessionCapabilities: { list: {}, additionalDirectories: {}, resume: {} },
       auth: { logout: {} },
+      _meta: { antigravity: { tier: true, systemPrompt: { append: true } } },
     },
-    authMethods: [{ id: "oauth-personal", name: "Log in with Google" }],
+    authMethods: [
+      { id: "oauth-personal", name: "Log in with Google", description: "Log in with your Google account" },
+      { id: "oauth-business", name: "Log in with Gemini Enterprise", description: "Log in with your Gemini Enterprise account" },
+      { id: "gemini-api-key", name: "Gemini API key", description: "Use an API key with Gemini Developer API" },
+      {
+        id: "agent-platform",
+        name: "Gemini Enterprise Agent Platform",
+        description: "Use Gemini Enterprise Agent Platform (formerly Vertex AI) with Application Default Credentials or an API key",
+      },
+    ],
   };
 
   it("accepts the official runtime's object-shaped capabilities", () => {
