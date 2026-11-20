@@ -518,4 +518,14 @@ describe("the fork's hooks into upstream files", () => {
     expect(source("server/runtime/runtime.ts")).toContain("this.withBatch(() => stopTurnOnly(this.store, owner, reason, {");
     expect(source("server/room-holds.ts")).toContain("|| isChineseStopWords(words);");
   });
+  it("automation reports carry attach_file files and every non-quiet turn of a multi-turn run", () => {
+    const reports = source("server/automation-reports.ts");
+    expect(reports).toContain('from "./suyuan/automation-report-turns.ts"');
+    expect(reports).toContain("if (!shouldDeliverAutomationTurn(run)) return;");
+    expect(reports).toContain("const { source, attachments } = extractTurnReport(store.activePath(run.threadId!), turnId);");
+    expect(reports).toContain("const turns = run.threadId ? collectRecoverableRoutineTurns(store.activePath(run.threadId), { failedRun: failed }) : [];");
+    expect(reports).toContain("const written = findPostedRunReply(targetMessages, run.id, turnKey);");
+    expect(reports).toContain("const written = findPostedRunFailure(targetMessages, run.id);");
+    expect(source("shared/routine-run.ts")).toContain("turnId?: string;");
+  });
 });
