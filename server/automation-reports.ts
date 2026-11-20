@@ -237,29 +237,30 @@ export function createAutomationReports(deps: AutomationReportDeps) {
         resumed = true;
         for (const run of manager.listRuns().reverse()) {
           if (run.report?.state !== "pending") continue;
-          if (run.status === "failed") {
+          const failed = run.status === "failed";
+          if (!hasQueuedReply(run.id)) {
+            const turns = run.threadId ? collectRecoverableRoutineTurns(store.activePath(run.threadId), { failedRun: failed }) : [];
+            if (turns.length === 0 && !failed) {
+              waiting.set(runReportReplyKey(run.id), { kind: "reply", run, ...(run.status !== "completed" ? { intermediate: true } : {}) });
+            } else {
+              for (let i = 0; i < turns.length; i += 1) {
+                const turn = turns[i]!;
+                const turnKey = turn.turnId ?? turn.messageId;
+                const key = runReportReplyKey(run.id, turnKey);
+                if (waiting.has(key)) continue;
+                const intermediate = i < turns.length - 1 || run.status !== "completed";
+                waiting.set(key, {
+                  kind: "reply", run,
+                  ...(turn.turnId ? { turnId: turn.turnId } : {}),
+                  ...(turn.messageId ? { messageId: turn.messageId } : {}),
+                  ...(intermediate ? { intermediate: true } : {}),
+                });
+              }
+            }
+          }
+          if (failed) {
             const failKey = runReportFailureKey(run.id);
             if (!waiting.has(failKey)) waiting.set(failKey, { kind: "failure", run, detail: run.error ?? "" });
-            continue;
-          }
-          if (hasQueuedReply(run.id)) continue;
-          const turns = run.threadId ? collectRecoverableRoutineTurns(store.activePath(run.threadId)) : [];
-          if (turns.length === 0) {
-            waiting.set(runReportReplyKey(run.id), { kind: "reply", run, ...(run.status === "waiting" ? { intermediate: true } : {}) });
-            continue;
-          }
-          for (let i = 0; i < turns.length; i += 1) {
-            const turn = turns[i]!;
-            const turnKey = turn.turnId ?? turn.messageId;
-            const key = runReportReplyKey(run.id, turnKey);
-            if (waiting.has(key)) continue;
-            const intermediate = i < turns.length - 1 || run.status === "waiting";
-            waiting.set(key, {
-              kind: "reply", run,
-              ...(turn.turnId ? { turnId: turn.turnId } : {}),
-              ...(turn.messageId ? { messageId: turn.messageId } : {}),
-              ...(intermediate ? { intermediate: true } : {}),
-            });
           }
         }
       }

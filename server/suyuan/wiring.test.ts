@@ -523,7 +523,7 @@ describe("the fork's hooks into upstream files", () => {
     expect(reports).toContain('from "./suyuan/automation-report-turns.ts"');
     expect(reports).toContain("if (!shouldDeliverAutomationTurn(run)) return;");
     expect(reports).toContain("const { source, attachments } = extractTurnReport(store.activePath(run.threadId!), turnId);");
-    expect(reports).toContain("const turns = run.threadId ? collectRecoverableRoutineTurns(store.activePath(run.threadId)) : [];");
+    expect(reports).toContain("const turns = run.threadId ? collectRecoverableRoutineTurns(store.activePath(run.threadId), { failedRun: failed }) : [];");
     expect(reports).toContain("const written = findPostedRunReply(targetMessages, run.id, turnKey);");
     expect(reports).toContain("const written = findPostedRunFailure(targetMessages, run.id);");
     expect(source("shared/routine-run.ts")).toContain("turnId?: string;");

@@ -51,7 +51,7 @@ function fixture() {
     runs.set(id, run);
     return run;
   };
-  const lines = () => store.messagesFor(main).filter((message) => message.automation);
+  const lines = (runId?: string) => store.messagesFor(main).filter((message) => message.automation && (!runId || message.automation.runId === runId));
   return { store, bot, main, runs, busy, notified, wrote, reports, startRun, lines, create };
 }
 
@@ -229,5 +229,106 @@ describe("suyuan automation report turns & attachments", () => {
 
     f.create().flush();
     expect(f.lines().map((m) => m.text)).toEqual(["第一轮结论", "第二轮结论"]);
+  });
+
+  it("recovers queued turn 1 replies and attachments before the failure line after a restart on a failed run", () => {
+    const f = fixture();
+    f.busy.add(f.main);
+    const run = f.startRun("排队后失败重启");
+    const vid = { kind: "file" as const, path: "/attachments/t1-video.mp4", mime: "video/mp4", name: "t1-video.mp4" };
+    f.store.appendMessage(run.threadId!, { role: "bot", kind: "text", text: "", attachments: [vid] });
+    f.store.appendMessage(run.threadId!, { role: "bot", kind: "text", text: "第一轮已完成并附视频。", turnId: "t1", turnTerminal: true, turnSucceeded: true });
+    f.store.appendMessage(run.threadId!, { role: "bot", kind: "digest", text: "[digest]", turnId: "t1" });
+    run.status = "waiting";
+    f.reports.runSettled(run, "t1");
+
+    f.store.appendMessage(run.threadId!, { role: "bot", kind: "text", text: "半截文字", turnId: "t2" });
+    run.status = "failed";
+    run.error = "provider crashed";
+    f.reports.runFailed(run, "provider crashed");
+
+    // Also add a single-turn failed run with partial non-terminal text: must only post the failure line.
+    const crashRun = f.startRun("单轮崩溃");
+    f.store.appendMessage(crashRun.threadId!, { role: "bot", kind: "text", text: "没跑完的半截", turnId: "c1" });
+    crashRun.status = "failed";
+    crashRun.error = "socket closed";
+    f.reports.runFailed(crashRun, "socket closed");
+
+    f.busy.delete(f.main);
+    f.create().flush();
+
+    expect(f.lines(run.id).map((m: Message) => ({ text: m.text, attachments: m.attachments, failed: m.automation?.failed }))).toEqual([
+      { text: "第一轮已完成并附视频。", attachments: [vid], failed: undefined },
+      { text: expect.stringContaining("provider crashed"), attachments: undefined, failed: true },
+    ]);
+    expect(f.lines(crashRun.id).map((m: Message) => ({ failed: m.automation?.failed }))).toEqual([
+      { failed: true },
+    ]);
+  });
+
+  it("stamps turnId when recovering a queued-for-retry run so the retry turn is not swallowed by dedup", () => {
+    const f = fixture();
+    f.busy.add(f.main);
+    const run = f.startRun("重启重试");
+    f.store.appendMessage(run.threadId!, { role: "bot", kind: "text", text: "第一轮汇报", turnId: "t1", turnTerminal: true, turnSucceeded: true });
+    run.status = "waiting";
+    f.reports.runSettled(run, "t1");
+
+    // On restart, RoutineManager moves an interrupted run back to queued for automatic retry.
+    run.status = "queued";
+    f.busy.delete(f.main);
+    const restarted = f.create();
+    restarted.flush();
+
+    expect(f.lines(run.id).map((m) => ({ text: m.text, turnId: m.automation?.turnId }))).toEqual([
+      { text: "第一轮汇报", turnId: "t1" },
+    ]);
+
+    // Retry executes as turn 2 and completes.
+    f.store.appendMessage(run.threadId!, { role: "user", kind: "text", text: "[Scheduled routine \"重启重试\" — do this now:]\nCheck\n[OpenMausBot: this run's first start stopped when OpenMausBot restarted before it finished.]" });
+    f.store.appendMessage(run.threadId!, { role: "bot", kind: "text", text: "重试后的第二轮结论", turnId: "t2", turnTerminal: true, turnSucceeded: true });
+    run.status = "completed";
+    restarted.runSettled(run, "t2");
+
+    expect(f.lines(run.id).map((m) => m.text)).toEqual(["第一轮汇报", "重试后的第二轮结论"]);
+  });
+
+  it("recovers an attach_file-only turn after a text turn on restart", () => {
+    const f = fixture();
+    const run = f.startRun("二轮纯附件");
+    const file2 = { kind: "file" as const, path: "/attachments/report-part2.pdf", mime: "application/pdf", name: "report-part2.pdf" };
+    f.store.appendMessage(run.threadId!, { role: "bot", kind: "text", text: "第一轮文字结论", turnId: "t1", turnTerminal: true, turnSucceeded: true });
+    f.store.appendMessage(run.threadId!, { role: "bot", kind: "digest", text: "[digest]", turnId: "t1" });
+    f.store.appendMessage(run.threadId!, { role: "bot", kind: "activity", turnId: "t2", tool: { name: "attach_file", ok: true } });
+    f.store.appendMessage(run.threadId!, { role: "bot", kind: "text", text: "", attachments: [file2] });
+    run.status = "completed";
+    run.report = { state: "pending" };
+
+    f.create().flush();
+    expect(f.lines(run.id).map((m: Message) => ({ text: m.text, attachments: m.attachments }))).toEqual([
+      { text: "第一轮文字结论", attachments: undefined },
+      { text: "", attachments: [file2] },
+    ]);
+  });
+
+  it("does not mistake an automatic routine retry prompt for a person side turn on restart", () => {
+    const f = fixture();
+    const run = f.startRun("自动重试恢复");
+    const retryImg = { kind: "image" as const, path: "/attachments/retry.png", mime: "image/png", name: "retry.png" };
+    f.store.appendMessage(run.threadId!, { role: "bot", kind: "text", text: "第一轮结果", turnId: "t1", turnTerminal: true, turnSucceeded: true });
+    f.store.appendMessage(run.threadId!, {
+      role: "user", kind: "text",
+      text: "[Scheduled routine \"自动重试恢复\" — do this now:]\nTrigger id: r1\nDo the check.\n[OpenMausBot: this run's first start failed before it finished. If it already did part of the work, check what it did.]",
+    });
+    f.store.appendMessage(run.threadId!, { role: "bot", kind: "text", text: "", attachments: [retryImg] });
+    f.store.appendMessage(run.threadId!, { role: "bot", kind: "text", text: "重试成功的最终结果", turnId: "t2", turnTerminal: true, turnSucceeded: true });
+    run.status = "completed";
+    run.report = { state: "pending" };
+
+    f.create().flush();
+    expect(f.lines(run.id).map((m: Message) => ({ text: m.text, attachments: m.attachments }))).toEqual([
+      { text: "第一轮结果", attachments: undefined },
+      { text: "重试成功的最终结果", attachments: [retryImg] },
+    ]);
   });
 });
