@@ -364,11 +364,12 @@ it("does not take a person's failed turn in a run's conversation for the run's o
   await expect.poll(async () => (await s.messages(threadId)).some((message) => message.kind === "activity" && message.tool?.ok === false), { timeout: 20_000 }).toBe(true);
   expect(await s.run(id)).toMatchObject({ status: "waiting" });
   expect((await s.run(id)).error).toBeUndefined();
-  expect(await s.lines()).toEqual([]);
+  // suyuan fork: turn 1's own reply is posted immediately while waiting on Sam, and the person's failed turn posts no failure line.
+  expect((await s.lines()).map((line) => [line.text, Boolean(line.automation?.failed)])).toEqual([["Asked Sam to count the stock.", false]]);
   writeFileSync(samGate, "done");
   await s.settled(id);
   await s.reported(id, "posted");
-  expect((await s.lines()).map((line) => line.text)).toEqual(["We have 42 boxes in stock."]);
+  expect((await s.lines()).map((line) => line.text)).toEqual(["Asked Sam to count the stock.", "We have 42 boxes in stock."]);
 }, 120_000);
 
 it("says in the main chat, once per run of failures, that an automation could not finish", async () => {
