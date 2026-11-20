@@ -331,4 +331,26 @@ describe("suyuan automation report turns & attachments", () => {
       { text: "重试成功的最终结果", attachments: [retryImg] },
     ]);
   });
+
+  it("does not leak attach_file attachments from a failed turn during restart recovery", () => {
+    const f = fixture();
+    f.busy.add(f.main);
+    const run = f.startRun("失败轮带附件");
+    const draft = { kind: "file" as const, path: "/attachments/draft.pdf", mime: "application/pdf", name: "draft.pdf" };
+    f.store.appendMessage(run.threadId!, { role: "bot", kind: "activity", turnId: "t1", tool: { name: "attach_file", ok: true } });
+    f.store.appendMessage(run.threadId!, { role: "bot", kind: "text", text: "", attachments: [draft] });
+    f.store.appendMessage(run.threadId!, { role: "bot", kind: "text", text: "正在核对报告", turnId: "t1", turnTerminal: true, turnSucceeded: false });
+    f.store.appendMessage(run.threadId!, { role: "bot", kind: "activity", turnId: "t1", tool: { name: "error: provider crashed", ok: false } });
+    f.store.appendMessage(run.threadId!, { role: "bot", kind: "digest", text: "[digest]", turnId: "t1", turnSucceeded: false });
+    run.status = "failed";
+    run.error = "provider crashed";
+    f.reports.runFailed(run, "provider crashed");
+
+    f.busy.delete(f.main);
+    f.create().flush();
+
+    expect(f.lines(run.id).map((m: Message) => ({ failed: m.automation?.failed, attachments: m.attachments }))).toEqual([
+      { failed: true, attachments: undefined },
+    ]);
+  });
 });

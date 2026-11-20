@@ -205,20 +205,27 @@ export function collectRecoverableRoutineTurns(
   const covered = new Set<number>();
   const indexById = new Map(path.map((message, index) => [message.id, index]));
 
+  const failedTurnIds = new Set<string>();
+  for (const message of path) {
+    if (message.turnId && (message.turnSucceeded === false || isFailedTurnActivity(message))) {
+      failedTurnIds.add(message.turnId);
+    }
+  }
+
   for (let i = 0; i < path.length; i += 1) {
     const message = path[i]!;
     if (!isBotText(message) || !message.turnTerminal) continue;
     if (personIndices.has(i) || (message.turnId && personTurnIds.has(message.turnId))) continue;
-    if (message.turnSucceeded === false) continue;
+    for (const item of sliceTurn(path, message.turnId, message.id)) {
+      const idx = indexById.get(item.id);
+      if (idx !== undefined) covered.add(idx);
+    }
+    if (message.turnSucceeded === false || (message.turnId && failedTurnIds.has(message.turnId))) continue;
     if (message.turnId) {
       if (seenTurnIds.has(message.turnId)) continue;
       seenTurnIds.add(message.turnId);
     }
     collected.push({ index: i, ...(message.turnId ? { turnId: message.turnId } : {}), messageId: message.id });
-    for (const item of sliceTurn(path, message.turnId, message.id)) {
-      const idx = indexById.get(item.id);
-      if (idx !== undefined) covered.add(idx);
-    }
   }
 
   // Recover attach_file-only turns that emitted no turnTerminal text row.
@@ -259,9 +266,12 @@ export function collectRecoverableRoutineTurns(
       if (item.turnSucceeded === false || isFailedTurnActivity(item)) failedSegment = true;
       if (isBotText(item) && item.attachments?.length) lastAttachIdx = j;
     }
-    if (failedSegment) continue;
+    if (failedSegment || (segTurnId !== undefined && failedTurnIds.has(segTurnId))) continue;
     // On a failed run, do not treat an incomplete trailing attach-only segment as a finished turn.
-    const hasLaterTurn = path.slice(segEnd + 1).some((item) => isTurnBoundary(item) || Boolean(item.turnTerminal));
+    const hasLaterTurn = path.slice(segEnd + 1).some((item) =>
+      (isTurnBoundary(item) && !(item.kind === "digest" && segTurnId !== undefined && item.turnId === segTurnId))
+      || (Boolean(item.turnTerminal) && item.turnSucceeded !== false),
+    );
     if (options.failedRun && !hasLaterTurn) continue;
 
     collected.push({
