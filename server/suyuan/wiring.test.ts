@@ -257,7 +257,7 @@ describe("the fork's hooks into upstream files", () => {
     expect(source("server/host/work-thread.ts")).toContain("if (usable && input.notice && !task.openedBy?.roomLane && input.others?.(task)) return task;");
     const index = source("server/index.ts");
     expect(index).toContain("others: EXTERNAL ? undefined : relayGate({ personBehind: teammatePrompts.personBehind, outside: outsideLineage.handsNoLevel, readableFrom: threadReadableFrom, openPersonCard }, internalSender.id, internalCapability.threadId)");
-    expect(index).toContain("if (!continued || continued.openedBy?.botId === internalSender.id) delegatedLevel.apply(internalSender, internalCapability.threadId, internalCapability.roomHandoffId ?? generation, recipient, target.threadId);");
+    expect(index).toContain("if (!continued || continued.openedBy?.botId === internalSender.id) delegatedLevel.apply(internalSender, internalCapability.threadId, internalCapability.roomHandoffId ?? generation, store.projectBotForTask(recipient.id, target.threadId) ?? recipient, target.threadId);");
   });
 
   it("a phone in Simple mode leads its home with the desk's tiles, and a long press opens a tile's menu", () => {
@@ -441,7 +441,7 @@ describe("the fork's hooks into upstream files", () => {
     expect(index).toContain("if (peerReviewRequired(internalSender, address.threadId) && targets.some(target => target.botId !== internalSender.id)) {");
     expect(index).toContain('const verdicts = await Promise.all(targets.map(target => target.botId === internalSender.id ? "allow" as const :');
     expect(index).toContain("if (!room && !fresh) reopenOwnThread(store, target.botId, call.thread, internalSender.id);");
-    expect(index).toContain("false, call.projectId, opened, call.self?.approvalMode, call.self?.modelSelection, folder.cwd)");
+    expect(index).toContain("false, call.projectId, opened, call.self?.approvalMode, modelOverride ?? call.self?.modelSelection, folder.cwd)");
     expect(index).toContain("rework: call.rework || target.botId === internalSender.id,");
     expect(index).toContain("store.appendMessage(address.threadId, ownThreadRow({ sender: internalSender, recipient, threadId: node.threadId,");
     // start_thread on yourself: only a conversation's own turn; the tool asks for the result back unless the bot says none, and the route alone keeps upstream's one-way thread.
@@ -527,5 +527,23 @@ describe("the fork's hooks into upstream files", () => {
     expect(reports).toContain("const written = findPostedRunReply(targetMessages, run.id, turnKey);");
     expect(reports).toContain("const written = findPostedRunFailure(targetMessages, run.id);");
     expect(source("shared/routine-run.ts")).toContain("turnId?: string;");
+  });
+  it("coordinate_bots accepts an optional per-handoff model_selection without changing the teammate default model", () => {
+    const index = source("server/index.ts");
+    expect(index).toContain("from \"./suyuan/handoff-model.ts\"");
+    expect(index).toContain("instanceId: b.modelSelection.instanceId,");
+    expect(index).toContain("validateHandoffModel(call.modelSelection,");
+    expect(index).toContain("prepareTargetThreadModel({ selection: modelOverride,");
+    expect(index).toContain("applyThreadModelPlan(modelPlan.plan, modelOps(target.botId, task.threadId))");
+    expect(index).toContain("revertThreadModelPlan(appliedModelPlan, modelOps(target.botId, target.threadId))");
+    expect(index).toContain("handoffModelNote(modelOverride)");
+    expect(index).toContain("modelSelection: z.unknown().optional(),");
+    expect(source("server/coordinator.ts")).toContain("modelSelection?: unknown;");
+    const call = source("server/drivers/agents-call.ts");
+    expect(call).toContain("parseHandoffModelArg(canonical.model_selection)");
+    expect(call).toContain("engine: ${b.instanceId}");
+    const facts = source("server/suyuan/thread-facts.ts");
+    expect(facts).toContain("HANDOFF_MODEL_DESC_SWAP,");
+    expect(facts).toContain("model_selection: HANDOFF_MODEL_PARAM");
   });
 });
