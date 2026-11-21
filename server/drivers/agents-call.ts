@@ -19,6 +19,7 @@ import { callResearchTool, RESEARCH_TOOL_NAMES } from "./agents-research-tools.t
 import { callHelperTool, HELPER_TOOL_NAMES } from "./agents-helper-tools.ts";
 import { callChiefReadTool, CHIEF_READ_TOOL_NAMES } from "../suyuan/chief-read-tools.ts";
 import { threadFacts } from "../suyuan/thread-facts.ts";
+import { parseHandoffModelArg } from "../suyuan/handoff-model.ts";
 import { selfThreadOpenedText } from "../suyuan/self-thread.ts";
 import { callUsageLimitsTool, USAGE_LIMITS_TOOL } from "./agents-usage-tool.ts";
 import { callWaitTool, WAIT_TOOL_NAMES } from "./agents-wait-tools.ts";
@@ -296,6 +297,7 @@ export async function callTool(called: string, input: Json, context: ToolCallCon
     // A non-text groupId still fails the check below, as it always has.
     if (snakeBlank && args.groupId != null && !(typeof args.groupId === "string" && args.groupId.trim() === "")) canonical.group_id = args.groupId;
     if (canonical.done_when === undefined) canonical.done_when = args.doneWhen;
+    if (canonical.model_selection === undefined) canonical.model_selection = args.modelSelection; // suyuan fork: server/suyuan/handoff-model.ts
     const ids = canonical.bot_ids;
     const optional = (key: string, type: "boolean" | "string") => canonical[key] === undefined || typeof canonical[key] === type;
     const usable = Array.isArray(ids) && ids.length > 0 && ids.every((id) => typeof id === "string")
@@ -307,10 +309,11 @@ export async function callTool(called: string, input: Json, context: ToolCallCon
       && (canonical.group_id === undefined || canonical.group_id === null || typeof canonical.group_id === "string");
     if (!usable) {
       return {
-        text: `coordinate_bots takes snake_case arguments: bot_ids (an array of 1-4 teammate ids) and message are required; group_id, reason, rework, title, thread ("standing", "new" or the id of a thread you opened on that teammate), reply ("resume" or "none"), consult (true or false), in_my_folder (true or false), done_when and answers are optional. Received: ${Object.keys(args).join(", ") || "none"}.`,
+        text: `coordinate_bots takes snake_case arguments: bot_ids (an array of 1-4 teammate ids) and message are required; group_id, reason, rework, title, thread ("standing", "new" or the id of a thread you opened on that teammate), reply ("resume" or "none"), consult (true or false), in_my_folder (true or false), done_when, answers and model_selection are optional. Received: ${Object.keys(args).join(", ") || "none"}.`,
         isError: true,
       };
     }
+    const modelPick = parseHandoffModelArg(canonical.model_selection); if (!modelPick.ok) return { text: modelPick.error, isError: true }; // suyuan fork: server/suyuan/handoff-model.ts
     const r = await api("/api/internal/coordinate-bots", { method: "POST", body: JSON.stringify({
       groupId: typeof canonical.group_id === "string" && canonical.group_id.trim() ? canonical.group_id.trim() : undefined, botIds: ids, message: canonical.message,
       reason: typeof canonical.reason === "string" && canonical.reason.trim() ? canonical.reason.trim() : undefined,
@@ -319,6 +322,7 @@ export async function callTool(called: string, input: Json, context: ToolCallCon
       title: typeof canonical.title === "string" && canonical.title.trim() ? canonical.title.trim() : undefined, consult: canonical.consult, inMyFolder: canonical.in_my_folder,
       done_when: typeof canonical.done_when === "string" && canonical.done_when.trim() ? canonical.done_when.trim() : undefined,
       answers: typeof canonical.answers === "string" && canonical.answers.trim() ? canonical.answers.trim() : undefined,
+      ...(modelPick.selection ? { modelSelection: modelPick.selection } : {}),
     }) });
     return { text: JSON.stringify(r), ...(r.error ? { isError: true } : {}) };
   }
@@ -359,7 +363,8 @@ export async function callTool(called: string, input: Json, context: ToolCallCon
         ? (b.status === "available" ? "" : b.statusText)
         : (b.busy ? "busy" : "");
       const team = typeof b.section === "string" ? `, department: ${peerName(b.section) || "General"}` : "";
-      return `- ${b.name}${role}${about} [id: ${b.id}, model: ${b.model}${team}${state ? `, ${state}` : ""}]`;
+      const engine = typeof b.instanceId === "string" && b.instanceId ? `, engine: ${b.instanceId}` : "";
+      return `- ${b.name}${role}${about} [id: ${b.id}, model: ${b.model}${engine}${team}${state ? `, ${state}` : ""}]`;
     });
     return {
       text: `Bots you can reach (every department; you can contact any of them):\n${lines.join("\n")}\n\nUse coordinate_bots for concrete work or, with consult: true, for advice, then end your turn. Busy teammates queue and results resume you automatically.`,

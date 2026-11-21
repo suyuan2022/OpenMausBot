@@ -594,7 +594,7 @@ import { createBotSkillsRoutes } from "./routes/bot-skills.ts"; import { noteTur
 import { createSkillShareRoutes } from "./routes/skill-share.ts";
 import { createTeamContextRoutes } from "./routes/team-context.ts";
 import { createDeciderRoutes } from "./routes/decider.ts"; import { createCloudSendRoutes } from "./routes/cloud-send.ts"; import { claudeCodeSkillInputs } from "./setup-import.ts"; import { createCloudConnectionsHost } from "./cloud-connections-host.ts";
-import { createUpdateCheckRoutes, serverUpdateChecker } from "./routes/update-check.ts"; import { createTimeZoneRoutes } from "./routes/time-zone.ts"; import { relayGate } from "./suyuan/relay-gate.ts"; import { suyuanFrame } from "./suyuan/register.ts"; import { homeThread, isHome } from "./suyuan/home.ts"; import { engineCompactsItself } from "./suyuan/native-compact.ts"; import { roomRoutingReady, routedText, withRoomRouter, withRoomRouterStatus } from "./suyuan/room-router.ts"; import { readsWith as suyuanReadsWith, waitingOnWire } from "./suyuan/inbox-read.ts"; import { watchConfigFile } from "./suyuan/config-reload-host.ts"; import { qualifyBareCodexModel } from "./suyuan/codex-official-alias.ts"; // suyuan fork
+import { createUpdateCheckRoutes, serverUpdateChecker } from "./routes/update-check.ts"; import { createTimeZoneRoutes } from "./routes/time-zone.ts"; import { relayGate } from "./suyuan/relay-gate.ts"; import { suyuanFrame } from "./suyuan/register.ts"; import { homeThread, isHome } from "./suyuan/home.ts"; import { engineCompactsItself } from "./suyuan/native-compact.ts"; import { roomRoutingReady, routedText, withRoomRouter, withRoomRouterStatus } from "./suyuan/room-router.ts"; import { readsWith as suyuanReadsWith, waitingOnWire } from "./suyuan/inbox-read.ts"; import { watchConfigFile } from "./suyuan/config-reload-host.ts"; import { qualifyBareCodexModel } from "./suyuan/codex-official-alias.ts"; import { applyThreadModelPlan, handoffModelNote, prepareTargetThreadModel, revertThreadModelPlan, validateHandoffModel, type ThreadModelPlan } from "./suyuan/handoff-model.ts"; // suyuan fork
 import { createBrowserSiteRoutes } from "./routes/browser-sites.ts";
 import { createInternalSignInRoutes } from "./routes/sign-in.ts";
 import { createInternalMcpRoutes } from "./routes/internal-mcp.ts";
@@ -13243,7 +13243,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
               id: b.id,
               name: b.name,
               section: b.section?.trim() || "",
-              model: b.modelSelection.model,
+              model: b.modelSelection.model, instanceId: b.modelSelection.instanceId,
               busy: !!b.busy,
               status,
               statusText: peerStatusWords(status),
@@ -13766,7 +13766,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
             : roomHandoffProblem(target, address);
           if (eligibility) return refuse(403, eligibility);
         }
-        let approvalGranted = false;
+        const handoffModel = validateHandoffModel(call.modelSelection, { answers: call.answers, hasRoomTarget: targets.some((target) => Boolean(target.groupId)), targets: targets.map((target) => store.bot(target.botId)!), checkSelection: (raw) => checkedModelSelection(raw, undefined, true), validateProposal: validateModelProposal, engine: threadEngine, policyRefusal: policyModelRefusal }); if (!handoffModel.ok) return refuse(handoffModel.status, handoffModel.error); const modelOverride = handoffModel.selection; let approvalGranted = false; // suyuan fork: server/suyuan/handoff-model.ts
         if (peerReviewRequired(internalSender, address.threadId) && targets.some(target => target.botId !== internalSender.id)) {
           const verdicts = await Promise.all(targets.map(target => target.botId === internalSender.id ? "allow" as const :
             requestPeerApproval(approvalBus, internalSender, store.bot(target.botId)!, call.message, call.consult ? "ask_bot" : "delegate_bot", address.threadId)));
@@ -13795,7 +13795,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
         const refused: string[] = [];
         const answeredForPerson = new Set<PeerDeliveryReceipt>();
         for (const target of targets) {
-          let createdThread: string | undefined;
+          let createdThread: string | undefined; let appliedModelPlan: ThreadModelPlan | undefined; const modelOps = (botId: string, threadId: string) => ({ switchModel: (selection: ModelSelection) => { const from = store.projectBotForTask(botId, threadId)?.modelSelection; store.switchTaskModel(botId, threadId, selection, false, false, from ? hostedModels?.resetTask(from, selection) : undefined); }, followBotModel: () => { store.followBotModel(botId, [threadId], (from, to) => hostedModels?.resetTask(from, to) ?? {}); } });
           const room = target.groupId ? destination : undefined;
           try {
             requireActiveInternalCapability();
@@ -13804,11 +13804,11 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
             // Work a person's request hands on opens in the receiving bot's chat with them when it may use their own apps.
             const opener = (room ? null : handOnFor) ?? openerFrom(address.threadId);
             // A Chief answers, for the person, the question a teammate it manages waits on in a thread the Chief did not open.
-            const forPerson = EXTERNAL || room || fresh || call.answers || mode !== "work" || call.thread === "standing" || !teammatePrompts.actsForPerson(internalSender, internalCapability.threadId) || !canManage(internalSender, recipient) || !threadReadableFrom(internalCapability.threadId)(call.thread) || !asksActingPerson(internalCapability.threadId, store.groupByThread(internalCapability.threadId) ? internalCapability.generation : undefined)(call.thread, recipient.id) ? undefined : await questionRouting.answerForPerson({ sender: internalSender, senderThreadId: address.threadId, target: recipient, threadId: call.thread, message: call.message });
+            const forPerson = EXTERNAL || room || fresh || call.answers || Boolean(modelOverride) || mode !== "work" || call.thread === "standing" || !teammatePrompts.actsForPerson(internalSender, internalCapability.threadId) || !canManage(internalSender, recipient) || !threadReadableFrom(internalCapability.threadId)(call.thread) || !asksActingPerson(internalCapability.threadId, store.groupByThread(internalCapability.threadId) ? internalCapability.generation : undefined)(call.thread, recipient.id) ? undefined : await questionRouting.answerForPerson({ sender: internalSender, senderThreadId: address.threadId, target: recipient, threadId: call.thread, message: call.message });
             if (forPerson) { if (forPerson.outcome === "failed") refused.push(forPerson.detail); else answeredForPerson.add(forPerson); receipts.push(forPerson); continue; } if (!room && !fresh) reopenOwnThread(store, target.botId, call.thread, internalSender.id);
             const continued = room || fresh ? undefined : workThreadFor(store, { botId: target.botId, botName: recipient.name, fromBotId: internalSender.id, fromThreadId: address.threadId, thread: call.thread, notice: mode === "notify",
               answering: coordinator.answersTo(internalCapability.roomHandoffId ?? generation), also: (task) => !CLOUD_TEAM || threadStarters.get(task.threadId) === opener, reach: (task) => outsideLineage.mayReach(address.threadId, task.threadId), others: EXTERNAL ? undefined : relayGate({ personBehind: teammatePrompts.personBehind, outside: outsideLineage.handsNoLevel, readableFrom: threadReadableFrom, openPersonCard }, internalSender.id, internalCapability.threadId), home: (task) => isHome(store, target.botId, task.threadId) });
-            const relayed = EXTERNAL || (!call.answers && (room || fresh || mode === "consult")) ? undefined : await questionRouting.relay({ sender: internalSender, senderThreadId: address.threadId,
+            const targetLive = Boolean(continued && (threadBusy(target.botId, continued.threadId) || coordinator.active().some((n) => !n.groupId && n.botId === target.botId && n.threadId === continued.threadId && !ENDED.has(n.status)))); const modelPlan = prepareTargetThreadModel({ selection: modelOverride, thread: call.thread, senderId: internalSender.id, recipient, continued, isHome: continued ? isHome(store, target.botId, continued.threadId) : false, busy: targetLive }); if (!modelPlan.ok) throw new Error(modelPlan.error); if (modelPlan.plan.kind === "switch" && continued) { const projected = store.projectBotForTask(target.botId, continued.threadId) ?? recipient; const threadRefused = validateModelProposal(modelPlan.plan.selection, projected); if (threadRefused) throw new Error(threadRefused); } const relayed = EXTERNAL || (!call.answers && (room || fresh || mode === "consult" || (Boolean(modelOverride) && !targetLive))) ? undefined : await questionRouting.relay({ sender: internalSender, senderThreadId: address.threadId,
               senderNode: coordinator.node(internalCapability.roomHandoffId ?? generation), target: recipient, message: call.message, ...(call.answers ? { answers: call.answers } : {}), ...(continued ? { threadId: continued.threadId } : {}),
               ...(internalCapability.delegatedThisTurn ? { sentThisTurn: internalCapability.delegatedThisTurn } : {}) });
             if (relayed) { if (relayed.outcome === "failed") refused.push(relayed.detail); receipts.push(relayed); continue; }
@@ -13819,12 +13819,12 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
             if (!room) {
               const opened = { botId: internalSender.id, name: internalSender.name, threadId: address.threadId, at: Date.now() };
               const task = continued ?? (fresh
-                ? store.createTask(target.botId, call.title ?? (call.message.replace(/\s+/g, " ").trim().slice(0, 60) || `From ${internalSender.name}`), false, call.projectId, opened, call.self?.approvalMode, call.self?.modelSelection, folder.cwd)
-                : store.createTask(target.botId, `@${internalSender.name} · work`, false, undefined, { ...opened, kind: "work" }, undefined, undefined, folder.cwd));
+                ? store.createTask(target.botId, call.title ?? (call.message.replace(/\s+/g, " ").trim().slice(0, 60) || `From ${internalSender.name}`), false, call.projectId, opened, call.self?.approvalMode, modelOverride ?? call.self?.modelSelection, folder.cwd)
+                : store.createTask(target.botId, `@${internalSender.name} · work`, false, undefined, { ...opened, kind: "work" }, undefined, modelOverride, folder.cwd));
               if (!task) throw new Error("The recipient no longer exists");
               target.threadId = task.threadId;
-              if (!continued) createdThread = task.threadId;
-              if (!continued || continued.openedBy?.botId === internalSender.id) delegatedLevel.apply(internalSender, internalCapability.threadId, internalCapability.roomHandoffId ?? generation, recipient, target.threadId);
+              if (!continued) createdThread = task.threadId; else if (applyThreadModelPlan(modelPlan.plan, modelOps(target.botId, task.threadId))) appliedModelPlan = modelPlan.plan;
+              if (!continued || continued.openedBy?.botId === internalSender.id) delegatedLevel.apply(internalSender, internalCapability.threadId, internalCapability.roomHandoffId ?? generation, store.projectBotForTask(recipient.id, target.threadId) ?? recipient, target.threadId);
             }
             const routed = lane ? { botId: target.botId, threadId: lane.threadId } : target;
             outsideLineage.carry(address.threadId, routed.threadId);
@@ -13833,12 +13833,12 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
               ...(call.doneWhen ? { doneWhen: call.doneWhen } : {}),
             });
             usageTrace.link(node.id, node.parentId, { threadId: internalCapability.threadId, turnId: liveTurnByThread.get(internalCapability.threadId) ?? "" }); if (!duplicate) actingPeople.handOn(internalCapability, node);
-            if (duplicate && createdThread) store.deleteTask(target.botId, createdThread);
+            if (duplicate && appliedModelPlan) revertThreadModelPlan(appliedModelPlan, modelOps(target.botId, target.threadId)); if (duplicate && createdThread) store.deleteTask(target.botId, createdThread);
             else if (createdThread) {
               threadStarters.set(createdThread, opener);
               if (fresh && !EXTERNAL) internalCapability.openedThreads += 1;
             }
-            createdThread = undefined;
+            createdThread = undefined; appliedModelPlan = undefined;
             const title = via === "room" ? undefined : store.taskByThread(node.botId, node.threadId)?.title;
             const finished: Partial<Record<HandoffView["status"], string>> = {
               completed: "it already finished and its result stands; send it with rework=true to run it again",
@@ -13855,8 +13855,8 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
                 : lane
                   ? `runs in its own thread "${lane.title}", in parallel with the other room jobs; its result posts in this room and ${returns}`
                   : title
-                    ? `${outsideRoomNote(addressedRoom, via)}sent to "${title}"; it runs after anything still running there`
-                    : "handed to the coordinator; the teammate's turn has not started yet"),
+                    ? `${outsideRoomNote(addressedRoom, via)}sent to "${title}"; it runs after anything still running there${handoffModelNote(modelOverride)}`
+                    : `handed to the coordinator; the teammate's turn has not started yet${handoffModelNote(modelOverride)}`),
               requestId: node.id,
               ...(via === "room" ? {} : { threadId: node.threadId }),
             }));
@@ -13866,7 +13866,7 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
                 reason: call.reason, doneWhen: call.doneWhen ? redactSecretsInText(call.doneWhen) : undefined, title: store.taskByThread(recipient.id, node.threadId)?.title }));
             }
           } catch (error) {
-            if (createdThread) store.deleteTask(target.botId, createdThread);
+            if (appliedModelPlan) revertThreadModelPlan(appliedModelPlan, modelOps(target.botId, target.threadId)); if (createdThread) store.deleteTask(target.botId, createdThread);
             const said = error instanceof Error ? error.message : String(error);
             refused.push(said);
               // A bot hidden since the call was admitted is not the sender's to see: keep the id, no current name.
@@ -13944,11 +13944,11 @@ const handleRequest = async (req: IncomingMessage, res: ServerResponse) => {
           reply: z.enum(["resume", "none"]).default("resume"),
           consult: z.boolean().default(false),
           inMyFolder: z.boolean().optional(),
-          done_when: z.string().trim().max(1000).optional(), answers: z.string().trim().min(1).max(128).optional(),
+          done_when: z.string().trim().max(1000).optional(), answers: z.string().trim().min(1).max(128).optional(), modelSelection: z.unknown().optional(),
         }).safeParse(await readInternalBody());
         if (!parsed.success) return json(res, 400, { error: "Provide 1-4 distinct botIds and a message of 1-4000 characters; thread is standing, new or the id of a thread you opened on that teammate, title one line of at most 80 characters, reply is resume or none, consult is a boolean, done_when at most 1000 characters." });
-        const { groupId, botIds, message, reason, rework, thread, title, reply, consult, inMyFolder, done_when: doneWhen, answers } = parsed.data;
-        const result = await coordinateBots({ groupId, botIds, message, reason: reason || undefined, rework, thread, title: title || undefined, reply, consult, inMyFolder, doneWhen: doneWhen || undefined, ...(answers ? { answers } : {}) }); refusedHandoffs.settled(internalCapability.threadId, internalSender, botIds, result.status);
+        const { groupId, botIds, message, reason, rework, thread, title, reply, consult, inMyFolder, done_when: doneWhen, answers, modelSelection } = parsed.data;
+        const result = await coordinateBots({ groupId, botIds, message, reason: reason || undefined, rework, thread, title: title || undefined, reply, consult, inMyFolder, doneWhen: doneWhen || undefined, ...(answers ? { answers } : {}), ...(modelSelection !== undefined ? { modelSelection } : {}) }); refusedHandoffs.settled(internalCapability.threadId, internalSender, botIds, result.status);
         return json(res, result.status, result.body);
       }
       if (method === "GET" && path === "/api/internal/room-targets") {

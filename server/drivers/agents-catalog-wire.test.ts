@@ -98,7 +98,7 @@ const BUDGET_BASELINE: Record<string, number> = {
   "skills+non-chief": 55388,
   "skills+voice+non-chief": 56169,
   "skills+shared+non-chief": 57653,
-  "skills+shared+voice+non-chief": 57590,
+  "skills+shared+voice+non-chief": 58812,
   "skills+shared+voice+cloud-home": 68681,
   "skills+shared+voice+non-chief+cloud-home": 58200,
   "default+legacy-switches": 62266,
@@ -109,7 +109,7 @@ const BUDGET_BASELINE: Record<string, number> = {
   "skills+shared+voice+escalations+x+team": 73584,
   "default+no-computer-pick": 61054,
   "default+room": 59410,
-  "non-chief+room": 48612,
+  "non-chief+room": 49834,
   "skills+shared+voice+escalations+x+team+images": 74357,
   "default+images": 63039,
 };
@@ -228,7 +228,7 @@ describe("agents proxy tools/list golden", () => {
       for (const alias of ["delegate_bot", "ask_bot", "send_to_bot", "check_delegation", "wait_delegation"]) expect(tools.has(alias), `${name}: ${alias}`).toBe(false);
       expect(JSON.stringify([...tools.values()])).not.toMatch(/Deprecated alias|works for this release/);
       const coordinate = tools.get("coordinate_bots")!.inputSchema.properties;
-      expect(Object.keys(coordinate)).toEqual(["group_id", "bot_ids", "message", "reason", "rework", "thread", "title", "in_my_folder", "reply", "consult", "done_when", "answers"]);
+      expect(Object.keys(coordinate)).toEqual(["group_id", "bot_ids", "message", "reason", "rework", "thread", "title", "in_my_folder", "reply", "consult", "done_when", "answers", "model_selection"]);
       expect(coordinate.thread).toMatchObject({ type: "string", description: expect.stringContaining("threadId") });
       expect(coordinate.thread!.enum).toBeUndefined();
       expect(coordinate.reply!.enum).toEqual(["resume", "none"]);

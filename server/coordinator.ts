@@ -21,6 +21,8 @@ export type CoordinateBotsCall = {
   projectId?: string;
   /** The assignment whose question the message answers, instead of new work. */
   answers?: string;
+  /** suyuan fork: optional per-handoff model override (server/suyuan/handoff-model.ts). */
+  modelSelection?: unknown;
 };
 
 export type { LegacyThreadResolver };

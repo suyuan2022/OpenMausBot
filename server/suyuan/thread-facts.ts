@@ -4,6 +4,7 @@
 // its chip or a #Title link, read-only (checked on an isolated instance, closed threads too). Every sentence here holds with
 // the list shown too. Each pair swaps one upstream
 // phrase; wiring.test.ts goes red when upstream rewords one, so a swap never quietly stops applying.
+import { HANDOFF_MODEL_DESC_SWAP, HANDOFF_MODEL_PARAM } from "./handoff-model.ts";
 import { SELF_THREAD_REPORT_PARAM } from "./self-thread.ts";
 
 export const THREAD_FACTS: ReadonlyArray<readonly [upstream: string, fork: string]> = [
@@ -48,6 +49,7 @@ export const THREAD_FACTS: ReadonlyArray<readonly [upstream: string, fork: strin
     "Its result returns to this conversation and resumes you, unless report is \"none\". To send it another message later, while it runs or after it answered, use coordinate_bots with your own bot id and its thread id as thread. This is not a teammate handoff: use coordinate_bots for teammates (thread \"new\" opens a fresh thread on them).",
   ],
   // coordinate_bots
+  HANDOFF_MODEL_DESC_SWAP,
   [
     "a thread id picks one you opened,",
     "a thread id picks one you opened (with your own bot id, one you opened on yourself with start_thread: that sends it another message),",
@@ -75,5 +77,6 @@ export function withThreadFacts<T extends Tool>(tool: T): T {
     return [key, typeof text === "string" ? { ...(value as object), description: fix(text) } : value];
   }));
   if (tool.name === "start_thread") return { ...tool, description, inputSchema: { ...tool.inputSchema, properties: { ...properties, report: SELF_THREAD_REPORT_PARAM } } };
+  if (tool.name === "coordinate_bots") return { ...tool, description, inputSchema: { ...tool.inputSchema, properties: { ...properties, model_selection: HANDOFF_MODEL_PARAM } } };
   return changed ? { ...tool, description, inputSchema: { ...tool.inputSchema, ...(properties ? { properties } : {}) } } : tool;
 }
