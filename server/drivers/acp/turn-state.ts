@@ -4,6 +4,7 @@ import type { RequestOutcome, SendTurnInput } from "../../contracts.ts";
 import type { spawnCli } from "../../procs.ts";
 import { noticeFailure } from "../../chat-notices.ts";
 import { errorReplyFailure, type ErrorReplyFailure } from "../engine-errors.ts";
+import { splitAntigravityErrorReply } from "../../suyuan/acp-resilience.ts"; // suyuan fork
 import type { AcpConfig } from "./core.ts";
 import type { AcpHost, AcpLink } from "./host.ts";
 
@@ -46,6 +47,7 @@ export interface AcpSession {
   launch: { command: string; args?: string[] };
   env: Record<string, string | undefined>;
   cwd: string;
+  additionalDirs?: string[]; // suyuan fork
   contractKey: string;
   /** mcpServers the native session was built with. They ride session/new and session/load, not argv,
    *  and bearer tokens rotate every turn, so a change re-establishes the session on the same child. */
@@ -84,11 +86,16 @@ export interface AcpTurnEnd {
  * nothing to show is a lost turn: a provider may cut a reasoning-only stream and still answer end_turn. */
 export function endTurn(current: AcpTurn, ok: boolean, stopReason: string | null, ai: string): AcpTurnEnd {
   const ended = ok && stopReason === null;
+  const agError = ended && !current.state.stopped ? splitAntigravityErrorReply(ai, current.state.text) : null;
   const errorReply = ended && !current.state.stopped && !current.state.repliedText ? errorReplyFailure(ai, current.state.text) : null;
-  if (!errorReply) current.flushAssistantText();
+  if (agError) {
+    current.state.text = agError.prefix;
+    if (agError.prefix.trim()) current.flushAssistantText();
+  } else if (!errorReply) current.flushAssistantText();
   if (ended && current.state.stopped) return { ok, stopReason: "cancelled" };
-  if (errorReply) {
-    const { stopReason: failed, ...error } = errorReply;
+  const finalError = errorReply ?? agError?.failure ?? null;
+  if (finalError) {
+    const { stopReason: failed, ...error } = finalError;
     return { ok: false, stopReason: failed, error };
   }
   if (ended && !current.state.producedItem) return { ok: false, stopReason: "empty_turn", error: noticeFailure("chat.notice.acpEmpty", { provider: ai }) };
