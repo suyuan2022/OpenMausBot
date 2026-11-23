@@ -546,4 +546,18 @@ describe("the fork's hooks into upstream files", () => {
     expect(facts).toContain("HANDOFF_MODEL_DESC_SWAP,");
     expect(facts).toContain("model_selection: HANDOFF_MODEL_PARAM");
   });
+  it("ACP passes bot memory/skills as additionalDirectories, allows clientFileSystem there, and recovers transient auth/502 failures", () => {
+    const core = source("server/drivers/acp/core.ts");
+    expect(core).toContain('from "../../suyuan/acp-extra-dirs.ts"');
+    expect(core).toContain('from "../../suyuan/acp-resilience.ts"');
+    expect(core).toContain("resolveClientPathInRoots([cwd, ...(session.additionalDirs ?? [])], requestPath)");
+    expect(core).toContain("if (isTransientAcpAuthError(error)) throw error;");
+    expect(core).toContain("acpAdditionalDirectories({ botId: turn.botId, cwd, initResult: init })");
+    expect(core).toContain("const extraDirParams = additionalDirs.length ? { additionalDirectories: additionalDirs } : {};");
+    expect(core).toContain("shouldRetryAntigravityErrorReply(state.text)");
+    expect(core).toContain("const transientStartup = failure.transient || isTransientAcpAuthError(e)");
+    const turnState = source("server/drivers/acp/turn-state.ts");
+    expect(turnState).toContain('from "../../suyuan/acp-resilience.ts"');
+    expect(turnState).toContain("antigravityErrorReplyFailure(ai, current.state.text)");
+  });
 });

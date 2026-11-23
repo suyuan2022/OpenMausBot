@@ -6,9 +6,11 @@ import { type ServerText } from "../../../shared/server-text.ts";
 // `allow`-kind option approves, and option order is never a security contract.
 import { mkdtempSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
-import { lstat, mkdir, readFile, realpath, stat, writeFile } from "node:fs/promises";
-import { basename, dirname, isAbsolute, join, relative, resolve } from "node:path";
+import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
+import { dirname, join } from "node:path";
 import { createHash } from "node:crypto";
+import { acpAdditionalDirectories, effectiveSessionKey, resolveClientPathInRoots } from "../../suyuan/acp-extra-dirs.ts"; // suyuan fork
+import { isTransientAcpAuthError, shouldRetryAntigravityErrorReply, waitForErrorReplyRetry } from "../../suyuan/acp-resilience.ts"; // suyuan fork
 
 import { PROVIDER_CREDENTIAL_ENV, stripControlPlaneEnv, WORKSPACE_CREDENTIAL_ENV } from "../../config.ts";
 import { openStartupModelCatalog } from "../../startup-model-catalog.ts";
@@ -656,33 +658,8 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
         const acp = host.link(threadId, cwd);
         const send = (obj: unknown) => acp.send(obj);
 
-        const resolveClientPath = async (requestPath: unknown): Promise<string> => {
-          if (typeof requestPath !== "string" || !isAbsolute(requestPath)) {
-            throw new Error("ACP file paths must be absolute.");
-          }
-          const workspace = await realpath(cwd).catch(() => resolve(cwd));
-          const requested = resolve(requestPath);
-          const lexical = relative(resolve(cwd), requested);
-          if (lexical === ".." || lexical.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) || isAbsolute(lexical)) {
-            throw new Error("ACP file path is outside the session workspace.");
-          }
-          const suffix = [basename(requested)];
-          let ancestor = dirname(requested);
-          while (!(await lstat(ancestor).catch(() => null))) {
-            const parent = dirname(ancestor);
-            if (parent === ancestor) throw new Error("ACP file path has no accessible parent.");
-            suffix.unshift(basename(ancestor));
-            ancestor = parent;
-          }
-          const candidate = resolve(await realpath(ancestor), ...suffix);
-          const rel = relative(workspace, candidate);
-          if (rel === ".." || rel.startsWith(`..${process.platform === "win32" ? "\\" : "/"}`) || isAbsolute(rel)) {
-            throw new Error("ACP file path is outside the session workspace.");
-          }
-          const existing = await lstat(candidate).catch(() => null);
-          if (existing?.isSymbolicLink()) throw new Error("ACP file path cannot be a symbolic link.");
-          return candidate;
-        };
+        const resolveClientPath = (requestPath: unknown): Promise<string> =>
+          resolveClientPathInRoots([cwd, ...(session.additionalDirs ?? [])], requestPath);
 
         const handleClientFileRequest = async (msg: any): Promise<void> => {
           const fail = (error: unknown) => send({
@@ -1243,7 +1220,8 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
                   try {
                     await session.host.once("authenticate", () => request("authenticate", { methodId }, INIT_TIMEOUT));
                     session.authenticated = true;
-                  } catch {
+                  } catch (error) {
+                    if (isTransientAcpAuthError(error)) throw error;
                     if (support.authFailure !== "continue") throw new Error(support.loginNote);
                   }
                 } else if (support.authFailure === "fail") {
@@ -1262,29 +1240,33 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
             };
             let runtimeAcceptsImages = await handshake();
             let init = session.initResult;
+            let additionalDirs = acpAdditionalDirectories({ botId: turn.botId, cwd, initResult: init });
+            let activeSessionKey = effectiveSessionKey(sessionKey, additionalDirs);
+            session.additionalDirs = additionalDirs;
 
             const cursor = !turn.sessionReset && typeof turn.resumeCursor === "string" ? turn.resumeCursor : null;
             let promptTurn = turn;
             let rebuiltFromReplay = false;
             for (;;) {
               const liveSessionId = session.sessionId;
-              if (liveSessionId !== null && session.sessionKey === sessionKey && (cursor === null || cursor === liveSessionId)) {
+              if (liveSessionId !== null && session.sessionKey === activeSessionKey && (cursor === null || cursor === liveSessionId)) {
                 break;
               }
               const selectionParams = narrowsNativeTools(turn.toolScope)
                 ? support.toolScopeSessionParams!(turn, init, mcpServers.length > 0, { config: turnConfig, env, cwd }) : {};
+              const extraDirParams = additionalDirs.length ? { additionalDirectories: additionalDirs } : {};
               let loaded = false;
               if (cursor) {
                 try {
                   await request(
                     support.resumeMethod === "resume" ? "session/resume" : "session/load",
-                    { sessionId: cursor, cwd, mcpServers: support.mcpServersFromLaunch ? [] : mcpServers, ...selectionParams },
+                    { sessionId: cursor, cwd, ...extraDirParams, mcpServers: support.mcpServersFromLaunch ? [] : mcpServers, ...selectionParams },
                     LOAD_SESSION_TIMEOUT,
                     (result) => {
                       if (result) {
                         loaded = true;
                         session.sessionId = cursor;
-                        session.sessionKey = sessionKey;
+                        session.sessionKey = activeSessionKey;
                         receiveModelVariants(result, true);
                       }
                     },
@@ -1309,6 +1291,9 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
                 session.current = current;
                 runtimeAcceptsImages = await handshake();
                 init = session.initResult;
+                additionalDirs = acpAdditionalDirectories({ botId: turn.botId, cwd, initResult: init });
+                activeSessionKey = effectiveSessionKey(sessionKey, additionalDirs);
+                session.additionalDirs = additionalDirs;
                 continue;
               }
               sessionAllows.delete(threadId);
@@ -1321,9 +1306,9 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
                 promptTurn = { ...turn, text: recovery.text };
                 rebuiltFromReplay = recovery.replayed;
               }
-              await request("session/new", { cwd, mcpServers: support.mcpServersFromLaunch ? [] : mcpServers, ...selectionParams }, NEW_SESSION_TIMEOUT, (result) => {
+              await request("session/new", { cwd, ...extraDirParams, mcpServers: support.mcpServersFromLaunch ? [] : mcpServers, ...selectionParams }, NEW_SESSION_TIMEOUT, (result) => {
                 session.sessionId = typeof result?.sessionId === "string" ? result.sessionId : null;
-                session.sessionKey = sessionKey;
+                session.sessionKey = activeSessionKey;
                 receiveModelVariants(result, true);
               });
               break;
@@ -1462,7 +1447,9 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
                   `${last ? ` (last seen: ${lastSeenPhrase(last)})` : ""}. Send the message again to retry.`;
               },
               );
-            if (pendingSplitReceipt) {
+            const reason = result?.stopReason;
+            const errorReplyRetry = reason === "end_turn" && retryOf === undefined && !state.producedItem && !state.repliedText && !state.stopped && !session.closing && shouldRetryAntigravityErrorReply(state.text);
+            if (pendingSplitReceipt && !errorReplyRetry) {
               // session/prompt resolving is the acceptance boundary: a rejected prompt leaves no receipt.
               if (state.usageCompacted) {
                 deletePromptSplitReceipt(DRIVER_KIND, pendingSplitReceipt.key);
@@ -1481,6 +1468,15 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
                   },
                 );
               }
+            }
+            if (errorReplyRetry) {
+              if (!await waitForErrorReplyRetry({ delayMs: envOr("OMB_ACP_ERROR_REPLY_RETRY_MS", 1_500), stopped: () => state.settled || state.stopped || session.closing })) {
+                if (!state.settled) settle(threadId, session, true, "cancelled");
+                return;
+              }
+              state.settled = true; session.current = null; active.delete(threadId); current.stopQuietWatch?.(); closeSession(threadId, "rpc-failure");
+              void sendTurn({ ...turn, startupRecovery: undefined, sessionReset: undefined }, turnId).catch((error) => { emit({ ...base(threadId, turnId), type: "runtime.error", message: error instanceof Error ? error.message : String(error) }); emit({ ...base(threadId, turnId), type: "turn.completed", ok: false, stopReason: "rpc_error", cost: null }); });
+              return;
             }
             // opencode 1.18.18 reports usage at the result root; grok and gemini under _meta.
             const usage = result?.usage ?? result?._meta ?? {};
@@ -1505,7 +1501,6 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
                   : {}),
               });
             }
-            const reason = result?.stopReason;
             if (reason === "end_turn") settle(threadId, session, true, null);
             else if (reason === "cancelled" || state.stopped) settle(threadId, session, true, "cancelled");
             else {
@@ -1533,7 +1528,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
                 || code === "insufficient_funds" || message === support.loginNote;
               const accountError = isAccountError(code);
               const failure = classifyError({ text: message });
-              const transientStartup = failure.transient || (failure.reason === "unknown" && code === "upstream_outage");
+              const transientStartup = failure.transient || isTransientAcpAuthError(e) || (failure.reason === "unknown" && code === "upstream_outage");
               const denied = /\b(?:(?:permission|access) denied|(?:approval|permission) (?:required|denied|rejected)|requires? (?:approval|permission)|policy (?:restriction|violation)|(?:blocked|denied|restricted) by (?:the )?policy)\b/i.test(message);
               const retryableStartup = approvalUnconfirmed || (transientStartup && (!code || code === "upstream_outage")
                 && ![-32700, -32600, -32601, -32602].includes((e as any)?.code));
