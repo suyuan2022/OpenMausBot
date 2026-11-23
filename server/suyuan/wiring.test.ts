@@ -558,6 +558,6 @@ describe("the fork's hooks into upstream files", () => {
     expect(core).toContain("const transientStartup = failure.transient || isTransientAcpAuthError(e)");
     const turnState = source("server/drivers/acp/turn-state.ts");
     expect(turnState).toContain('from "../../suyuan/acp-resilience.ts"');
-    expect(turnState).toContain("antigravityErrorReplyFailure(ai, current.state.text)");
+    expect(turnState).toContain("splitAntigravityErrorReply(ai, current.state.text)");
   });
 });

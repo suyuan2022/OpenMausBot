@@ -56,6 +56,48 @@ describe("antigravityErrorReplyFailure", () => {
   it("ignores normal replies that merely discuss 502 errors", () => {
     expect(antigravityErrorReplyFailure("Google Gemini (Antigravity)", "刚才遇到了一次 502 Bad Gateway，已经重试成功。")).toBeNull();
     expect(antigravityErrorReplyFailure("Google Gemini (Antigravity)", "Agent execution error is a phrase in the log.")).toBeNull();
+    expect(antigravityErrorReplyFailure("Google Gemini (Antigravity)", "日志里出现 `Agent execution error: iterateResponseStream: HTTP/1.0 502 Bad Gateway`")).toBeNull();
+    expect(antigravityErrorReplyFailure("Google Gemini (Antigravity)", "昨天撞上 Agent execution error: HTTP/1.0 502 Bad Gateway，现在好了。")).toBeNull();
+  });
+
+  it("preserves partial assistant text and fails the turn when 502 is appended mid-stream before end_turn", () => {
+    let flushedText = "";
+    const turn = {
+      turnId: "t2",
+      turn: { threadId: "th1", text: "hi" },
+      turnConfig: { cli: "fake", fullAuto: true },
+      controlsHost: false,
+      state: {
+        settled: false,
+        promptSent: true,
+        text: "先查到两条优惠：\nAgent execution error: iterateResponseStream: invalid stream chunk: HTTP/1.0 502 Bad Gateway",
+        textMessageId: null,
+        producedItem: false,
+        repliedText: false,
+        startupActivity: true,
+        stopped: false,
+        usagePeak: null,
+        usageLast: null,
+        usageCompacted: false,
+        cancelling: false,
+      },
+      acknowledge: () => {},
+      asks: new Map(),
+      runningTools: new Set(),
+      unkeyedToolIds: [],
+      endedToolIds: new Set(),
+      interruptTimer: null,
+      stopQuietWatch: null,
+      flushAssistantText: () => { flushedText = turn.state.text; turn.state.text = ""; },
+      receiveModelVariants: () => {},
+    } as unknown as AcpTurn;
+
+    expect(shouldRetryAntigravityErrorReply(turn.state.text)).toBe(false);
+    const end = endTurn(turn, true, null, "Google Gemini (Antigravity)");
+    expect(end.ok).toBe(false);
+    expect(end.stopReason).toBe("rpc_error");
+    expect(end.error?.message).toContain("502");
+    expect(flushedText.trim()).toBe("先查到两条优惠：");
   });
 
   it("makes endTurn fail cleanly even after earlier tool calls or progress text", () => {
