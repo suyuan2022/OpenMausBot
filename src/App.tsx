@@ -90,7 +90,7 @@ import { useSessionEnded } from "@/lib/session-ended";
 import { PairPage } from "./pair/PairPage";
 import { WebPanelPage } from "@/components/WebPanelPage";
 import { AppPreviewPanel } from "@/components/published-apps/AppPreviewPanel";
-import { useSuyuan } from "@/suyuan/use-suyuan"; // suyuan fork
+import { useSuyuan } from "@/suyuan/use-suyuan"; import { useCloseBotDrawer } from "@/suyuan/phone-inbox"; // suyuan fork
 import { threadsShownNow } from "@/suyuan/home";
 import { FilePreviewPanel } from "@/components/FilePreviewPanel";
 import { refreshPublishedApps } from "@/lib/own-published-apps";
@@ -181,7 +181,7 @@ function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
   const chatBot = useMemo(() => bot && newChatBot(bot, state.newChat), [bot, state.newChat]);
   const { open: drawerOpen, show: openDrawer, hide: hideDrawer, noteAction: noteDrawerAction } = useBotListDrawer({ selectedId: state.selectedId, botThread: chatBot?.threadId, groupThread: group?.threadId,
     view: state.activeView, pluginsOpen: state.pluginsOpen, settingsOpen: state.settingsOpen });
-  const closeDrawer = useCallback(() => { hideDrawer(); menuButtonRef.current?.focus(); }, [hideDrawer]);
+  const closeDrawer = useCallback(() => { hideDrawer(); menuButtonRef.current?.focus(); }, [hideDrawer]); useCloseBotDrawer(hideDrawer); // suyuan fork: the phone's inbox closes the list when a line opens a conversation
   const notificationFeed = useNotificationFeed() && !remoteClient;
   const advanced = useAdvancedMode();
   const roomPanelOpen = useRoomPanelShown({ group, state, simple: !advanced && !remoteClient });

@@ -3,6 +3,7 @@
 import { Pin, PinOff } from "lucide-react";
 import type { InboxView } from "../../../shared/inbox";
 import { t } from "@/lib/i18n";
+import { PHONE_LAYOUT, useMediaQuery } from "@/lib/use-media-query";
 import { type AppState } from "@/state/store";
 import { sameJson } from "@/state/same-json";
 import { useStoreDispatch, useStoreSelector } from "@/state/store-select";
@@ -11,7 +12,7 @@ import { AttentionThreadRows, attentionJumpAction, crossBotAttentionThreads, typ
 import { NeedsYouLine } from "../TeamOwner";
 import { setAttentionPinned, useAttentionPinned } from "./attention-pinned";
 import { closeInbox } from "@/state/inbox";
-import { inboxFixes } from "./inbox-view";
+import { inboxFixes } from "./inbox-view"; import { leavePhoneInbox } from "@/suyuan/phone-inbox"; // suyuan fork
 
 /** The conversations this list shows: the work in progress — at work, waiting on a teammate or on the person, or
  * finished but still unread. A conversation the person has read leaves for the finished list below, so the two lists
@@ -67,13 +68,14 @@ export function InboxActive({ view, current, exclude }: {
   const dispatch = useStoreDispatch();
   const team = useTeamPeople();
   const pinned = useAttentionPinned();
+  const phone = useMediaQuery(PHONE_LAYOUT); // suyuan fork: a phone's inbox and the bot list under it close for the conversation
   const entries = useStoreSelector((state) => inboxAttentionEntries(state, view).filter((entry) => !exclude?.has(entry.task.threadId)), sameJson);
   const fixes = inboxFixes(team?.needsYou, view);
   return (
     <>
       {fixes.length > 0 && (
         <section data-inbox-fixes className="border-t border-hairline/40 px-1.5 py-1.5">
-          {fixes.map((item) => <NeedsYouLine key={`${item.kind}:${item.id}`} item={item} onOpened={closeInbox} />)}
+          {fixes.map((item) => <NeedsYouLine key={`${item.kind}:${item.id}`} item={item} onOpened={phone ? leavePhoneInbox : closeInbox} />)}
         </section>
       )}
       {(entries.length > 0 || pinned) && (
@@ -85,7 +87,7 @@ export function InboxActive({ view, current, exclude }: {
               {pinned ? <PinOff size={14} aria-hidden="true" /> : <Pin size={14} aria-hidden="true" />}
             </button>
           </div>
-          <AttentionThreadRows inset entries={entries} unreadDot current={current} onJump={(entry) => dispatch(attentionJumpAction(entry))} />
+          <AttentionThreadRows inset entries={entries} unreadDot current={current} onJump={(entry) => { dispatch(attentionJumpAction(entry)); if (phone) leavePhoneInbox(); }} />
         </section>
       )}
     </>

@@ -148,6 +148,28 @@ describe("suyuan-v2 thin-fork wiring", () => {
     expect(index).toContain("createPlaceInbox({ dataDir: DATA_DIR, readsWith: (lineThread, opened) => suyuanReadsWith(store, lineThread, opened, (id) => delegatorOf(id)?.threadId ?? null),");
   });
 
+  it("keeps the phone's inbox a page over the bot list, which only a line that opens a conversation closes", () => {
+    const row = source("src/components/SidebarInboxRow.tsx");
+    expect(row).toContain("const phone = useMediaQuery(PHONE_LAYOUT);");
+    expect(row).toContain("else { openInbox(); if (!phone) onOpened?.(); }");
+    // Sidebar.tsx is untouched: it still hands the row its close, which the row no longer calls on a phone.
+    expect(source("src/components/Sidebar.tsx")).toContain("onOpened={phone ? onClose : undefined} />");
+    expect(source("src/hooks/use-bot-list-drawer.ts")).toContain('const KEEPS_LIST_OPEN = "[data-team-side], [data-sidebar-inbox], [data-inbox-panel]";');
+    const app = source("src/App.tsx");
+    expect(app).toContain('import { useCloseBotDrawer } from "@/suyuan/phone-inbox";');
+    expect(app).toContain("useCloseBotDrawer(hideDrawer);");
+    const panel = source("src/components/inbox/InboxPanel.tsx");
+    expect(panel).toContain('<div data-inbox-page className="fixed inset-0 z-50 flex flex-col bg-app">');
+    expect(panel).toContain('className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-app pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">');
+    for (const sheet of ["max-h-[85dvh]", "min-h-[50dvh]", "rounded-t-2xl", "bg-black/40"]) expect(panel).not.toContain(sheet);
+    expect(panel).toContain("onOpen={(row) => { dispatch(attentionJumpAction(row)); if (phone) leavePhoneInbox(); }}");
+    expect(source("src/components/inbox/use-inbox-actions.ts")).toContain("if (phone) leavePhoneInbox();");
+    const active = source("src/components/inbox/InboxActive.tsx");
+    expect(active).toContain("onOpened={phone ? leavePhoneInbox : closeInbox} />");
+    expect(active).toContain("onJump={(entry) => { dispatch(attentionJumpAction(entry)); if (phone) leavePhoneInbox(); }} />");
+    expect(source("src/locales/zh.json")).toContain('"inbox.emptyHint": "当机器人需要你确认、向你提问或完成任务时，会显示在这里。"');
+  });
+
   it("loads every CSS overlay from the one frontend hook", () => {
     const hook = source("src/suyuan/use-suyuan.ts");
     for (const sheet of ["chat-wrap", "keyboard-fit", "no-zoom", "phone-code", "phone-tables", "skill-burger", "steady-tables", "wide-replies"]) {

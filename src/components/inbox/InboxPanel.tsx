@@ -17,7 +17,7 @@ import { InboxRowItem } from "./InboxRow";
 import { PinnedThreads, pinnedThreadRows } from "./PinnedThreads";
 import { matchesSearch, nextAfter } from "./inbox-answer";
 import { rowsIn, waitingCount } from "./inbox-view";
-import { useInboxActions } from "./use-inbox-actions"; import { useUnreadRows } from "@/suyuan/inbox-unread"; // suyuan fork: read news leaves the list
+import { useInboxActions } from "./use-inbox-actions"; import { useUnreadRows } from "@/suyuan/inbox-unread"; import { leavePhoneInbox } from "@/suyuan/phone-inbox"; // suyuan fork: read news leaves the list; a phone's inbox is a page
 import { roundButtonCls } from "../bot-panel/rows";
 
 
@@ -113,7 +113,7 @@ export const InboxPanel = memo(function InboxPanel() {
           <>
             <div className="min-h-0 flex-1 overflow-y-auto">
               {/* The conversations each bot and room pinned, at the top of the list. */}
-              {!query.trim() && <PinnedThreads rows={pinnedRows} now={now} current={openThread} onOpen={(row) => dispatch(attentionJumpAction(row))} onUnpin={(row) => dispatch(attentionUnpinAction(row))} />}
+              {!query.trim() && <PinnedThreads rows={pinnedRows} now={now} current={openThread} onOpen={(row) => { dispatch(attentionJumpAction(row)); if (phone) leavePhoneInbox(); }} onUnpin={(row) => dispatch(attentionUnpinAction(row))} />}
               {listed.length > 0 && <label className="mx-[13px] my-2.5 flex h-8 items-center gap-2 rounded-lg bg-ink/[0.045] px-2.5 ring-[0.5px] ring-ink/[0.12] focus-within:ring-ink/30">
                 <Search size={14} aria-hidden="true" className="shrink-0 text-ink-tertiary" />
                 <input type="search" value={query} onChange={(event) => setQuery(event.target.value)} placeholder={t("inbox.search")} aria-label={t("inbox.search")}
@@ -152,9 +152,10 @@ export const InboxPanel = memo(function InboxPanel() {
   );
   if (phone) {
     return createPortal(
-      <div className="fixed inset-0 z-50 flex flex-col justify-end bg-black/40" onMouseDown={(event) => { if (event.target === event.currentTarget) closeInbox(); }}>
+      // suyuan fork: a page over the whole screen, not a sheet that leaves the conversation showing above it.
+      <div data-inbox-page className="fixed inset-0 z-50 flex flex-col bg-app">
         <section role="dialog" aria-modal="true" aria-label={t("inbox.panel.title")} data-inbox-panel="sheet" onKeyDown={onKeyDown}
-          className="animate-pop-in motion-reduce:animate-none flex max-h-[85dvh] min-h-[50dvh] flex-col overflow-hidden rounded-t-2xl border-t border-hairline/50 bg-panel pb-[env(safe-area-inset-bottom)]">
+          className="flex h-full min-h-0 flex-1 flex-col overflow-hidden bg-app pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]">
           {body}
         </section>
       </div>,

@@ -2,6 +2,7 @@
 // on the person as its count and a dot while any bot is at work. It stays when nothing waits, with no count.
 import { Inbox } from "lucide-react";
 import { cn } from "@/lib/cn";
+import { PHONE_LAYOUT, useMediaQuery } from "@/lib/use-media-query";
 import { t } from "@/lib/i18n";
 import { closeInbox, openInbox, useInboxPanel, useInboxSupport, useInboxView } from "@/state/inbox";
 import { useStore } from "@/state/store";
@@ -21,13 +22,15 @@ export function SidebarInboxRow({ icons, large, running, onOpened }: {
   const { state } = useStore();
   const team = useTeamPeople();
   const { open } = useInboxPanel();
+  const phone = useMediaQuery(PHONE_LAYOUT);
   if (support === "no") return null;
   const count = waitingCount(view) + inboxFixes(team?.needsYou, view).length + unreadConversations(inboxAttentionEntries(state, view), view);
   const shown = count > 9 ? "9+" : String(count);
   const label = count > 0 ? t("inbox.row.count", { count }) : t("inbox.panel.title");
   const toggle = () => {
     if (open) closeInbox();
-    else { openInbox(); onOpened?.(); }
+    // suyuan fork: a phone's inbox is a page over the bot list, which stays open under it (src/suyuan/phone-inbox.ts).
+    else { openInbox(); if (!phone) onOpened?.(); }
   };
   const dot = running && <span data-inbox-running="" aria-hidden="true" className={cn("absolute -bottom-0.5 -right-0.5 rounded-full border-2 border-panel bg-success", icons ? "size-3" : "size-2.5")} />;
   if (icons) {

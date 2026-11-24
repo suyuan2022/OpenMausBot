@@ -9,7 +9,8 @@ export interface DrawerPlace {
   settingsOpen: boolean;
 }
 
-const KEEPS_LIST_OPEN = "[data-team-side]";
+// suyuan fork: the Inbox row and the inbox itself keep it open too; a line that opens a conversation closes it by asking (src/suyuan/phone-inbox.ts).
+const KEEPS_LIST_OPEN = "[data-team-side], [data-sidebar-inbox], [data-inbox-panel]";
 
 /**
  * The bot list that covers a narrow window. It closes when the person goes somewhere: another chat or page, or a

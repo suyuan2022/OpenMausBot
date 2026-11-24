@@ -5,9 +5,9 @@ import { PHONE_LAYOUT, useMediaQuery } from "@/lib/use-media-query";
 import { openThread } from "@/state/store";
 import { useStoreRef } from "@/state/store-ref";
 import { useStoreSelector } from "@/state/store-select";
-import { closeInbox, doneInboxRow, openInbox, readInboxRow, refreshInbox } from "@/state/inbox";
+import { doneInboxRow, openInbox, readInboxRow, refreshInbox } from "@/state/inbox";
 import type { CardResponse } from "@/lib/card-answer";
-import { answerThread, closeResponse, type QuickAction } from "./inbox-view";
+import { answerThread, closeResponse, type QuickAction } from "./inbox-view"; import { leavePhoneInbox } from "@/suyuan/phone-inbox"; // suyuan fork
 
 /** What a row's buttons do. An ask is answered through its copy's card here, which answers the card where it was asked,
  * as its buttons in the chat do; a line of news is done, or opened where it came from. */
@@ -31,8 +31,8 @@ export function useInboxActions(view: InboxView | null) {
     if (!target) return;
     openThread(dispatch, { botId: target.botId, threadId: target.threadId }, store.state(), showThreads);
     if (target.messageId) dispatch({ type: "focusMessage", threadId: target.threadId, messageId: target.messageId });
-    // The conversation is in the main window; on a phone the inbox is a sheet over it.
-    if (phone) closeInbox();
+    // The conversation is in the main window; on a phone the inbox is a sheet over it. suyuan fork: a page over the bot list too.
+    if (phone) leavePhoneInbox();
   }, [view, store, dispatch, showThreads, phone]);
 
   const run = useCallback((row: InboxRow, action: QuickAction) => {

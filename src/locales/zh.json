@@ -2181,6 +2181,7 @@
   "sidebar.people.invite": "邀请他人",
   "inbox.panel.title": "收件箱",
   "inbox.empty": "还没有给你的内容。",
+  "inbox.emptyHint": "当机器人需要你确认、向你提问或完成任务时，会显示在这里。",
   "inbox.waitsOnYou": "待你处理",
   "inbox.card.summary": "{needs} 项待你处理 · {info} 项供你参考",
   "inbox.card.forInfo": "{count} 项供你参考",
