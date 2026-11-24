@@ -10,15 +10,14 @@ import { closeInbox, markAllInboxRead, readInboxLine, readInboxRow, useInboxMark
 import { sameJson } from "@/state/same-json";
 import { useStoreDispatch, useStoreSelector } from "@/state/store-select";
 import { useActiveLocale } from "@/lib/use-active-locale";
-import { InboxActive, inboxAttentionEntries, inboxOpenThread, readNewsThreads, unreadConversations } from "./InboxActive";
+import { InboxActive, inboxAttentionEntries, inboxOpenThread, unreadConversations } from "./InboxActive";
 import { attentionJumpAction, attentionUnpinAction } from "../SidebarBotActivity";
 import { InboxReading } from "./InboxReading";
 import { InboxRowItem } from "./InboxRow";
-import { FinishedThreads, finishedThreads } from "./FinishedThreads";
 import { PinnedThreads, pinnedThreadRows } from "./PinnedThreads";
 import { matchesSearch, nextAfter } from "./inbox-answer";
-import { listedRows, rowsIn, waitingCount } from "./inbox-view";
-import { useInboxActions } from "./use-inbox-actions";
+import { rowsIn, waitingCount } from "./inbox-view";
+import { useInboxActions } from "./use-inbox-actions"; import { useUnreadRows } from "@/suyuan/inbox-unread"; // suyuan fork: read news leaves the list
 import { roundButtonCls } from "../bot-panel/rows";
 
 
@@ -52,8 +51,9 @@ export const InboxPanel = memo(function InboxPanel() {
     if (row.tab === "needs-you" || row.replies) { readInboxLine(row.id); return; }
     openInChat(row);
   };
-  // Finished work the person has read leaves the list for the Done line at the foot; its conversation moves to Finished.
-  const listed = listedRows(view);
+  // Finished work the person has read leaves the list for the Done line at the foot. suyuan fork: so does any news they
+  // have read, and the Finished conversations are not listed (FORK.md).
+  const listed = useUnreadRows(view);
   const rows = listed.filter((row) => matchesSearch(row, query));
   const done = rowsIn(view, "done").filter((row) => matchesSearch(row, query)).sort((a, b) => b.at - a.at);
   const ids = rows.map((row) => row.id);
@@ -79,7 +79,6 @@ export const InboxPanel = memo(function InboxPanel() {
   };
   const pinnedRows = useStoreSelector((state) => pinnedThreadRows(state.bots, state.groups, state.pendingQueued), sameJson);
   const pinnedThreads = useMemo(() => new Set(pinnedRows.map((row) => row.task.threadId)), [pinnedRows]);
-  const finishedRows = useStoreSelector((state) => finishedThreads(state.bots, state.groups, state.pendingQueued, undefined, readNewsThreads(view), pinnedThreads), sameJson);
   const unread = useStoreSelector((state) => unreadConversations(inboxAttentionEntries(state, view), view));
   const count = waitingCount(view) + unread;
   const openThread = useStoreSelector((state) => inboxOpenThread(state), sameJson);
@@ -134,8 +133,6 @@ export const InboxPanel = memo(function InboxPanel() {
                   : rows.map((row) => <InboxRowItem key={row.id} row={row} now={now} onOpen={open} onAction={run} />)}
               </div>
               {!query.trim() && <InboxActive view={view} current={openThread} exclude={pinnedThreads} />}
-              {/* The finished, already-read conversations. */}
-              {!query.trim() && <FinishedThreads rows={finishedRows} now={now} current={openThread} onOpen={(row) => dispatch(attentionJumpAction(row))} />}
               {done.length > 0 && (
                 <section data-inbox-done className="px-1.5 pb-1.5">
                   <button type="button" data-inbox-done-toggle aria-expanded={showDone} onClick={() => setShowDone(!showDone)}

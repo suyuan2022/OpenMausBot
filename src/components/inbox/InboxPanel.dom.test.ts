@@ -91,7 +91,7 @@ describe("the inbox panel", () => {
     await click("[data-inbox-mark-all]");
     expect(server.calls).toContainEqual({ path: "/api/inbox/read-all", method: "POST" });
     expect(unreadIds()).toEqual([]);
-    expect(rowIds(), "the finished work leaves the list, the rest stays").toEqual([approvalRow.id, questionRow.id, messageRow.id]);
+    expect(rowIds(), "the finished work leaves the list; suyuan fork: so does the news now read, and the asks stay").toEqual([approvalRow.id, questionRow.id]);
     expect(document.querySelector(`[data-inbox-row="${approvalRow.id}"] [data-inbox-action="allow"]`), "the ask still waits on its answer").not.toBeNull();
     expect(dispatch).not.toHaveBeenCalledWith(expect.objectContaining({ type: "decideRequest" }));
     expect(server.calls.filter((call) => /\/(done)$/.test(call.path))).toEqual([]);
@@ -149,9 +149,48 @@ describe("the inbox panel", () => {
     expect([...document.querySelectorAll("[data-pinned-title]")].map((el) => el.textContent)).toEqual(["Daily digest", "Older digest"]);
     const active = [...document.querySelectorAll("[data-inbox-active] button")].map((button) => button.textContent).join(" ");
     expect(active, "the pinned section already shows it").not.toContain("Daily digest");
-    const finished = [...document.querySelectorAll("[data-inbox-finished] button")].map((button) => button.textContent).join(" ");
-    expect(finished).not.toContain("Older digest");
+    expect(document.querySelector("[data-inbox-finished]"), "suyuan fork: the Finished section is not shown").toBeNull();
     expect(document.querySelector("[data-inbox-tab-count]")?.textContent, "one line plus the same conversation is one").toBe("1");
+  });
+});
+
+// suyuan fork (FORK.md): src/suyuan/inbox-unread.ts.
+describe("the inbox panel on the suyuan fork", () => {
+  const listed = () => [...document.querySelectorAll<HTMLElement>("[data-inbox-list] [data-inbox-row]")].map((row) => row.dataset.inboxRow);
+
+  it("lists what waits on the person and what is unread: news already read is gone, a line read here stays until the panel closes", async () => {
+    shown(inboxView([approvalRow, questionRow, messageRow, { ...reportRow, unread: false }, settledRow]));
+    openInbox();
+    await mount(createElement(InboxPanel));
+    expect(listed(), "the read report is not listed; the ask already read still is").toEqual([approvalRow.id, questionRow.id, messageRow.id]);
+    // The server's answer to the read: the same list with that line read.
+    server.view = inboxView([approvalRow, questionRow, { ...messageRow, unread: false }, { ...reportRow, unread: false }, settledRow]);
+    await click(`[data-inbox-row="${messageRow.id}"] button`);
+    expect(server.calls).toContainEqual({ path: `/api/inbox/${messageRow.id}/read`, method: "POST" });
+    expect(currentInbox()!.rows.find((row) => row.id === messageRow.id)!.unread).toBe(false);
+    await click('[aria-label="Back to the list"]');
+    expect(listed(), "a line read here stays while the panel is open").toEqual([approvalRow.id, questionRow.id, messageRow.id]);
+    expect(document.querySelector(`[data-inbox-row="${messageRow.id}"]`)!.hasAttribute("data-unread")).toBe(false);
+    act(() => root.unmount());
+    root = createRoot(document.body.appendChild(document.createElement("div")));
+    await mount(createElement(InboxPanel));
+    expect(listed(), "it is gone the next time the inbox opens").toEqual([approvalRow.id, questionRow.id]);
+  });
+
+  it("shows no Finished section, even with a finished conversation the person has read", async () => {
+    const reporter = { id: "reporter", name: "Reporter", threadId: "rep-main", tasks: [{ threadId: "rep-read", title: "Read digest", createdAt: 0, updatedAt: INBOX_NOW }] } as unknown as Bot;
+    openInbox();
+    await mount(createElement(InboxPanel), [reporter]);
+    expect(document.querySelector("[data-inbox-finished]")).toBeNull();
+    expect(document.body.textContent).not.toContain("Read digest");
+  });
+
+  it("keeps the Done line at the foot for what is settled", async () => {
+    openInbox();
+    await mount(createElement(InboxPanel));
+    expect(document.querySelector("[data-inbox-done] [data-inbox-done-toggle]")!.textContent).toContain("1");
+    await click("[data-inbox-done-toggle]");
+    expect([...document.querySelectorAll<HTMLElement>("[data-inbox-done] [data-inbox-row]")].map((row) => row.dataset.inboxRow)).toEqual([settledRow.id]);
   });
 });
 

@@ -4,6 +4,7 @@ import { t } from "@/lib/i18n";
 import { useShowThreads } from "@/lib/thread-preferences";
 import type { Action, AppState } from "@/state/store";
 import { noteThreadsShown } from "./home";
+import { inboxCatchUpKey, useInboxCatchUp } from "./inbox-unread";
 import "./chat-wrap.css";
 import "./keyboard-fit.css";
 import { installKeyboardFit } from "./keyboard-fit";
@@ -23,6 +24,7 @@ export function useSuyuan(state: AppState, dispatch: (action: Action) => void): 
   // During render, not in an effect: the sidebar, menus and chat render right after and read it (./home.ts).
   noteThreadsShown(useShowThreads());
   useWebPush(state, dispatch);
+  useInboxCatchUp(inboxCatchUpKey(state), state.hydrated === true);
   useEffect(() => installSwipeBack(), []);
   useEffect(() => installNoZoom(), []);
   useEffect(() => installKeyboardFit(), []);

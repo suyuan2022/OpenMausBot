@@ -130,6 +130,24 @@ describe("suyuan-v2 thin-fork wiring", () => {
     }
   });
 
+  it("keeps the inbox to what waits on the person: read news gone, no Finished section, background runs read with their conversation", () => {
+    const panel = source("src/components/inbox/InboxPanel.tsx");
+    expect(panel).toContain('import { useUnreadRows } from "@/suyuan/inbox-unread";');
+    expect(panel).toContain("const listed = useUnreadRows(view);");
+    expect(panel).toContain("const rows = listed.filter((row) => matchesSearch(row, query));");
+    expect(panel).not.toContain("<FinishedThreads");
+    expect(panel).not.toContain("finishedThreads(");
+    // What stays of upstream's panel: the pinned conversations, the active ones, and the Done line at the foot.
+    for (const kept of ["<PinnedThreads ", "<InboxActive ", "<section data-inbox-done ", "openInChat(row);"]) expect(panel).toContain(kept);
+    expect(source("src/suyuan/use-suyuan.ts")).toContain("useInboxCatchUp(inboxCatchUpKey(state), state.hydrated === true);");
+    const place = source("server/host/place-inbox.ts");
+    expect(place).toContain("readsWith?(lineThread: string, opened: string): boolean;");
+    expect(place).toContain("if (!line.seen && (line.threadId === threadId || deps.readsWith?.(line.threadId, threadId)) && lineFor(auth, line))");
+    const index = source("server/index.ts");
+    expect(index).toContain('import { readsWith as suyuanReadsWith } from "./suyuan/inbox-read.ts";');
+    expect(index).toContain("createPlaceInbox({ dataDir: DATA_DIR, readsWith: (lineThread, opened) => suyuanReadsWith(store, lineThread, opened, (id) => delegatorOf(id)?.threadId ?? null),");
+  });
+
   it("loads every CSS overlay from the one frontend hook", () => {
     const hook = source("src/suyuan/use-suyuan.ts");
     for (const sheet of ["chat-wrap", "keyboard-fit", "no-zoom", "phone-code", "phone-tables", "skill-burger", "steady-tables", "wide-replies"]) {

@@ -86,6 +86,8 @@ export interface PlaceInboxDeps {
    * connect, or an ask left open after its turn ended. */
   waiting?(): Array<PersonWait & { threadId: string }>;
   now?: () => number;
+  /** suyuan fork: reading this conversation also reads a line from that background run (server/suyuan/inbox-read.ts). */
+  readsWith?(lineThread: string, opened: string): boolean;
 }
 
 
@@ -311,7 +313,7 @@ export function createPlaceInbox(deps: PlaceInboxDeps) {
     /** The person opened this conversation: what waited there for them is read. */
     seen(auth: RequestAuth, threadId: string): void {
       let changed = false;
-      for (const line of lines) if (line.threadId === threadId && !line.seen && lineFor(auth, line)) { line.seen = true; changed = true; }
+      for (const line of lines) if (!line.seen && (line.threadId === threadId || deps.readsWith?.(line.threadId, threadId)) && lineFor(auth, line)) { line.seen = true; changed = true; }
       if (changed) save();
     },
     stop: unsubscribe,
