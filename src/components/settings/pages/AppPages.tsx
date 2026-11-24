@@ -18,6 +18,7 @@ import { CustomThemesSettings } from "../../CustomThemesSettings";
 import { DiagnosticsRow } from "../../DiagnosticsRow";
 import { NotificationRows } from "../../NotificationSettingsRows";
 import { VoiceButtonRow } from "@/suyuan/VoiceButtonRow"; // suyuan fork
+import { SkillBurgerRow } from "@/suyuan/SkillBurgerRow"; // suyuan fork
 import { OpenAtLoginRow } from "../../OpenAtLoginRow";
 import { PinnedPanelsSettings } from "../../PinnedPanelsSettings";
 import { RemoteComputerSection } from "../../RemoteComputerSection";
@@ -62,6 +63,7 @@ export function AppPage() {
         <SettingsRows selectWidth={208}>
           <LanguageRow simple />
           <VoiceButtonRow />
+          <SkillBurgerRow />
           <NotificationRows simple />
         </SettingsRows>
       </SettingsGroup>
@@ -129,6 +131,7 @@ export function GeneralPage() {
         <SendKeyRow simple />
         <FollowUpRow simple />
         <VoiceButtonRow />
+        <SkillBurgerRow />
         {window.ogb?.talkShortcut ? <TalkShortcutRow /> : elsewhere(window.ogb?.talkShortcut, ctx) && ctx.cloud ? <InertRow title={t("settings.search.talk")} control={<span className="text-[13px] leading-5 text-ink-secondary">{t("settings.general.talkOff")}</span>} /> : null}
       </SettingsRows>
     </SettingsGroup>

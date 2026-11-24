@@ -43,6 +43,7 @@ const rows = () => [...host.querySelectorAll("[data-burger-layer]")].map((row) =
 const button = (text: string) => [...host.querySelectorAll("button")].find((node) => node.textContent?.includes(text));
 
 beforeEach(() => {
+  localStorage.setItem("omb-suyuan-skill-burger", "1"); // suyuan fork: the card is off until Settings turns it on.
   fixture.api.mockReset();
   fixture.api.mockImplementation(async (path: string) => (path.includes("?runner=") ? { workflow, everyChat: false } : {}));
   host = document.createElement("div");
@@ -52,6 +53,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
+  localStorage.removeItem("omb-suyuan-skill-burger");
 });
 
 it("reads the newest run's steps from its rows, and lays the cases under their decide step", () => {

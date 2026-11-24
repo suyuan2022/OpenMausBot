@@ -30,6 +30,7 @@ const burger = () => host.querySelector<HTMLElement>("[data-skill-burger]");
 const button = (text: string) => [...host.querySelectorAll("button")].find((node) => node.textContent?.includes(text));
 
 beforeEach(() => {
+  localStorage.setItem("omb-suyuan-skill-burger", "1"); // suyuan fork: the card is off until Settings turns it on.
   fixture.api.mockReset();
   host = document.createElement("div");
   document.body.append(host);
@@ -38,6 +39,7 @@ beforeEach(() => {
 afterEach(() => {
   act(() => root.unmount());
   host.remove();
+  localStorage.removeItem("omb-suyuan-skill-burger");
 });
 
 it("shows only for a run of two real steps, one layer each, with the ask on top", async () => {

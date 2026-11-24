@@ -1,0 +1,9 @@
+/* suyuan fork: a bot's bubble on iPhone Safari is as wide as its text. Upstream (styles.css, "No lone last word")
+   wraps a bubble and a reply's paragraphs with text-wrap: pretty. WebKit sizes a w-fit bubble by the ordinary line
+   breaks and then lays the text out with the pretty ones, which for Chinese end each line three to five characters
+   early: the bubble kept its width and showed an empty band down its right side. Ordinary wrapping fills the line.
+   Same selectors as upstream's, doubled on :root so this wins whichever of the two rules the bundle puts first. */
+:root [data-chat-bubble="simple"],
+:root .chat-md :is(p, li, blockquote) {
+  text-wrap: wrap;
+}

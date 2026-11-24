@@ -9,6 +9,7 @@ import { describe, expect, it, vi } from "vitest";
 import { RichTable } from "./RichTable";
 import { ChatMarkdown } from "./ChatMarkdown";
 import { ReplyBlocks } from "./ReplyBlocks";
+import { SIMPLE_BUBBLE_MAX } from "./chat-bubble";
 import { CHAR_PX, COLUMN_MAX_CHARS, COLUMN_MIN_CHARS, columnMinimums, fitsColumns } from "@/lib/table-fit";
 import { formattedReplyWidth } from "@/lib/formatted-reply";
 
@@ -102,16 +103,30 @@ describe("a table in a reply", () => {
     expect(css).toMatch(/\.chat-wide \.chat-md > :not\(\.chat-table\) \{\s*max-width: var\(--chat-prose-max\);\s*min-width: 100%;/);
   });
 
-  it("lets Simple mode's prose widen the bubble only to the reading width, then fill the width its tables gave it", () => {
+  // suyuan fork: ReplyBlocks keeps the split layout (prose in bubbles, each table in its own card), not upstream's one bubble.
+  it("splits Simple mode's reply around its tables: prose in reading-width bubbles, each table in its own card at the message's width", () => {
     const doc = parse(renderToStaticMarkup(createElement(ReplyBlocks, {
       blocks: [{ kind: "prose", text: "Before" }, { kind: "table", text: markdown }, { kind: "prose", text: "After" }],
       citation: { messageId: "m1", ownerType: "bot", ownerId: "b1", threadId: "t1" },
+      tray: createElement("span", { "data-tray": "" }),
       render: (text: string) => text,
     })));
-    expect(doc.querySelector("[data-reply-bubble]")!.className).toContain("w-fit");
-    const prose = [...doc.querySelectorAll("[data-reply-prose]")];
-    expect(prose).toHaveLength(2);
-    for (const block of prose) expect(block.className).toBe("min-w-full max-w-[var(--chat-bubble-max)]");
-    expect(doc.querySelector("[data-reply-table]")!.className).toBe("min-w-0");
+    const blocks = doc.querySelector("[data-reply-blocks]")!;
+    expect(blocks.className).toBe("flex w-full flex-col items-start gap-1");
+    expect(doc.querySelector("[data-reply-bubble]")).toBeNull();
+    const prose = [...doc.querySelectorAll('[data-chat-bubble="simple"]')];
+    expect(prose.map((bubble) => bubble.textContent)).toEqual(["Before", "After"]);
+    for (const bubble of prose) {
+      expect(bubble.className).toContain("w-fit");
+      expect(bubble.className).toContain(SIMPLE_BUBBLE_MAX);
+    }
+    const table = doc.querySelector("[data-reply-table]")!;
+    expect(table.className).toBe("my-2 w-full max-w-[var(--chat-card-pct)] first:mt-0 last:mb-0");
+    expect(table.parentElement).toBe(blocks);
+    expect(table.closest('[data-chat-bubble="simple"]')).toBeNull();
+    // The tray stands beside the first block, in a row of its own inside the reply.
+    const tray = doc.querySelector("[data-tray]")!;
+    expect(tray.parentElement!.parentElement).toBe(blocks);
+    expect(tray.previousElementSibling).toBe(prose[0]);
   });
 });

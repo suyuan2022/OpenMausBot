@@ -1,0 +1,21 @@
+/* suyuan fork: two layout fixes for the chat dock's Skill Burger card (src/components/skill-burger/).
+
+   Its list of steps (ol.burger-layers in SkillBurger.tsx, RunBurger.tsx and DraftSteps.tsx) is a column that scrolls
+   past a fixed height. Each step is a flex item that may shrink, and .burger-layer's overflow: hidden (styles.css)
+   takes away the floor its content would give it, so a long run did not scroll: its 24 steps were squashed into
+   slivers a few pixels tall. A step that never shrinks keeps its height, and the list scrolls. */
+.burger-layers > li {
+  flex-shrink: 0;
+}
+
+/* The jump-to-latest arrow (JumpToLatestButton.tsx) stands in a zero-height wrapper between the card and the composer
+   (ChatView.tsx), centred, 8px above the composer: on a pane narrower than about 756px that is on top of the card's
+   bottom button, "+ Add Skill Burger". While a card is in the dock the arrow is placed against the dock instead, 8px
+   above the card's top edge, where it covers nothing. */
+.chat-column-dock:has(> div > [data-skill-burger]) > [class="relative"] {
+  position: static;
+}
+.chat-column-dock:has(> div > [data-skill-burger]) > [class="relative"] > button {
+  top: -2.75rem;
+  bottom: auto;
+}

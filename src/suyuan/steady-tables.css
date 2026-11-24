@@ -7,12 +7,6 @@
    a message as wide as the row (ChatView.tsx and GroupView.tsx give a tabled bubble w-full), while a bubble or a widget
    row that shrinks to its content, or advanced mode's reply sharing its row with the buttons and the time, would squash
    a table sized this way. */
-/* suyuan fork: keep tabled Simple replies from squashing .chat-table or oscillating with hover time.
-   In 0.1.178 ReplyBlocks wraps prose and tables inside a w-fit [data-reply-bubble], so widen a tabled bubble
-   to fill its allowed card width whenever [data-reply-table] uses contain: inline-size. */
-[data-reply-bubble]:has([data-reply-table]) {
-  width: 100%;
-}
 [data-reply-table] .chat-table {
   contain: inline-size;
 }

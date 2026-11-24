@@ -96,7 +96,9 @@ describe("suyuan-v2 thin-fork wiring", () => {
     expect(source("src/main.tsx")).not.toContain("last-frame");
     expect(source("src/lib/notify.ts")).toContain("if (pushHandlesNotifications() && !frame.forPerson) return;");
     expect(source("src/components/NotificationSettingsRows.tsx")).toContain("<WebPushRow />");
-    expect(source("src/components/settings/pages/AppPages.tsx")).toContain("<VoiceButtonRow />");
+    const appPages = source("src/components/settings/pages/AppPages.tsx");
+    expect(appPages.match(/<VoiceButtonRow \/>/g)).toHaveLength(2);
+    expect(appPages.match(/<VoiceButtonRow \/>\n\s*<SkillBurgerRow \/>/g)).toHaveLength(2);
     expect(source("src/hooks/use-unread-divider.ts")).toContain("useDividerSeen(");
 
     const cal = source("src/components/RoutineCalendarPage.tsx");
@@ -116,9 +118,45 @@ describe("suyuan-v2 thin-fork wiring", () => {
     expect(source("src/state/thread-navigation.ts")).toContain("foreground(bot).tasks");
   });
 
+  it("keeps the Skill Burger card off until Settings turns it on", () => {
+    const slot = source("src/components/skill-burger/SkillBurgerSlot.tsx");
+    expect(slot).toContain("const enabled = useSkillBurger();");
+    expect(slot).toContain("useRunnable(enabled ? ");
+    expect(slot).toContain("if (!enabled || !finished || !runKey || named.has(runKey)) return;");
+    expect(slot).toContain("if (!enabled || !finished || !runKey || drafts.has(runKey)) return;");
+    expect(slot).toContain("if (!enabled) return null;");
+    for (const test of ["SkillBurger", "RunBurger"]) {
+      expect(source(`src/components/skill-burger/${test}.dom.test.ts`)).toContain('localStorage.setItem("omb-suyuan-skill-burger", "1")');
+    }
+  });
+
+  it("loads every CSS overlay from the one frontend hook", () => {
+    const hook = source("src/suyuan/use-suyuan.ts");
+    for (const sheet of ["chat-wrap", "keyboard-fit", "no-zoom", "phone-code", "phone-tables", "skill-burger", "steady-tables", "wide-replies"]) {
+      expect(hook).toContain(`import "./${sheet}.css";`);
+    }
+    // chat-wrap.css undoes this upstream rule; if upstream drops or rewords it, the overlay needs another look.
+    expect(source("src/styles.css")).toMatch(/\[data-chat-bubble="simple"\],\n\.chat-md :is\(p, li, blockquote\) \{\n\s*text-wrap: pretty;/);
+    expect(source("src/suyuan/chat-wrap.css")).toMatch(/:root \[data-chat-bubble="simple"\],\n:root \.chat-md :is\(p, li, blockquote\) \{\n\s*text-wrap: wrap;/);
+    expect(source("src/suyuan/skill-burger.css")).toMatch(/\.burger-layers > li \{\n\s*flex-shrink: 0;/);
+  });
+
   it("keeps DOM selectors required by retained CSS overlays intact", () => {
-    expect(source("src/components/ReplyBlocks.tsx")).toContain("data-reply-bubble");
-    expect(source("src/components/ReplyBlocks.tsx")).toContain("data-reply-table");
+    // Tabled replies keep the split layout: prose in ordinary bubbles, each table a card of its own at the top level.
+    const reply = source("src/components/ReplyBlocks.tsx");
+    expect(reply).not.toContain("data-reply-bubble");
+    expect(reply).toContain("data-reply-blocks");
+    expect(reply).toContain('<div key={index} data-reply-table className="my-2 w-full max-w-[var(--chat-card-pct)] first:mt-0 last:mb-0">');
+    expect(reply).toContain('<div key={index} data-chat-bubble="simple" className={cn("w-fit", SIMPLE_BUBBLE_MAX, SIMPLE_BOT_BUBBLE,');
+    expect(source("src/suyuan/wide-replies.css")).not.toContain("data-reply-bubble");
+    expect(source("src/suyuan/steady-tables.css")).not.toContain("data-reply-bubble");
+    // skill-burger.css moves the jump-to-latest arrow off the card: it finds the arrow by this markup in the chat dock.
+    const chat = source("src/components/ChatView.tsx");
+    expect(chat).toMatch(/chat-column-dock">\n\s*<SkillBurgerSlot /);
+    expect(chat).toMatch(/<div className="relative">\n\s*<JumpToLatestButton onClick=\{jumpToLatest\} className="pointer-events-auto bottom-2" \/>/);
+    expect(source("src/components/skill-burger/SkillBurgerSlot.tsx").match(/<div className="flex justify-end px-4 pb-2">/g)).toHaveLength(2);
+    for (const card of ["SkillBurger", "RunBurger"]) expect(source(`src/components/skill-burger/${card}.tsx`)).toContain("data-skill-burger=");
+    for (const list of ["SkillBurger", "RunBurger", "DraftSteps"]) expect(source(`src/components/skill-burger/${list}.tsx`)).toContain('className="burger-layers flex ');
     expect(source("src/components/RichTable.tsx")).toContain("data-table-card");
     expect(source("src/components/RichTable.tsx")).toContain('className="chat-table"');
     expect(source("src/components/CodeBlock.tsx")).toContain("chat-code-block");

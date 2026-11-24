@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 
 import { askOf, burgerLayers, burgerWorthy, type RunMessage } from "../../../shared/skill-burger/layers";
 import { latestRun, runView } from "../../../shared/skill-burger/run-view";
+import { useSkillBurger } from "@/suyuan/skill-burger"; // suyuan fork
 import { fetchBurgerDraft, fetchBurgerSummary, useRunnable, type DraftView } from "@/lib/skill-burger";
 import { RunBurger } from "./RunBurger";
 import { layerLine, SkillBurger } from "./SkillBurger";
@@ -31,9 +32,10 @@ export function SkillBurgerSlot({ botId, threadId, busy, canWrite, messages, liv
   liveTools: ReadonlySet<string>;
   transcriptKey: string;
 }) {
+  const enabled = useSkillBurger(); // suyuan fork: off until Settings turns the card on; off, it neither mounts nor asks the server anything.
   const seen = useMemo(() => latestRun(messages, liveTools), [messages, liveTools]);
   const edit = useMemo(() => (seen ? null : editIn(messages)), [seen, messages]);
-  const runnable = useRunnable(seen?.name ?? edit?.name ?? null, botId);
+  const runnable = useRunnable(enabled ? seen?.name ?? edit?.name ?? null : null, botId);
   const layers = useMemo(() => burgerLayers(messages, liveTools), [messages, liveTools]);
   const [closed, setClosed] = useState<ReadonlyMap<string, string>>(() => new Map());
   const [named, setNamed] = useState<ReadonlyMap<string, string>>(() => new Map());
@@ -43,24 +45,25 @@ export function SkillBurgerSlot({ botId, threadId, busy, canWrite, messages, liv
   const runKey = run ? `${transcriptKey}:${run}:${layers.length}` : "";
 
   useEffect(() => {
-    if (!finished || !runKey || named.has(runKey)) return;
+    if (!enabled || !finished || !runKey || named.has(runKey)) return;
     let current = true;
     void fetchBurgerSummary(botId, threadId).then((summary) => {
       if (current && summary) setNamed((map) => new Map(map).set(runKey, summary));
     });
     return () => { current = false; };
-  }, [finished, runKey, botId, threadId, named]);
+  }, [enabled, finished, runKey, botId, threadId, named]);
 
   // The finished run as it would be saved, from the server: the card explains it from this once it arrives.
   useEffect(() => {
-    if (!finished || !runKey || drafts.has(runKey)) return;
+    if (!enabled || !finished || !runKey || drafts.has(runKey)) return;
     let current = true;
     void fetchBurgerDraft(botId, threadId).then((draft) => {
       if (current) setDrafts((map) => new Map(map).set(runKey, draft));
     });
     return () => { current = false; };
-  }, [finished, runKey, botId, threadId, drafts]);
+  }, [enabled, finished, runKey, botId, threadId, drafts]);
 
+  if (!enabled) return null;
   const close = (key: string) => () => setClosed((current) => new Map(current).set(transcriptKey, key));
   if (seen || edit) {
     const key = seen ? `run:${seen.run}` : `edit:${edit!.id}`;

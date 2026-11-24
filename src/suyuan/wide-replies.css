@@ -45,12 +45,11 @@
   [data-message-row].items-start [data-testid="message-actions"]:has(> [role="menu"]) {
     z-index: 30;
   }
-  /* A bubble, but not the wrapper of a reply split around tables (ReplyBlocks.tsx sets both data-chat-bubble="simple"
-     on the outer w-full wrapper and data-reply-bubble on the inner card). */
-  [data-message-row].items-start:has([data-chat-bubble="simple"]) [data-chat-bubble="simple"]:not(:has([data-reply-blocks])):not([data-reply-bubble]) {
+  /* A bubble, but not the wrapper of a reply split around tables: that one spans the row, and the buttons sit beside
+     its first block (ReplyBlocks.tsx). */
+  [data-message-row].items-start:has([data-chat-bubble="simple"]) [data-chat-bubble="simple"]:not(:has([data-reply-blocks])) {
     max-width: min(var(--chat-bubble-max), calc(100% - var(--suyuan-tray)));
   }
-  [data-message-row].items-start:has([data-chat-bubble="simple"]) [data-reply-bubble],
   [data-message-row].items-start:has([data-chat-bubble="simple"]) [data-reply-table] {
     max-width: calc(100% - var(--suyuan-tray));
   }
