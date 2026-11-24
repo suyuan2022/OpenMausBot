@@ -471,6 +471,11 @@ export class RuntimeCoordinator implements Coordinator {
     for (const { root, work } of trees) if (root) this.rememberStop(root, work);
   }
 
+  stopTurnDirect(threadId: string, reason = STOPPED_BY_USER): void {
+    this.ready();
+    this.runtime.stopRequesterTurn({ threadId }, reason);
+  }
+
   stopHandoff(id: string): "stopped" | "ended" | undefined {
     this.ready();
     const n = this.store.get(id);

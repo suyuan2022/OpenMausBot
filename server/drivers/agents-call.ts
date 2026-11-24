@@ -20,7 +20,7 @@ import { dropBlankArguments } from "./agents-blank-arguments.ts";
 import { callResearchTool, RESEARCH_TOOL_NAMES } from "./agents-research-tools.ts";
 import { callHelperTool, HELPER_TOOL_NAMES } from "./agents-helper-tools.ts";
 import { callWhatChangedTool, WHAT_CHANGED_TOOL } from "./agents-what-changed-tool.ts";
-import { callUsageLimitsTool, USAGE_LIMITS_TOOL } from "./agents-usage-tool.ts";
+import { callUsageLimitsTool, USAGE_LIMITS_TOOL } from "./agents-usage-tool.ts"; import { callChiefReadTool, CHIEF_READ_TOOL_NAMES } from "../suyuan/chief-read-tools.ts"; import { threadFacts } from "../suyuan/thread-facts.ts"; import { parseHandoffModelArg } from "../suyuan/handoff-model.ts";
 import { callThreadPostTool, THREAD_POST_TOOL } from "./agents-thread-post-tool.ts"; import { callListThreadsTool, LIST_THREADS_TOOL } from "./agents-list-threads-tool.ts"; import { callRenameThreadTool, RENAME_THREAD_TOOL } from "./agents-thread-title-tool.ts"; import { callWorkflowTool, WORKFLOW_TOOL_NAMES } from "./agents-workflow-tool.ts";
 import { callWaitTool, WAIT_TOOL_NAMES } from "./agents-wait-tools.ts"; import { callCheckBackTool, CHECK_BACK_TOOL_NAMES } from "./agents-check-back-tool.ts";
 import { callBurstTool } from "./agents-burst-tool.ts";
@@ -259,6 +259,7 @@ export async function callTool(called: string, input: Json, context: ToolCallCon
   if (TRIGGER_TOOL_NAMES.has(name)) return callTriggerTool(name, args, context);
   if (WAIT_TOOL_NAMES.has(name)) return callWaitTool(name, args, context); if (CHECK_BACK_TOOL_NAMES.has(name)) return callCheckBackTool(args, context);
   if (name === USAGE_LIMITS_TOOL) return callUsageLimitsTool(context, args);
+  if (CHIEF_READ_TOOL_NAMES.has(name)) return callChiefReadTool(name, args, context);
   if (COMPUTER_ASK_TOOL_NAMES.has(name)) return callComputerAskTool(args, context);
   // Second lock: with sharing off the catalog already omits these tools.
   if (SHARED_COMPUTER_TOOL_NAMES.has(name) && !context.sharedComputers) {
@@ -301,6 +302,7 @@ export async function callTool(called: string, input: Json, context: ToolCallCon
     // A non-text groupId still fails the check below, as it always has.
     if (snakeBlank && args.groupId != null && !(typeof args.groupId === "string" && args.groupId.trim() === "")) canonical.group_id = args.groupId;
     if (canonical.done_when === undefined) canonical.done_when = args.doneWhen;
+    if (canonical.model_selection === undefined) canonical.model_selection = args.modelSelection; // suyuan fork: server/suyuan/handoff-model.ts
     const ids = canonical.bot_ids;
     const optional = (key: string, type: "boolean" | "string") => canonical[key] === undefined || typeof canonical[key] === type;
     const usable = Array.isArray(ids) && ids.length > 0 && ids.every((id) => typeof id === "string")
@@ -312,10 +314,11 @@ export async function callTool(called: string, input: Json, context: ToolCallCon
       && (canonical.group_id === undefined || canonical.group_id === null || typeof canonical.group_id === "string") && (canonical.files === undefined || canonical.files === null || (Array.isArray(canonical.files) && canonical.files.every((path) => typeof path === "string") && canonical.files.filter((path) => path.trim()).length <= 5));
     if (!usable) {
       return {
-        text: `coordinate_bots takes snake_case arguments: bot_ids (an array of 1-4 teammate ids) and message are required; group_id, reason, rework, title, thread ("standing", "new" or the id of a thread you opened on that teammate), reply ("resume" or "none"), consult (true or false), in_my_folder (true or false), done_when, answers and files (an array of at most 5 file paths) are optional. Received: ${Object.keys(args).join(", ") || "none"}.`,
+        text: `coordinate_bots takes snake_case arguments: bot_ids (an array of 1-4 teammate ids) and message are required; group_id, reason, rework, title, thread ("standing", "new" or the id of a thread you opened on that teammate), reply ("resume" or "none"), consult (true or false), in_my_folder (true or false), done_when, answers, files (an array of at most 5 file paths) and model_selection are optional. Received: ${Object.keys(args).join(", ") || "none"}.`,
         isError: true,
       };
     }
+    const modelPick = parseHandoffModelArg(canonical.model_selection); if (!modelPick.ok) return { text: modelPick.error, isError: true }; // suyuan fork: server/suyuan/handoff-model.ts
     const answer = await apiResponse("/api/internal/coordinate-bots", { method: "POST", body: JSON.stringify({
       groupId: typeof canonical.group_id === "string" && canonical.group_id.trim() ? canonical.group_id.trim() : undefined, botIds: ids, message: canonical.message,
       reason: typeof canonical.reason === "string" && canonical.reason.trim() ? canonical.reason.trim() : undefined,
@@ -324,6 +327,7 @@ export async function callTool(called: string, input: Json, context: ToolCallCon
       title: typeof canonical.title === "string" && canonical.title.trim() ? canonical.title.trim() : undefined, consult: canonical.consult, inMyFolder: canonical.in_my_folder,
       done_when: typeof canonical.done_when === "string" && canonical.done_when.trim() ? canonical.done_when.trim() : undefined,
       answers: typeof canonical.answers === "string" && canonical.answers.trim() ? canonical.answers.trim() : undefined, files: Array.isArray(canonical.files) && canonical.files.some((path) => path.trim()) ? canonical.files.filter((path) => path.trim()) : undefined,
+      ...(modelPick.selection ? { modelSelection: modelPick.selection } : {}),
     }) });
     return apiAnswer(answer.ok, answer.status, answer.body);
   }
@@ -364,7 +368,7 @@ export async function callTool(called: string, input: Json, context: ToolCallCon
         ? (b.status === "available" ? "" : b.statusText)
         : (b.busy ? "busy" : "");
       const team = typeof b.section === "string" ? `, department: ${peerName(b.section) || "General"}` : "";
-      return `- ${b.name}${role}${about} [id: ${b.id}, model: ${b.model}${team}${state ? `, ${state}` : ""}]`;
+      return `- ${b.name}${role}${about} [id: ${b.id}, model: ${b.model}${typeof b.instanceId === "string" && b.instanceId ? `, engine: ${b.instanceId}` : ""}${team}${state ? `, ${state}` : ""}]`;
     });
     return {
       text: `Bots you can reach (every department; you can contact any of them):\n${lines.join("\n")}\n\nUse coordinate_bots for concrete work or, with consult: true, for advice, then end your turn. Busy teammates queue and results resume you automatically.`,
@@ -433,7 +437,7 @@ export async function callTool(called: string, input: Json, context: ToolCallCon
     if (!threadId) return { text: "close_thread needs the thread_id from list_threads or start_thread.", isError: true };
     const r = await api(`/api/internal/threads/${encodeURIComponent(threadId)}/close`, { method: "POST", body: JSON.stringify({ fromBotId: BOT_ID, fromThreadId: THREAD_ID }) });
     if (r.error) return { text: `Couldn't close that thread: ${String(r.error)}`, isError: true };
-    return { text: `Closed #${String(r.title)}${r.botName ? ` on @${String(r.botName)}` : ""}. It stays in the person's sidebar, idle, with a note that you closed it.` };
+    return { text: threadFacts(`Closed #${String(r.title)}${r.botName ? ` on @${String(r.botName)}` : ""}. It stays in the person's sidebar, idle, with a note that you closed it.`) };
   }
   if (name === "start_thread") {
     const title = String(args.title ?? "").trim();

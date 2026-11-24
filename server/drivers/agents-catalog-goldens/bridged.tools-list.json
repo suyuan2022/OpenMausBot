@@ -38,7 +38,7 @@
     },
     {
       "name": "coordinate_bots",
-      "description": "The one way to hand work on: ask existing OpenMausBot teammates a question or assign them concrete work. Give 1-4 bot_ids from list_bots; they see only what you send, so include constraints and done_when, and pass files they need in files. In a room it goes to this room; elsewhere to your standing work thread with each teammate. Results return here and resume you, so end your turn after sending; on return, verify the outcome and send fixes with rework true. Never target whoever assigned you this work or anyone above it: end your turn and your reply reaches them. Never thank a finished teammate or repeat a refused call unchanged.",
+      "description": "The one way to hand work on: ask existing OpenMausBot teammates a question or assign them concrete work. Give 1-4 bot_ids from list_bots; they see only what you send, so include constraints and done_when, and pass files they need in files (or pass model_selection to override their model for this job). In a room it goes to this room; elsewhere to your standing work thread with each teammate. Results return here and resume you, so end your turn after sending; on return, verify the outcome and send fixes with rework true. Never target whoever assigned you this work or anyone above it: end your turn and your reply reaches them. Never thank a finished teammate or repeat a refused call unchanged.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
@@ -73,7 +73,7 @@
           "title": {
             "type": "string",
             "maxLength": 80,
-            "description": "With thread \"new\": its short sidebar name."
+            "description": "With thread \"new\": the new thread's title, shown at the top of the thread and used by list_threads and #Title links; short and specific."
           },
           "in_my_folder": {
             "type": "boolean",
@@ -106,6 +106,29 @@
             },
             "maxItems": 5,
             "description": "Paths as for attach_file, 100 MB together: copied into each teammate's inbox. Files a teammate attaches with attach_file come back with its result."
+          },
+          "model_selection": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "instanceId": {
+                "type": "string"
+              },
+              "model": {
+                "type": "string"
+              },
+              "effort": {
+                "type": "string"
+              },
+              "variant": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "instanceId",
+              "model"
+            ],
+            "description": "Optional: override engine/model for this hand-off only (teammate default stays unchanged). Omit for their default."
           }
         },
         "required": [
@@ -562,7 +585,7 @@
     },
     {
       "name": "find_tool",
-      "description": "Find an OpenMausBot tool that is not in your tool list. Say what you want to do in a few words, or give the tool's name. Each match comes back with its description and exact input schema; run one with use_tool. Tools reached this way: list_shared_computers, shared_computer, assignment_status, usage_limits, list_threads, close_thread, rename_thread, run_workflow, workflow_edit, start_thread, burst, list_models, vm_exec, show_widget, show_html, unpublish_page, create_bot, list_team_setup, list_team_library, propose_team_setup, propose_bot_deletion, manage_room, x_search, research_search, research_endpoint, research_call, decide, extract, what_changed, edit_image, generate_image, report_bug, check_app_hosting, retry_thread, memory_log, session_search, trigger_info, trigger, delete_trigger, wait_until, list_waits, cancel_wait, check_back, propose_profile, propose_model, propose_team_memory, skills_list, skill_manage, mcp_server, app_settings.",
+      "description": "Find an OpenMausBot tool that is not in your tool list. Say what you want to do in a few words, or give the tool's name. Each match comes back with its description and exact input schema; run one with use_tool. Tools reached this way: list_shared_computers, shared_computer, assignment_status, usage_limits, team_threads, team_thread_read, list_threads, close_thread, rename_thread, run_workflow, workflow_edit, start_thread, burst, list_models, vm_exec, show_widget, show_html, unpublish_page, create_bot, list_team_setup, list_team_library, propose_team_setup, propose_bot_deletion, manage_room, x_search, research_search, research_endpoint, research_call, decide, extract, what_changed, edit_image, generate_image, report_bug, check_app_hosting, retry_thread, memory_log, session_search, trigger_info, trigger, delete_trigger, wait_until, list_waits, cancel_wait, check_back, propose_profile, propose_model, propose_team_memory, skills_list, skill_manage, mcp_server, app_settings.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,

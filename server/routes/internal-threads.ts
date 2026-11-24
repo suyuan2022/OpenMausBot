@@ -4,6 +4,8 @@ import { reachablePeers } from "../peer-roster.ts";
 import { threadTitleFrom, type BotRecord, type Store, type TaskRecord } from "../store.ts";
 import { PASS, type RouteHandler } from "./table.ts";
 import { conversationLanguage, serverLine } from "../server-lines.ts";
+import { createChiefReadRoutes } from "../suyuan/chief-read-threads.ts";
+import { homeStaysOpen, isHome } from "../suyuan/home.ts";
 
 const THREADS_PAGE = 100;
 
@@ -20,7 +22,7 @@ interface ThreadRow {
 
 /** Only dispatch inside the internal capability gate: `from` and `fromThreadId` come from the caller's capability. */
 export function createInternalThreadRoutes(deps: {
-  store: Pick<Store, "bot" | "bots" | "tasks" | "taskByThread" | "appendMessage" | "patchTask" | "setTaskClosedBy" | "renameTask">;
+  store: Pick<Store, "bot" | "bots" | "tasks" | "taskByThread" | "appendMessage" | "patchTask" | "setTaskClosedBy" | "renameTask" | "messagesTail" | "groupByThread">;
   coordinator: Pick<Coordinator, "awaitingAnswer" | "parkedDirect" | "activeDirect" | "active">;
   from: BotRecord;
   fromThreadId: string;
@@ -35,7 +37,8 @@ export function createInternalThreadRoutes(deps: {
   readBody(): Promise<unknown>;
 }): RouteHandler {
   const { store, coordinator, from, fromThreadId } = deps;
-  return async ({ res, url, path, method, json }) => {
+  const chiefRead = createChiefReadRoutes(deps);
+  const threads: RouteHandler = async ({ res, url, path, method, json }) => {
     // list_threads: the caller's own threads plus, on reachable peers, only threads it opened; a peer's other threads are its own business.
     if (method === "GET" && path === "/api/internal/threads") {
       if (!deps.ownsThread(from.id, fromThreadId)) {
@@ -119,6 +122,7 @@ export function createInternalThreadRoutes(deps: {
       return json(res, 403, { error: "that thread is not yours to close — only the bot that opened it, its own bot, or (for a thread a bot opened) a Chief of Staff can" });
     }
     if (threadId === fromThreadId) return json(res, 400, { error: "you cannot close the thread you are speaking in — finish your turn instead" });
+    if (isHome(store, owner.id, threadId)) return json(res, 409, { error: homeStaysOpen(owner.name) });
     if (coordinator.awaitingAnswer(threadId)) {
       return json(res, 409, { error: `#${task.title} is waiting on the person's answer to its question — it continues once they reply there, so leave it open` });
     }
@@ -138,4 +142,5 @@ export function createInternalThreadRoutes(deps: {
     store.setTaskClosedBy(owner.id, threadId, { botId: from.id, name: from.name, at: Date.now() });
     return json(res, 200, { closed: true, threadId, title: task.title, botName: owner.name });
   };
+  return async (ctx) => (await chiefRead(ctx)) === PASS ? threads(ctx) : undefined;
 }

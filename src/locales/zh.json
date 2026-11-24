@@ -9319,6 +9319,8 @@
   "activity.tool.team.skillManage": "管理技能",
   "activity.tool.team.skillsList": "技能列表",
   "activity.tool.team.startThread": "开始对话",
+  "activity.tool.team.teamThreadRead": "查看团队会话",
+  "activity.tool.team.teamThreads": "列出团队会话",
   "activity.tool.team.toolResultRead": "读取工具结果",
   "activity.tool.team.unpublishPage": "取消发布页面",
   "activity.tool.team.updateHtml": "更新 HTML",

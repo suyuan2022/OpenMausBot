@@ -46,4 +46,6 @@ export interface AutomationLine {
   /** The card in the run's conversation this line stands for: an option card
    * is copied whole, a sign-in, connection or credential card is named. */
   copyOf?: string;
+  /** The turn in executionThreadId that emitted this line (suyuan fork multi-turn reporting). */
+  turnId?: string;
 }

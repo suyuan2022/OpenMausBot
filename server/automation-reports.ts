@@ -15,6 +15,10 @@ import { serverLine } from "./server-lines.ts";
 import type { BotRecord, Message, Store } from "./store.ts";
 import { hostTimeZone } from "./turn-clock.ts";
 import { AUTHORITY, fromNote, routineWho } from "./provenance-label.ts";
+import {
+  collectRecoverableRoutineTurns, extractTurnReport, findPostedRunFailure, findPostedRunReply,
+  hasPostedRunReply, runReportFailureKey, runReportReplyKey, shouldDeliverAutomationTurn, type TurnAttachment,
+} from "./suyuan/automation-report-turns.ts";
 
 const QUIET = /^[\s*_`"'.!-]*nothing new[\s*_`"'.!-]*$/i;
 const NEEDS_INPUT = /^\s*needs input:\s*/i;
@@ -80,15 +84,17 @@ export function waitingCardText(message: Pick<Message, "kind" | "signIn" | "conn
   return null;
 }
 
-/** The newest line of each automation: whatever else is dropped for room, the chat's session always gets these. */
+/** The newest run's lines of each automation: whatever else is dropped for room, the chat's session always gets these. */
 export function newestAutomationLines(messages: readonly Pick<Message, "id" | "automation">[]): Set<string> {
-  const newest = new Map<string, string>();
-  for (const message of messages) if (message.automation) newest.set(message.automation.routineId, message.id);
-  return new Set(newest.values());
+  const newestRun = new Map<string, string>();
+  for (const message of messages) if (message.automation) newestRun.set(message.automation.routineId, message.automation.runId);
+  const kept = new Set<string>();
+  for (const message of messages) {
+    if (message.automation && newestRun.get(message.automation.routineId) === message.automation.runId) kept.add(message.id);
+  }
+  return kept;
 }
 
-const saidLine = (message: Message) => message.role === "bot" && message.kind === "text";
-const turnOfLine = (message: Message) => message.turnId ?? message.sentInTurn;
 const settledQuestion = (message: Message) => {
   const card = message.card;
   return message.kind === "options" && !message.automation && card?.requestType === "question"
@@ -98,7 +104,7 @@ const settledQuestion = (message: Message) => {
 type Waiting =
   /** `messageId`: the line the run's reply is read from; null when its last turn said and sent nothing, absent when it is
    * unknown (a report still waiting after a restart). */
-  | { kind: "reply"; run: RoutineRun; messageId?: string | null }
+  | { kind: "reply"; run: RoutineRun; turnId?: string; messageId?: string | null; attachments?: TurnAttachment[]; intermediate?: boolean }
   | { kind: "failure"; run: RoutineRun; detail: string }
   | { kind: "card"; run: RoutineRun; threadId: string; messageId: string };
 
@@ -135,37 +141,23 @@ export function createAutomationReports(deps: AutomationReportDeps) {
     return bot && task && !task.routineRunId ? { bot, threadId: task.threadId } : null;
   };
 
-  const lineOf = (run: RoutineRun, extra: Pick<AutomationLine, "needsYou" | "failed" | "partial" | "recovered" | "copyOf">): AutomationLine => ({
+  const lineOf = (run: RoutineRun, extra: Pick<AutomationLine, "needsYou" | "failed" | "partial" | "recovered" | "copyOf" | "turnId">): AutomationLine => ({
     routineId: run.routineId, runId: run.id, name: run.routineName, trigger: run.eventSource ?? run.triggerSource ?? (run.manual ? "manual" : "schedule"),
     executionThreadId: run.threadId!, scheduledFor: run.scheduledFor, ...extra,
   });
 
-  /** The reply a run ends with: its last turn's last text, or after a restart the last line of the last turn that
-   * settled or sent a file. */
-  const replyOf = (run: RoutineRun, messageId?: string | null) => {
-    const path = run.threadId ? store.activePath(run.threadId) : [];
-    if (messageId !== undefined) return messageId === null ? undefined : path.find((message) => message.id === messageId);
-    const last = path.findLast((message) => saidLine(message) && (message.turnTerminal || message.sentInTurn !== undefined));
-    const turn = last?.sentInTurn;
-    return (turn ? path.findLast((message) => saidLine(message) && message.turnId === turn) ?? last : last) ?? path.findLast(saidLine);
+  const hasQueuedReply = (runId: string, excludeKey?: string): boolean => {
+    for (const [key, entry] of waiting) {
+      if (key !== excludeKey && entry.kind === "reply" && entry.run.id === runId) return true;
+    }
+    return false;
   };
-
-  /** The files the reply's turn sent the person, in order: its attach_file lines' and the reply's own, without the
-   * images its tools returned. */
-  const sentWith = (run: RoutineRun, reply: Message | undefined): NonNullable<Message["attachments"]> => {
-    if (!reply) return [];
-    const turn = turnOfLine(reply);
-    const lines = turn ? store.activePath(run.threadId!).filter((message) => saidLine(message) && turnOfLine(message) === turn) : [reply];
-    return lines.flatMap((message) => message.attachments ?? []).filter((file) => file.kind !== "image" || !file.fromTool);
-  };
-
-  const read = (run: RoutineRun, message: Message | undefined) => readRunReply(message?.text ?? "", sentWith(run, message).length > 0);
 
   /** The automation's line before this run's in the chat, written or still waiting ahead of it, says a run failed. */
-  const lastSaidFailed = (run: RoutineRun, threadId: string): boolean => {
+  const lastSaidFailed = (run: RoutineRun, threadId: string, currentKey: string): boolean => {
     let queued: Waiting | undefined;
     for (const [key, line] of waiting) {
-      if (key === run.id) break;
+      if (key === currentKey) break;
       if (line.kind !== "card" && line.run.routineId === run.routineId && destination(line.run)?.threadId === threadId) queued = line;
     }
     if (queued) return queued.kind === "failure";
@@ -220,11 +212,11 @@ export function createAutomationReports(deps: AutomationReportDeps) {
   };
 
   /** False while the chat it goes to is busy. */
-  const write = (line: Waiting): boolean => {
+  const write = (key: string, line: Waiting): boolean => {
     const { run } = line;
     const target = destination(run);
     if (!target) {
-      if (line.kind !== "card") deps.routines()?.noteReport(run.id, undefined);
+      if (line.kind !== "card" && !(line.kind === "reply" && line.intermediate)) deps.routines()?.noteReport(run.id, undefined);
       return true;
     }
     if (deps.busy(target.bot.id, target.threadId)) return false;
@@ -232,32 +224,68 @@ export function createAutomationReports(deps: AutomationReportDeps) {
       writeCopy(line, target);
       return true;
     }
-    const written = store.messagesFor(target.threadId).find((message) =>
-      (message.automation?.runId === run.id && message.kind === "text" && !message.automation.copyOf) || message.routineRun?.runId === run.id);
+    const targetMessages = store.messagesFor(target.threadId);
+    const language = deps.threadLanguage?.(target.threadId);
+    if (line.kind === "failure") {
+      const written = findPostedRunFailure(targetMessages, run.id);
+      if (written) {
+        deps.routines()?.noteReport(run.id, { state: "posted", threadId: target.threadId, messageId: written.id });
+        return true;
+      }
+      const note = deps.notes?.take(run.id, language) ?? null;
+      const said = withNote({
+        quiet: false,
+        text: line.detail ? serverLine(language, run.partial ? "server.runs.partlyDoneWhy" : "server.runs.didNotFinishWhy", { detail: line.detail }) : serverLine(language, "server.runs.didNotFinish"),
+      }, note);
+      const posted = store.appendMessage(target.threadId, {
+        role: "bot", kind: "text", text: said.quiet ? "" : said.text,
+        automation: lineOf(run, { failed: true, ...(run.partial ? { partial: true as const } : {}) }),
+      });
+      deps.routines()?.noteReport(run.id, { state: "posted", threadId: target.threadId, messageId: posted.id });
+      deps.wrote(target.bot, target.threadId);
+      store.patchTask(target.bot.id, target.threadId, { unread: true });
+      return true;
+    }
+
+    const extracted = line.messageId === null
+      ? { source: undefined, attachments: line.attachments ?? [] }
+      : extractTurnReport(run.threadId ? store.activePath(run.threadId) : [], line.turnId, line.messageId);
+    const source = extracted.source;
+    const attachments = line.attachments ?? extracted.attachments;
+    const turnKey = line.turnId ?? source?.id;
+    const written = findPostedRunReply(targetMessages, run.id, turnKey);
     if (written) {
       deps.routines()?.noteReport(run.id, { state: "posted", threadId: target.threadId, messageId: written.id });
       return true;
     }
-    const source = line.kind === "reply" ? replyOf(run, line.messageId) : undefined;
-    const language = deps.threadLanguage?.(target.threadId);
-    const said: RunReply = line.kind === "reply" ? withNote(read(run, source), deps.notes?.take(run.id, language) ?? null)
-      : withNote({ quiet: false, text: line.detail ? serverLine(language, run.partial ? "server.runs.partlyDoneWhy" : "server.runs.didNotFinishWhy", { detail: line.detail }) : serverLine(language, "server.runs.didNotFinish") }, deps.notes?.take(run.id, language) ?? null);
-    const recovered = said.quiet && lastSaidFailed(run, target.threadId);
+    const priorPosted = hasPostedRunReply(targetMessages, run.id);
+    const note = !line.intermediate ? deps.notes?.take(run.id, language) ?? null : null;
+    const raw = readRunReply(source?.text ?? "", attachments.length > 0);
+    if (raw.quiet && !note && (line.intermediate || priorPosted || hasQueuedReply(run.id, key))) return true;
+    const said = withNote(raw, note);
+    const recovered = said.quiet && lastSaidFailed(run, target.threadId, key);
     if (said.quiet && !recovered) {
       deps.routines()?.noteReport(run.id, { state: "quiet" });
       return true;
     }
     const reply: Extract<RunReply, { quiet: false }> = said.quiet ? { quiet: false, text: recoveredText(run.routineName, run.finishedAt ?? Date.now(), language) } : said;
-    const files = recovered ? [] : sentWith(run, source);
+    const files = recovered ? [] : attachments;
+    const stampTurn = Boolean((line.intermediate || priorPosted) && turnKey);
     const posted = store.appendMessage(target.threadId, {
       role: "bot", kind: "text", text: reply.text,
       ...(files.length ? { attachments: files } : {}),
-      automation: lineOf(run, line.kind === "failure" ? { failed: true, ...(run.partial ? { partial: true as const } : {}) } : recovered ? { recovered: true } : reply.question ? { needsYou: true } : {}),
+      automation: lineOf(run, {
+        ...(recovered ? { recovered: true } : reply.question ? { needsYou: true } : {}),
+        ...(stampTurn ? { turnId: turnKey } : {}),
+      }),
     });
     deps.routines()?.noteReport(run.id, { state: "posted", threadId: target.threadId, messageId: posted.id });
     deps.wrote(target.bot, target.threadId);
-    if (line.kind === "failure" || reply.question !== undefined || routineRunNeedsReview(run)) store.patchTask(target.bot.id, target.threadId, { unread: true });
-    if (line.kind === "reply" && !recovered) deps.notify(reply.question ? "question" : "done", target.bot, target.threadId, `${run.routineName}: ${reply.question ?? reply.text}`);
+    if (reply.question !== undefined || routineRunNeedsReview(run)) store.patchTask(target.bot.id, target.threadId, { unread: true });
+    if (!recovered) {
+      const summary = reply.question ?? (reply.text || (files[0] && "name" in files[0] && files[0].name) || "Attachment");
+      deps.notify(reply.question ? "question" : "done", target.bot, target.threadId, `${run.routineName}: ${summary}`);
+    }
     return true;
   };
 
@@ -271,11 +299,35 @@ export function createAutomationReports(deps: AutomationReportDeps) {
         const runs = manager.listRuns().reverse();
         reconcileQuestionCopies(runs);
         for (const run of runs) {
-          if (run.report?.state !== "pending" || waiting.has(run.id)) continue;
-          waiting.set(run.id, run.status === "failed" ? { kind: "failure", run, detail: run.error ?? "" } : { kind: "reply", run });
+          if (run.report?.state !== "pending") continue;
+          const failed = run.status === "failed";
+          if (!hasQueuedReply(run.id)) {
+            const turns = run.threadId ? collectRecoverableRoutineTurns(store.activePath(run.threadId), { failedRun: failed }) : [];
+            if (turns.length === 0 && !failed) {
+              waiting.set(runReportReplyKey(run.id), { kind: "reply", run, ...(run.status !== "completed" ? { intermediate: true } : {}) });
+            } else {
+              for (let i = 0; i < turns.length; i += 1) {
+                const turn = turns[i]!;
+                const turnKey = turn.turnId ?? turn.messageId;
+                const key = runReportReplyKey(run.id, turnKey);
+                if (waiting.has(key)) continue;
+                const intermediate = i < turns.length - 1 || run.status !== "completed";
+                waiting.set(key, {
+                  kind: "reply", run,
+                  ...(turn.turnId ? { turnId: turn.turnId } : {}),
+                  ...(turn.messageId ? { messageId: turn.messageId } : {}),
+                  ...(intermediate ? { intermediate: true } : {}),
+                });
+              }
+            }
+          }
+          if (failed) {
+            const failKey = runReportFailureKey(run.id);
+            if (!waiting.has(failKey)) waiting.set(failKey, { kind: "failure", run, detail: run.error ?? "" });
+          }
         }
       }
-      for (const [key, line] of waiting) if (write(line)) waiting.delete(key);
+      for (const [key, line] of waiting) if (write(key, line)) waiting.delete(key);
     } finally {
       flushing = false;
     }
@@ -321,26 +373,52 @@ export function createAutomationReports(deps: AutomationReportDeps) {
 
   return {
     flush,
-    /** A run's turn ended: once the run is complete, its reply becomes one line in the chat it reports to, or nothing. */
+    /** A run's turn ended: each non-quiet turn delivers its reply and turn attachments to the chat it reports to. */
     runSettled(run: RoutineRun, turnId?: string): void {
-      if (run.target !== "bot" || run.status !== "completed" || !run.threadId) return;
-      if (run.deliver === "brief") return deps.brief?.(run, turnId);
-      const path = store.activePath(run.threadId);
-      const said = turnId ? path.findLast((message) => saidLine(message) && message.turnId === turnId) ?? path.findLast((message) => saidLine(message) && message.sentInTurn === turnId)
-        : replyOf(run);
-      const reply = read(run, said);
+      if (!shouldDeliverAutomationTurn(run)) return;
+      if (run.deliver === "brief") {
+        if (run.status === "completed") deps.brief?.(run, turnId);
+        return;
+      }
+      const intermediate = run.status === "waiting";
+      const { source, attachments } = extractTurnReport(store.activePath(run.threadId!), turnId);
+      const reply = readRunReply(source?.text ?? "", attachments.length > 0);
       const bot = store.bot(run.botId);
       const target = destination(run);
-      if (target && (!reply.quiet || lastSaidFailed(run, target.threadId) || deps.notes?.has(run.id))) hold(run.id, { kind: "reply", run, messageId: said?.id ?? null });
-      else {
-        const noted = withNote(reply, deps.notes?.take(run.id, deps.threadLanguage?.(run.threadId)) ?? null);
-        if (noted.quiet) deps.routines()?.noteReport(run.id, { state: "quiet" });
-        else if (bot) deps.notify("done", bot, run.threadId, noted.text);
+      const turnKey = turnId ?? source?.id;
+      const key = runReportReplyKey(run.id, turnKey);
+      if (target) {
+        if (!reply.quiet || (!intermediate && deps.notes?.has(run.id))) {
+          hold(key, {
+            kind: "reply", run,
+            ...(turnId ? { turnId } : {}),
+            messageId: source ? source.id : null,
+            attachments,
+            ...(intermediate ? { intermediate: true } : {}),
+          });
+        } else if (!intermediate) {
+          const prior = hasPostedRunReply(store.messagesFor(target.threadId), run.id) || hasQueuedReply(run.id, key);
+          if (prior) return;
+          if (lastSaidFailed(run, target.threadId, key)) {
+            hold(key, { kind: "reply", run, ...(turnId ? { turnId } : {}), messageId: source ? source.id : null, attachments });
+          } else {
+            deps.routines()?.noteReport(run.id, { state: "quiet" });
+          }
+        }
+      } else {
+        const noted = !intermediate ? withNote(reply, deps.notes?.take(run.id, deps.threadLanguage?.(run.threadId!)) ?? null) : reply;
+        if (noted.quiet) {
+          if (!intermediate) deps.routines()?.noteReport(run.id, { state: "quiet" });
+        } else if (bot) {
+          deps.notify("done", bot, run.threadId!, noted.text || (attachments[0] && "name" in attachments[0] && attachments[0].name) || "Attachment");
+        }
       }
     },
     /** A run failed in a way the person is told about: one line says so where its reports go. */
     runFailed(run: RoutineRun, detail: string): void {
-      if (run.target === "bot" && run.status === "failed" && run.deliver !== "brief" && run.threadId && destination(run)) hold(run.id, { kind: "failure", run, detail });
+      if (run.target === "bot" && run.status === "failed" && run.deliver !== "brief" && run.threadId && destination(run)) {
+        hold(runReportFailureKey(run.id), { kind: "failure", run, detail });
+      }
     },
     /** This run's result, questions and failure come to its bot's chat as lines of their own, or through the brief.
      * A missed run, or one that failed before it had a conversation, has no line to say so, and keeps its card,
@@ -349,7 +427,7 @@ export function createAutomationReports(deps: AutomationReportDeps) {
       return run.target === "bot" && destination(run) !== null
         && (run.deliver === "brief" || (run.status !== "missed" && (run.status !== "failed" || Boolean(run.threadId))));
     },
-    /** This conversation is a run's own, and only its last reply reaches the chat the run reports to. */
+    /** This conversation is a run's own, and its replies reach the chat the run reports to. */
     reportsElsewhere(threadId: string): boolean {
       const run = deps.routines()?.runForThread(threadId);
       return run?.target === "bot" && run.deliver !== "brief" && destination(run) !== null;

@@ -22,6 +22,9 @@ import { MAUSBOT_TOOL_DEFINITIONS } from "./agents-mausbot-tools.ts";
 import { PERSON_TOOL_DEFINITIONS } from "./agents-person-tools.ts";
 import { RESEARCH_TOOL_DEFINITIONS, RESEARCH_TOOL_NAMES, X_TOOL_NAMES } from "./agents-research-tools.ts";
 import { SHARE_TOOL_DEFINITIONS } from "./agents-share-tool.ts";
+import { RUN_WITH_SCHEMA } from "../suyuan/run-with.ts";
+import { CHIEF_READ_TOOL_DEFINITIONS } from "../suyuan/chief-read-tools.ts";
+import { withThreadFacts } from "../suyuan/thread-facts.ts";
 import type { CatalogProfile } from "./agents-catalog-profile.ts";
 import { advertisedSchema } from "./agents-schema.ts"; import { withoutToolsOff } from "./agents-tool-groups.ts";
 export { catalogProfileFromEnv, type CatalogProfile } from "./agents-catalog-profile.ts";
@@ -107,6 +110,7 @@ const TRIGGER_FIELDS_SCHEMA = {
   continuity: { type: "boolean", description: "Schedules: each run gets the last run's report." },
   overlap: { type: "string", enum: ["skip", "queue"], description: "Schedules: while a run works, skip (default) or queue one." },
   run_on_startup: { type: "boolean", description: "Repeating schedules: also run when OpenMausBot starts." },
+  ...RUN_WITH_SCHEMA,
 } as const;
 
 /** What the engine keeps of a brief: it clips a longer one instead of refusing the call. */
@@ -204,6 +208,7 @@ const TOOL_DEFINITIONS = [
     inputSchema: { type: "object", properties: {} },
   },
   USAGE_LIMITS_TOOL_DEFINITION,
+  ...CHIEF_READ_TOOL_DEFINITIONS,
   {
     name: "list_rooms",
     description:
@@ -616,7 +621,7 @@ const TOOL_DEFINITIONS = [
   {
     name: "trigger",
     description:
-      "Set up or change an automation (a routine): when something happens, a bot does the instructions. Create it in this turn, without asking to confirm, whenever the person describes recurring or event-based work; something to do once, now, is not one, and a later look at this chat is check_back. when=schedule runs on a time rule or cron (trigger_info first for the current time); app_event when a connected app's event happens (trigger_info action=events first; better than a schedule that keeps checking); webhook when another app calls its private address, which you may paste only into that app's setup; limit_reset when an AI's usage limit resets. update, pause, resume and run_now take a trigger_id from trigger_info. Pause a temporary monitor once its goal is met, then read it back; delete_trigger only at the person's request. To the person these are automations: write name and instructions as they would say them.",
+      "Set up or change an automation (a routine): when something happens, a bot does the instructions. Create it in this turn, without asking to confirm, whenever the person describes recurring or event-based work; something to do once, now, is not one, and a later look at this chat is check_back. when=schedule runs on a time rule or cron (trigger_info first for the current time); app_event when a connected app's event happens (trigger_info action=events first; better than a schedule that keeps checking); webhook when another app calls its private address, which you may paste only into that app's setup; limit_reset when an AI's usage limit resets. update, pause, resume and run_now take a trigger_id from trigger_info. Pause a temporary monitor once its goal is met, then read it back; delete_trigger only at the person's request. A plain reminder takes run_with=none: no AI runs, it costs nothing. To the person these are automations: write name and instructions as they would say them.",
     inputSchema: {
       type: "object",
       additionalProperties: false,
@@ -801,7 +806,7 @@ const TOOL_DEFINITIONS = [
     },
   },
   APP_SETTINGS_TOOL_DEFINITION,
-].map((tool) => {
+].map(withThreadFacts).map((tool) => {
   const annotations = agentToolAnnotations(tool.name);
   return annotations ? { ...tool, annotations } : tool;
 });
@@ -812,6 +817,7 @@ export const SHARED_COMPUTER_TOOL_NAMES = new Set(["list_shared_computers", "sha
 const VOICE_TOOL_NAMES = new Set(["send_voice_note"]);
 const CHIEF_ONLY_TOOL_NAMES = new Set([
   "create_bot", "list_team_setup", "list_team_library", "propose_team_setup", "propose_bot_deletion", "manage_room", "retry_thread",
+  "team_threads", "team_thread_read",
 ]);
 const CHIEF_TARGET_TOOL_NAMES = new Set(["propose_profile", "propose_model", "reset_cloud_computer"]);
 const CHIEF_TARGET_FIELDS = new Set(["for_bot_id", "browserProfile"]);

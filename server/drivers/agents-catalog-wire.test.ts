@@ -72,7 +72,7 @@ function profiles(): Record<string, Profile> {
 }
 
 const PROFILES = profiles();
-const CHIEF_ONLY_TOOLS = ["create_bot", "list_team_setup", "list_team_library", "propose_team_setup", "propose_bot_deletion", "manage_room", "retry_thread"];
+const CHIEF_ONLY_TOOLS = ["create_bot", "list_team_setup", "list_team_library", "propose_team_setup", "propose_bot_deletion", "manage_room", "retry_thread", "team_threads", "team_thread_read"];
 const CHIEF_TARGET_TOOLS = ["propose_profile", "propose_model"];
 const CHIEF_PROFILE_TARGET = " A Chief of Staff may pass for_bot_id (from list_bots) for a requested change to another bot in its section.";
 const TEAMWORK_TOOLS = ["list_room_targets", "coordinate_bots", "assignment_status", "list_bots", "list_rooms", "list_threads", "close_thread", "start_thread", "post_to_room"];
@@ -87,37 +87,37 @@ const FULL = "skills+shared+voice+x+team+images+hosting";
 
 /** Bytes when the budget was last set; a profile may move at most 2% either way (lower it to lock in a win). */
 const BUDGET_BASELINE: Record<string, number> = {
-  "default": 61509,
-  "voice": 62290,
-  "shared": 63774,
-  "shared+voice": 64555,
-  "skills": 63830,
-  "skills+voice": 64611,
-  "skills+shared": 66095,
-  "skills+shared+voice": 66876,
-  "non-chief": 52961,
-  "voice+non-chief": 53742,
-  "shared+non-chief": 55226,
-  "shared+voice+non-chief": 56007,
-  "skills+non-chief": 55282,
-  "skills+voice+non-chief": 56063,
-  "skills+shared+non-chief": 57547,
-  "skills+shared+voice+non-chief": 58328,
-  "skills+shared+voice+cloud-home": 66632,
-  "skills+shared+voice+non-chief+cloud-home": 58084,
-  "default+legacy-switches": 61509,
-  "default+mausbot": 62160,
-  "skills+shared+voice+mausbot": 67527,
-  "skills+shared+voice+x": 70715,
-  "skills+shared+voice+x+team": 70715,
-  "default+no-computer-pick": 60297,
-  "default+room": 56857,
-  "non-chief+room": 48309,
-  "skills+shared+voice+x+team+images": 72662,
-  "default+images": 63456,
-  "skills+shared+voice+x+team+images+hosting": 74525,
-  "default+hosting": 63372,
-  "default+tools-off": 57192,
+  "default": 64442,
+  "voice": 65223,
+  "shared": 66707,
+  "shared+voice": 67488,
+  "skills": 66763,
+  "skills+voice": 67544,
+  "skills+shared": 69028,
+  "skills+shared+voice": 69809,
+  "non-chief": 54629,
+  "voice+non-chief": 55410,
+  "shared+non-chief": 56894,
+  "shared+voice+non-chief": 57675,
+  "skills+non-chief": 56950,
+  "skills+voice+non-chief": 57731,
+  "skills+shared+non-chief": 59215,
+  "skills+shared+voice+non-chief": 59996,
+  "skills+shared+voice+cloud-home": 69565,
+  "skills+shared+voice+non-chief+cloud-home": 59752,
+  "default+legacy-switches": 64442,
+  "default+mausbot": 65093,
+  "skills+shared+voice+mausbot": 70460,
+  "skills+shared+voice+x": 73648,
+  "skills+shared+voice+x+team": 73648,
+  "default+no-computer-pick": 63230,
+  "default+room": 59777,
+  "non-chief+room": 49964,
+  "skills+shared+voice+x+team+images": 75595,
+  "default+images": 66389,
+  "skills+shared+voice+x+team+images+hosting": 77458,
+  "default+hosting": 66305,
+  "default+tools-off": 60125,
 };
 
 const RPC_PREFIX = '{"jsonrpc":"2.0","id":1,"result":';
@@ -234,7 +234,7 @@ describe("agents proxy tools/list golden", () => {
       for (const alias of ["delegate_bot", "ask_bot", "send_to_bot", "check_delegation", "wait_delegation"]) expect(tools.has(alias), `${name}: ${alias}`).toBe(false);
       expect(JSON.stringify([...tools.values()])).not.toMatch(/Deprecated alias|works for this release/);
       const coordinate = tools.get("coordinate_bots")!.inputSchema.properties;
-      expect(Object.keys(coordinate)).toEqual(["group_id", "bot_ids", "message", "reason", "rework", "thread", "title", "in_my_folder", "reply", "consult", "done_when", "answers", "files"]);
+      expect(Object.keys(coordinate)).toEqual(["group_id", "bot_ids", "message", "reason", "rework", "thread", "title", "in_my_folder", "reply", "consult", "done_when", "answers", "files", "model_selection"]);
       expect(coordinate.thread).toMatchObject({ type: "string", description: expect.stringContaining("threadId") });
       expect(coordinate.thread!.enum).toBeUndefined();
       expect(coordinate.reply!.enum).toEqual(["resume", "none"]);

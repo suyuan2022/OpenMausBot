@@ -5,6 +5,7 @@ import { redactSecretsInText } from "../../shared/redact.ts";
 import { hostFaultOf, retryCannotFix } from "../host-fault.ts";
 import { composeEnvelope } from "./envelope.ts";
 import { assignmentLevel } from "./level.ts";
+import { stopTurnOnly } from "../suyuan/stop-turn-only.ts";
 import type { RuntimeStore } from "./store.ts";
 import { answersSender, asking, awaited, childrenSince, settledSince, clip, continuations, CUT_TWICE, duration, isTerminal, loopStop, nextGuard, outwardDetail, ownsConversation, ownThread, path, restartNote, wakeOwner } from "./tree.ts";
 import { DEFAULT_LIMITS, type Answerer, type Assignment, type Assignee, type Clock, type EndResult, type EnqueueRequest, type EnqueueResult, type EnvelopeNames,
@@ -690,6 +691,18 @@ export class Runtime {
         this.settle(n, "cancelled", "stopped", reason);
       }
     });
+  }
+
+  /** suyuan fork: the person cut only the conversation's running turn (Stop, a message that goes first, a restart). */
+  stopRequesterTurn(owner: Owner, reason = "Stopped by user"): void {
+    this.withBatch(() => stopTurnOnly(this.store, owner, reason, {
+      drop: (id) => { this.turns.delete(id); this.heldFor.delete(id); },
+      touch: (n) => this.touch(n),
+      renew: (root, now) => this.renew(root, now),
+      settle: (n, detail) => this.settle(n, "cancelled", "stopped", detail),
+      decideCarried: (ids) => this.decideCarried(ids),
+      now: () => this.clock.now(),
+    }));
   }
 
   status(id: string): StatusView | undefined {

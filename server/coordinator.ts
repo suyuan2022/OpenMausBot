@@ -30,6 +30,8 @@ export type CoordinateBotsCall = {
   ownThread?: { modelSelection?: ModelSelection; approvalMode?: NewThreadLevel };
   /** post_to_thread: one message into this existing thread; wake starts a run there, else it waits for the next one. */
   post?: { deliveryId: string; wake: boolean };
+  /** suyuan fork: optional per-handoff model selection override. */
+  modelSelection?: unknown;
 };
 
 export type { LegacyThreadResolver };
@@ -229,6 +231,7 @@ export interface Coordinator {
   liveEdges(): LiveHandoffEdge[];
   /** The conversation stopped: its work and everything that work handed out end, and nothing resumes it. */
   stopAwaitingDirect(threadId: string, reason?: string): void;
+  stopTurnDirect(threadId: string, reason?: string): void;
   /** The person stopped one hand-off, not the conversation that made it: that work and everything it handed on end as the
    * person's stop, and its requester hears it was stopped and goes on. Undefined for no such hand-off. */
   stopHandoff(id: string): "stopped" | "ended" | undefined;

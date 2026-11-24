@@ -18,7 +18,7 @@ const APP_ONLY = ["app", "event", "account"] as const;
 const SAME_CONVERSATION_ONLY = "same_conversation applies only to when=app_event, when=webhook or when=schedule.";
 const REQUEST_ROUTE = "/api/internal/trigger-requests";
 const TAKES = () => ` trigger takes ${argumentNames(fullInputSchema("trigger"))}.`;
-const SCHEDULE_ONLY = ["schedule", "timeout_minutes", "timeoutMinutes", "clear_timeout", "continuity", "overlap", "run_on_startup", "runOnStartup"] as const;
+const SCHEDULE_ONLY = ["schedule", "timeout_minutes", "timeoutMinutes", "clear_timeout", "continuity", "overlap", "run_on_startup", "runOnStartup", "run_with", "model_selection", "only_if"] as const; // suyuan fork: run_with
 
 function jsonRecord(value: unknown): value is Json {
   return value !== null && typeof value === "object" && !Array.isArray(value);
@@ -271,6 +271,7 @@ function routineFields(args: Json): { fields: Json; error?: string } {
   if (typeof args.continuity === "boolean") fields.continuity = args.continuity;
   if (args.overlap !== undefined) fields.overlap = args.overlap;
   if (typeof runOnStartup === "boolean") fields.runOnStartup = runOnStartup;
+  if (args.run_with != null) fields.runWith = args.run_with; if (args.model_selection != null) fields.modelSelection = args.model_selection; if (typeof args.only_if === "string") fields.onlyIf = args.only_if; // suyuan fork: server/suyuan/run-with.ts reads them
   return { fields };
 }
 
@@ -480,7 +481,7 @@ async function createTrigger(args: Json, forBotId: string | undefined, context: 
     return request({ action: "create", kind: "app", trigger, ...(forBotId ? { forBotId } : {}) }, context, `Created the app-event trigger “${String(fields.name)}”`);
   }
   if (when === "limit_reset") {
-    const misplaced = ["schedule", "webhook_event_types", "webhook_payload_filter", "run_on_startup", "runOnStartup"].find((key) => args[key] !== undefined && args[key] !== null);
+    const misplaced = ["schedule", "webhook_event_types", "webhook_payload_filter", "run_on_startup", "runOnStartup", "run_with", "model_selection", "only_if"].find((key) => args[key] !== undefined && args[key] !== null);
     if (misplaced) return { text: `A limit-reset trigger runs when the engine's limit resets, so it takes no ${misplaced}.`, isError: true };
     const timing = limitResetSchedule(args.engine, args.repeat);
     if (timing.error) return { text: timing.error, isError: true };
