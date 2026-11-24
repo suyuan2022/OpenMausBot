@@ -27,3 +27,7 @@ name, a type, an extracted function, one shared helper. A rule ("never X",
 rule that guards correctness; fix the code.
 
 More specific `AGENTS.md` files override this note within their directories.
+
+## Suyuan fork（必读）
+
+在夙愿个人分叉（`suyuan` / `suyuan-v2`）改代码、验证、部署或聊架构设计前，先完整读取 [`CLAUDE.md`](./CLAUDE.md)（含增量隔离、行数红线、隔离验证与「在做中学 Harness 基本功」要求）。

@@ -1,32 +1,70 @@
-# OpenMausBot · suyuan-v2 分叉说明
+# OpenMausBot · suyuan-v2 分叉说明与状态
 
-`suyuan2022/OpenMausBot` 是 [milind-soni/OpenMausBot](https://github.com/milind-soni/OpenMausBot) 的个人 fork，只服务于夙愿自己的环境（办公室虚拟机 `lizhi-vm` 与公网入口 `bot.tokenic.cn`）。
+> **接手先跑**：`node scripts/suyuan/status.mjs`（离线加 `--offline`）。线上版本、bot 模型分布、虚拟机主开关、远端分支、工作区脏状态与最近提交均由脚本现查，**本文件不抄动态数字**。
+>
+> **长期维护与扩容规则（防膨胀、防过时）**：
+> 1. **小改写一行，大改拆文档**：普通改动在「保留的能力」加 1 短行（写清“为什么留 + 上游去向”，单行不超过 260 字）；涉及超过 3 条规则或跨 3 个以上模块的大特性，规格拆到 `docs/suyuan/<主题>.md`，表格「主要位置」列只放该文档链接。
+> 2. **短命项带日期，长周期不催办**：只有「等夙愿真机确认」「近期要做」每条必须用 `[YYYY-MM-DD]` 标日期（超 14 天、缺日期或日期无效由 `status.mjs` 提醒）；其余长期小节只统计条数，不催办。
+> 3. **退场留一行墓碑**：交还上游或刻意删掉的能力，从「保留的能力」挪进「已定论与退场记录」留一句原因，防后续重造。
+> 4. **跨处分工**：日常使用现象、夜巡自动发现的 bug 与生效追踪全放 `~/suyuanos/04 进化实验室/dogfood/OpenMausBot.md`；本页只管仓库改动索引、红线、上线待验与拍板结论；`~/Documents/omb-wt/待办.md` 已于 2026-11-13 停用归档。
 
-`suyuan-v2` 基于上游 `upstream/main`（`v0.1.178`，`36e9f4b8f`）重构为「薄分叉（thin fork）」：保留真正不可替代的十余项高价值能力，把与上游冲突高、或上游已做得更好的界面与路由能力彻底交还上游。开发和验证约定见 [`CLAUDE.md`](./CLAUDE.md)。
+## 保留的能力
 
-## 保留的能力清单
+自建代码隔离在 `server/suyuan/`、`shared/suyuan/`、`src/suyuan/`、`scripts/suyuan/` 与 `public/suyuan-push-sw.js`，所有上游接入点由 `server/suyuan/wiring.test.ts` 守卫。开发与隔离验证纪律见 [`CLAUDE.md`](./CLAUDE.md)。
 
-| 模块 | 解决什么问题 | 改动位置 | 状态 / 说明 |
+| 模块 | 为什么留（解决什么问题） | 主要位置 | 上游去向 |
 |---|---|---|---|
-| 分叉运维与接线护栏 | 增量类型检查、三线 CI、自动发包、零中断虚拟机部署与隔离真机测试；每处上游接入点有源码断言守卫 | `.github/workflows/suyuan-*.yml`、`.github/actions/suyuan-setup/`、`scripts/suyuan/`、`FORK.md`、`CLAUDE.md`、`server/suyuan/wiring.test.ts` | 仅自用 |
-| 更新检测指向本 fork | 不误提示用官方包覆盖本地 fork | `server/update-check.ts`、`server/update-check.test.ts`、`server/update-check.suyuan.test.ts` | 仅自用 |
-| 自建网页推送（Web Push） | 苹果 App 未自带自建服务器推送；Safari PWA 收完结/提问/审批通知，点击直达对应对话，设备撤销登录时一并退订清理 | `public/suyuan-push-sw.js`、`server/suyuan/web-push*.ts`、`src/suyuan/web-push.ts`、`src/suyuan/use-web-push.ts`、`src/suyuan/WebPushRow.tsx`；接入 `server/index.ts`、`src/App.tsx`、`src/lib/notify.ts`、`src/components/NotificationSettingsRows.tsx` | v2 已补齐 `sessions.onSessionRevoked` 退订清理 |
-| 关闭投机预总结（`OMB_WARM_SUMMARY=0`） | 防止服务端在未达线前抢跑折叠导致长对话丢失上下文，同时直接复用上游原生压缩机制 | `server/suyuan/register.ts`（`OMB_WARM_SUMMARY ??= "0"`），接入 `server/index.ts`、`server/drivers/claude.ts` | 替代旧自建压缩栈 |
-| ACP 额外目录穿透 | 为 Antigravity 等 ACP 引擎传递并放行 bot 的 `additionalDirectories`，同时隔离会话键 | `server/suyuan/acp-extra-dirs.ts`，接入 `server/drivers/acp/core.ts`、`client-file-request.ts`、`turn-state.ts` | v2 新增并补全 |
-| 附件强缓存、Codex 别名、屏幕 MCP 与配置热重载 | 图片长缓存减低北京中转带宽压力；Codex 官方别名兼容；配置 `screenMcpServers` 防自动钉住浏览器并统一提示文案；改 `config.json` 热生效 | `server/suyuan/attachment-cache.ts`、`codex-official-alias.ts`、`screen-mcp.ts`、`config-reload*.ts`；接入 `server/config.ts`、`routes/threads.ts`、`drivers/codex*.ts`、`server/index.ts` | — |
-| 自动化首轮立即汇报与未竟恢复 | 定时/委托任务在第一轮结果出来时立即汇报，中断重连后可恢复待汇报轮次 | `server/suyuan/automation-report-turns.ts`，接入 `server/automation-reports.ts` | 已适配 `0.1.178` 汇报流程 |
-| 纯文本直达提醒与触发器增强 | 轻量提醒直接文本投递不走完整长链；定时任务支持先检查再执行（`check_first`）及指定执行对象（`run_with`） | `server/suyuan/plain-reminder.ts`、`check-first.ts`、`run-with.ts`、`shared/suyuan/`、`src/suyuan/run-with.ts`、`src/suyuan/RunWithSelect.tsx`；接入 `RoutineCalendarPage.tsx`、`packages/phone-protocol/`、`server/drivers/agents-*`、`server/index.ts` | — |
-| 只停当前轮与中文口头喊停 | 人喊停时优先只停当前轮而不是连坐整组；识别中文停手口令防止群聊继续抢答 | `server/suyuan/stop-turn-only.ts`、`chinese-stop.ts`；接入 `person-stop.ts`、`runtime.ts`、`runtime-coordinator.ts`、`room-holds.ts`、`server/index.ts` | — |
-| 派活临时切换模型 | `coordinate_bots` 支持单次派活传 `model_selection`，并在忙时拒绝跨模型覆盖 | `server/suyuan/handoff-model.ts`；接入 `agents-catalog.ts`、`agents-call.ts`、`server/index.ts` | — |
-| Chief 只读队友对话与工具说明微调 | Chief（如荔枝）可用 `team_threads` / `team_thread_read` 只读看队友 1:1 进展；对齐线程行为事实 | `server/suyuan/chief-read-threads.ts`、`chief-read-tools.ts`、`chief-read-view.ts`、`thread-facts.ts`；接入 `routes/internal-threads.ts`、`agents-catalog.ts`、`agents-call.ts`、`system-prompt.ts`、`src/locales/` | — |
-| 瘦身版「一个 bot 一个家」 | 保持 1 bot 1 家门面的简洁菜单/未读提示/守护规则，同时**零改动** `Sidebar.tsx` 与 `ChatView.tsx`，完整吃进上游布局升级 | `server/suyuan/home.ts`、`src/suyuan/home.ts`；接入 `work-thread.ts`、`internal-threads.ts`、`ChatMoreMenu.tsx`、`RoomMoreMenu.tsx`、`SidebarBotMenu.tsx`、`DetailsTab.tsx`、`ResultsDestination.tsx`、`bot-unread.ts`、`thread-navigation.ts` | 保留 `side === "team"` 团队边界 |
-| 精简收件箱（Inbox） | 收件箱主列表只留「等你处理的」和「还没读的」：读过的消息下次打开就不再占位（当次打开期间点开的那条先留着，方便顺着往下读）；在 bot 的主对话里读过，后台任务（派活、定时任务）汇报上来的那几条也一并算已读；不显示「最近已读的对话」区块，置顶对话、进行中的对话和底部「已完成」折叠区照旧。手机上收件箱是盖住整屏的一页（不再是露出半截对话的底部弹窗）：从 bot 列表点开时列表不收起，关掉收件箱就回到列表；只有在收件箱里点具体条目进对话时，收件箱和 bot 列表才一起收起；补上空收件箱提示语的简体中文 | `src/suyuan/inbox-unread.ts`、`server/suyuan/inbox-read.ts`、`src/suyuan/phone-inbox.ts`；接入 `src/components/inbox/InboxPanel.tsx`（`useUnreadRows`，不渲染 `<FinishedThreads>`，手机整屏 `data-inbox-page`）、`src/suyuan/use-suyuan.ts`（`useInboxCatchUp`）、`server/host/place-inbox.ts`（`deps.readsWith`）、`server/index.ts`（`suyuanReadsWith`）、`src/components/SidebarInboxRow.tsx`、`src/hooks/use-bot-list-drawer.ts`、`src/App.tsx`（`useCloseBotDrawer`）、`src/components/inbox/use-inbox-actions.ts`、`src/components/inbox/InboxActive.tsx`、`src/locales/zh.json`（`inbox.emptyHint`） | 从 v1 恢复的精简版；`FinishedThreads.tsx` 及其测试保留不删，只是面板不再引用；`Sidebar.tsx` 不动，它传给收件箱那一行的「收起列表」在手机上不再被调用 |
-| 轻量移动端与 PWA 体验层 | 气泡宽排与表格不乱跳（带表格的回复保持旧版拆分排版：文字在普通气泡里，每张表格独立成整宽卡片）、气泡内文字换行铺满不留右侧空白、代码块防撑宽、表格外框；打字时隐藏停止、默认隐藏语音圆钮（设置可开）、默认隐藏任务步骤卡片 Skill Burger（设置可开，并修步骤被压扁、回到底部按钮压住卡片）、未读分割线即时标记、键盘贴合、右滑返回、禁整页双击/双指缩放、图片预览双指缩放、状态栏主题色 | `src/suyuan/use-suyuan.ts`、`wide-replies.css`、`steady-tables.css`、`phone-tables.css`、`phone-code.css`、`table-plate.ts`、`chat-wrap.css`、`voice-button.ts`、`VoiceButtonRow.tsx`、`skill-burger.ts`、`SkillBurgerRow.tsx`、`skill-burger.css`、`divider-seen.ts`、`keyboard-fit.*`、`swipe-back.ts`、`no-zoom.*`、`preview-zoom.ts`、`theme-color.ts`；接入 `Composer.tsx`、`AppPages.tsx`、`ReplyBlocks.tsx`、`skill-burger/SkillBurgerSlot.tsx`、`use-unread-divider.ts`、`main.tsx`、`App.tsx` | 不再改动 `Sidebar.tsx` / `ChatView.tsx` |
+| 分叉运维、守卫与更新源 | 增量 CI、自动发包、零中断部署、隔离真机测试；更新检测指本 fork | `.github/workflows/suyuan-*.yml`、`scripts/suyuan/`、`wiring.test.ts`、`update-check.ts` | 仅自用 |
+| 自建网页推送（Web Push） | 闭源 iOS App 无法自托管推送；Safari PWA 收通知，撤销设备时退订 | `public/suyuan-push-sw.js`、`server/suyuan/web-push*.ts`、`src/suyuan/*web-push*` | 可问上游 |
+| 关闭投机预总结 | 默认 `OMB_WARM_SUMMARY=0`，防抢跑折叠丢上下文，其余交上游原生 | `server/suyuan/register.ts` | 仅自用 |
+| ACP 额外目录穿透 | 让 Antigravity 等非 Claude 引擎读工作区与共用技能并隔离会话键 | `server/suyuan/acp-extra-dirs.ts` | 候选提 PR |
+| 附件缓存与接入小修 | 图片长缓存省带宽；Codex 别名；`screenMcpServers` 防钉浏览器；热重载 | `server/suyuan/attachment-cache.ts`、`codex-official-alias.ts`、`screen-mcp.ts`、`config-reload*.ts` | 缓存候选提 PR |
+| 自动化汇报与触发增强 | 定时/派活首轮立即汇报与恢复；纯文本免模型提醒、`check_first`、`run_with` | `server/suyuan/automation-report-turns.ts`、`plain-reminder.ts`、`check-first.ts`、`run-with.ts` | 仅自用 |
+| 停轮、中文喊停与切模型 | 喊停不连坐队友；中文停手口令防抢答；派活单次指定 `model_selection` | `server/suyuan/stop-turn-only.ts`、`chinese-stop.ts`、`handoff-model.ts` | 仅自用 |
+| Chief 只读队友对话 | Chief（荔枝）用 `team_threads` / `team_thread_read` 只读队友进展 | `server/suyuan/chief-read-*.ts`、`thread-facts.ts` | 仅自用 |
+| 瘦身版「一个 bot 一个家」 | 保持 1 bot 1 家门面与未读逻辑，且零改动 `Sidebar.tsx` / `ChatView.tsx` | `server/suyuan/home.ts`、`src/suyuan/home.ts` | 仅自用 |
+| 精简收件箱（Inbox） | 只留待处理与未读、后台任务随主对话已读、手机整屏独立页、补中文空态 | `src/suyuan/inbox-unread.ts`、`server/suyuan/inbox-read.ts`、`src/suyuan/phone-inbox.ts` | 仅自用 |
+| 手机排版与表格稳定 | 宽排气泡、表格稳定与独立整宽卡片、防撑宽、未读分割线即时标记 | `src/suyuan/wide-replies.css`、`steady-tables.css`、`table-plate.ts`、`divider-seen.ts` | `steady-tables` 候选提 PR |
+| 手机手势与控件开关 | 键盘贴合、右滑返回、禁整页缩放、默认隐藏语音钮与任务步骤卡片（可开） | `src/suyuan/keyboard-fit.*`、`swipe-back.ts`、`no-zoom.*`、`voice-button.ts`、`skill-burger.*` | 仅自用 |
 
-## 在 v2 中退场 / 交还上游的部分
+## 硬红线与仓库外依赖
 
-以下旧改在 `v0.1.178` 已由上游原生解决或收益不再值得背负维护成本，已在 `suyuan-v2` 清理移除：
+- **代码与验证红线**：**绝不改动** `src/components/Sidebar.tsx` 与 `src/components/ChatView.tsx`；严禁验证时碰生产 `lizhi-vm:8799` 与 `~/.openmausbot`；严禁在文档或日志输出密钥/token。
+- **回滚不动的仓库外依赖与迁移**（`deploy-vm.sh --rollback` 只换程序不动配置；旧版回退包 `0.1.149-suyuan.65` 与 `suyuan-v1-archive` 作兜底；新增一次性迁移或补丁按“日期 + 位置 + 目的 + 备份/版本”追加）：
+  - **2026-11-13，Claude 会话保留**：虚拟机 `~/.claude/settings.json` 设 `cleanupPeriodDays: 3650`（防默认 30 天删旧会话影响回搜原文；备份 `settings.json.bak-20261113-keep-sessions`）。
+  - **2026-11-24，`lcu` 非 Claude 补丁**：虚拟机 `~/.local/share/lcu/current/adapters/claude.mjs`（当前 `lcu 0.13.5-7d17e28f4418`）打了 `fallbackNonClaudeContext`，供 Antigravity 调 `lcu`；升级 `lcu` 时复核。
+  - **2026-11-24，群聊路由迁入原生配置**：原 `suyuan-room-router.json` 参数已迁入 `config.json` 的 `decider`（备份 `config.json.bak-20261124-suyuan-v2`）。
 
-- **`room-router`**：上游已原生支持 `decider.provider = "custom"` + `customApi = "chat"`。切到 v2 正式部署时，将生产 `~/.openmausbot/suyuan-room-router.json` 迁入 `config.json` 的 `decider` 字段即可。
-- **自建压缩与固定前缀补丁**：移除 `steady-prompt`、`native-compact`、`compact-volatile`，统一交由上游 `0.1.178` 压缩与 `OMB_WARM_SUMMARY=0` 处理。
-- **重度界面与消息流魔改**：移除 `Sidebar.tsx` / `SidebarTiles` / `ChatView.tsx` 补丁、`last-frame`、`quiet-*`、`tray-at-finger`、`relay`、`BackgroundRunBar`、`PassedOnFrom`、`PhoneInboxButton`、`recent-work`、`waiting-on`（收件箱「在等谁」提示）、`self-thread`、`relay-gate`、`idle-archive`。收件箱的 `inbox-read` / `inbox-unread` 两个轻量 hook 已恢复，见上表「精简收件箱」。
+## 上游同步与跳过清单
+
+- **同步节奏**：每 1–2 周手工合一次 `upstream/main`（底座版本与同步日期见 `status.mjs`）。
+- **待定给上游提 PR 的通用修复**：`acp-extra-dirs`、`steady-tables.css`、`attachment-cache`（开不开由夙愿定）。
+- **合上游时明确跳过 / 不拿的项**（决定跳过某条上游改动时，记清特征与原因，防下次误合）：
+  - **聊天内展示压缩过程卡片**（如旧上游 `a5cf727f6` 类改动）：夙愿不要在聊天流里看到压缩过程提示卡片。
+
+## 等夙愿真机确认
+
+- `[2026-11-24]` **`.68` 手机整屏收件箱**：点收件箱盖住整屏、关掉回 bot 列表，只有点条目才进对话；上线后待确认手感。
+- `[2026-11-24]` **删掉假首屏后的首屏速度**：`last-frame` 已移除，待手机实测上游首屏是否够快，慢了再考虑轻骨架屏。
+- `[2026-11-24]` **上游原生列表排序与首页**：旧版“按最新消息排 + 头像方块”未搬，先试用几天再定。
+- `[2026-11-24]` **iPhone 带表格对话是否仍卡顿**：`.67` 已恢复表格整宽卡片，待真机确认。
+
+## 近期要做
+
+- `[2026-11-24]` **清理两条废弃远端分支**：`origin/fix/sync-retry-flaky`、`origin/feat/routine-one-thread`（删前问夙愿）。
+- `[2026-11-24]` **清理虚拟机残留旧路由文件**：`~/.openmausbot/suyuan-room-router.json` 已不再读取，确认后可删。
+
+## 碰到再说与长期专题
+
+- **聊天流待买/待办卡片体验**：已在 T3 线程「OpenMausBot 交互与待办体验优化」待聊；定稿后若跨模块则拆到 `docs/suyuan/`。
+- **记忆写入分层（未设计）**：bot 学到的偏好目前一律写进 `aboutMe`，规矩类如何分流到 `everyBotRules` 待设计。
+- **部署失败自动回滚真机演练**：目前只用假命令测过，后续有隔离演练窗口时补一次。
+- **日常低频现象观察**：跨 bot 记忆不同步、排队文案、非 Claude 的 `run_with: haiku` 等现象统一归口 `~/suyuanos/04 进化实验室/dogfood/OpenMausBot.md`，碰到升级到线再进本页「近期要做」。
+
+## 已定论与退场记录
+
+- **不做改名对外分发（2026-11-24 定调）**：T3 线程「老板个人助理私教定位与方案评估」已给出结论——不走删 `enterprise/` 改名对外维护发行版，本改造版只自用与演示；私教走定制服务。
+- **Antigravity 中途发消息进队列（2026-11-19 定维持现状）**：谷歌 ACP 桥未暴露中途插话接口，等上游补接口再看。
+- **v2 退场 — 群聊路由与自建压缩栈**：`room-router`（改用原生 `decider`）、`steady-prompt` / `native-compact` / `compact-volatile`（改用原生压缩 + `OMB_WARM_SUMMARY=0`）。
+- **v2 退场 — 重度界面与消息流魔改**：`Sidebar.tsx` / `ChatView.tsx` 补丁、`SidebarTiles`、`last-frame`、`quiet-*`、`tray-at-finger`、`relay`、`BackgroundRunBar`、`PassedOnFrom`、`PhoneInboxButton`。
+- **v2 退场 — 后台与收件箱重补丁**：`recent-work`、`waiting-on`、`self-thread`、`relay-gate`、`idle-archive`（收件箱只保留轻量的已读离开与整屏页）。
