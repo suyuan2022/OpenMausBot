@@ -1,4 +1,4 @@
-import { userError } from "../user-errors.ts";
+import { userError } from "../user-errors.ts"; import { attachmentCacheControl } from "../suyuan/attachment-cache.ts";
 import { basename, join } from "node:path";
 import { pipeline } from "node:stream/promises";
 
@@ -489,7 +489,7 @@ export function createThreadRoutes(deps: ThreadRouteDeps): RouteHandler {
       // Visibility is decided per request, so the browser must never reuse one member's copy for another identity.
       const headers = {
         "content-type": attachment.mime,
-        "cache-control": "private, no-store",
+        "cache-control": attachmentCacheControl(attachment.mime, viewerFor(auth).kind === "all" && !member && !deps.memberDefaultBot && !workspaceAccess),
         "x-content-type-options": "nosniff",
       };
       if (attachment.mime.startsWith("audio/")) {

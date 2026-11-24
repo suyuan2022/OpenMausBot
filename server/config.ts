@@ -397,7 +397,7 @@ const appConfigSchema = z.object({
   browserProfiles: browserProfilesSchema.optional(),
   instances: instanceConfigMapSchema.optional(),
   /** Loose on purpose: one bad server entry is skipped later, never fails the whole file. */
-  mcpServers: z.record(z.string(), z.unknown()).optional(),
+  mcpServers: z.record(z.string(), z.unknown()).optional(), screenMcpServers: z.array(z.string().max(64)).max(16).optional(), // suyuan fork: server/suyuan/screen-mcp.ts
 });
 const storedAppConfigSchema = appConfigSchema.extend(helperStoredShape).extend({
   vpsServers: storedVpsServersSchema,
@@ -430,7 +430,7 @@ export interface AppConfig extends HelperConfig {
     publicUrl?: string;
     phone?: "ios" | "android";
   };
-  mcpServers?: Record<string, unknown>;
+  mcpServers?: Record<string, unknown>; screenMcpServers?: string[];
   language?: string; computerName?: string;
   xai?: { key?: string; url?: string };
   mistral?: { key?: string };

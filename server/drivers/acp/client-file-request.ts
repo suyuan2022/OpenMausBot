@@ -3,6 +3,7 @@ import { mkdir, readFile, stat, writeFile } from "node:fs/promises";
 import { dirname } from "node:path";
 
 import { resolveAcpClientPath } from "./client-path.ts";
+import { resolveClientPathInRoots } from "../../suyuan/acp-extra-dirs.ts";
 
 const CLIENT_FILE_MAX_BYTES = 8 * 1024 * 1024;
 
@@ -12,12 +13,17 @@ export async function answerClientFileRequest(msg: any, context: {
   enabled: boolean;
   /** Server-owned directories a read may also reach; writes stay inside `cwd`. */
   readRoots: () => readonly string[] | undefined;
+  /** suyuan fork: session additionalDirectories where reads and writes are allowed. */
+  extraRoots?: () => readonly string[] | undefined;
 }): Promise<void> {
   const { send } = context;
   try {
     if (!context.enabled) throw new Error("Client file access is disabled.");
     const params = msg.params ?? {};
-    const path = await resolveAcpClientPath(params.path, context.cwd, msg.method === "fs/read_text_file" ? context.readRoots() : undefined);
+    const extra = context.extraRoots?.();
+    const path = extra?.length
+      ? await resolveClientPathInRoots([context.cwd, ...extra, ...(msg.method === "fs/read_text_file" ? (context.readRoots() ?? []) : [])], params.path)
+      : await resolveAcpClientPath(params.path, context.cwd, msg.method === "fs/read_text_file" ? context.readRoots() : undefined);
     if (msg.method === "fs/read_text_file") {
       const info = await stat(path);
       if (!info.isFile() || info.size > CLIENT_FILE_MAX_BYTES) {

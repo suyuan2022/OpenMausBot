@@ -60,6 +60,8 @@ export interface AcpSession {
   sessionConfigResult: any;
   initResult: any;
   authenticated: boolean;
+  /** suyuan fork: session additionalDirectories advertised for this session's host. */
+  additionalDirs?: string[];
   idleTimer: ReturnType<typeof setTimeout> | null;
   /** The config option values this live session confirmed, so an unchanged one is not sent again. */
   appliedConfig: AppliedConfig;

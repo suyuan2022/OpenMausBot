@@ -8,7 +8,7 @@ import { mkdtempSync, rmSync } from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
-import { answerClientFileRequest } from "./client-file-request.ts"; import { loadUntilReplayQuiet } from "./load-replay.ts";
+import { answerClientFileRequest } from "./client-file-request.ts"; import { loadUntilReplayQuiet } from "./load-replay.ts"; import { acpAdditionalDirectories, effectiveSessionKey } from "../../suyuan/acp-extra-dirs.ts";
 import { createHash } from "node:crypto";
 
 import { PROVIDER_CREDENTIAL_ENV, stripControlPlaneEnv, WORKSPACE_CREDENTIAL_ENV } from "../../config.ts";
@@ -565,7 +565,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
         const handleServerRequest = (msg: any, current: AcpTurn) => {
           current.state.startupActivity = true; if (current.state.promptSent) current.acknowledge();
           if (msg.method === "fs/read_text_file" || msg.method === "fs/write_text_file") {
-            void answerClientFileRequest(msg, { send, cwd, enabled: support.clientFileSystem === true, readRoots: () => support.clientReadRoots?.(current.turn) });
+            void answerClientFileRequest(msg, { send, cwd, enabled: support.clientFileSystem === true, readRoots: () => support.clientReadRoots?.(current.turn), extraRoots: () => session.additionalDirs });
             return;
           }
           const question = questionRequestFor(support.questionRequests, msg.method);
@@ -1118,13 +1118,16 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
             let runtimeAcceptsImages = await handshake();
             let init = session.initResult;
             const heldSystem = () => sessionSystem(support, init, instanceId, turn);
+            let additionalDirs = acpAdditionalDirectories({ botId: turn.botId, cwd, initResult: init });
+            session.additionalDirs = additionalDirs;
+            const activeKey = () => effectiveSessionKey(liveSessionKey(sessionKey, heldSystem()), additionalDirs);
 
             await backgroundEnds.get(threadId); const cursor = turn.sessionReset ? null : support.backgroundWork ? support.backgroundWork.resumeCursor(turn.resumeCursor, session.sessionId, session) : typeof turn.resumeCursor === "string" ? turn.resumeCursor : null;
             let promptTurn = turn;
             let rebuiltFromReplay = false;
             for (;;) {
               const liveSessionId = session.sessionId;
-              if (liveSessionId !== null && session.sessionKey === liveSessionKey(sessionKey, heldSystem()) && (cursor === null || cursor === liveSessionId)) {
+              if (liveSessionId !== null && session.sessionKey === activeKey() && (cursor === null || cursor === liveSessionId)) {
                 break;
               }
               const selectionParams = narrowsNativeTools(turn.toolScope)
@@ -1136,13 +1139,13 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
                     link: session.acp, sessionId: cursor, quietMs: support.loadReplayQuietMs?.(turn), replayed: () => session.sessionConfigResult ?? {},
                     send: (receive) => request(
                       support.resumeMethod === "resume" ? "session/resume" : "session/load",
-                      { sessionId: cursor, cwd, mcpServers: support.mcpServersFromLaunch ? [] : acpSessionMcpServers(mcpServers, ownMcp, init), ...selectionParams, ...support.sessionSetupParams?.(init, heldSystem()) },
+                      { sessionId: cursor, cwd, ...(additionalDirs.length ? { additionalDirectories: additionalDirs } : {}), mcpServers: support.mcpServersFromLaunch ? [] : acpSessionMcpServers(mcpServers, ownMcp, init), ...selectionParams, ...support.sessionSetupParams?.(init, heldSystem()) },
                       support.sessionSetupTimeoutMs ?? LOAD_SESSION_TIMEOUT, receive),
                     receive: (result) => {
                       if (result) {
                         loaded = true;
                         session.sessionId = cursor;
-                        session.sessionKey = liveSessionKey(sessionKey, heldSystem());
+                        session.sessionKey = activeKey();
                         receiveModelVariants(result, true);
                       }
                     },
@@ -1165,7 +1168,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
                 sessions.set(threadId, session);
                 session.current = current;
                 runtimeAcceptsImages = await handshake();
-                init = session.initResult;
+                init = session.initResult; additionalDirs = acpAdditionalDirectories({ botId: turn.botId, cwd, initResult: init }); session.additionalDirs = additionalDirs;
                 continue;
               }
               sessionAllows.delete(threadId);
@@ -1179,9 +1182,9 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
                 promptTurn = { ...turn, text: recovery.text };
                 rebuiltFromReplay = recovery.replayed;
               }
-              await request("session/new", { cwd, mcpServers: support.mcpServersFromLaunch ? [] : acpSessionMcpServers(mcpServers, ownMcp, init), ...selectionParams, ...support.sessionSetupParams?.(init, heldSystem()) }, support.sessionSetupTimeoutMs ?? NEW_SESSION_TIMEOUT, (result) => {
+              await request("session/new", { cwd, ...(additionalDirs.length ? { additionalDirectories: additionalDirs } : {}), mcpServers: support.mcpServersFromLaunch ? [] : acpSessionMcpServers(mcpServers, ownMcp, init), ...selectionParams, ...support.sessionSetupParams?.(init, heldSystem()) }, support.sessionSetupTimeoutMs ?? NEW_SESSION_TIMEOUT, (result) => {
                 session.sessionId = typeof result?.sessionId === "string" ? result.sessionId : null;
-                session.sessionKey = liveSessionKey(sessionKey, heldSystem());
+                session.sessionKey = activeKey();
                 receiveModelVariants(result, true);
               });
               break;
