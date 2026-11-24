@@ -90,6 +90,8 @@ import { useSessionEnded } from "@/lib/session-ended";
 import { PairPage } from "./pair/PairPage";
 import { WebPanelPage } from "@/components/WebPanelPage";
 import { AppPreviewPanel } from "@/components/published-apps/AppPreviewPanel";
+import { useSuyuan } from "@/suyuan/use-suyuan"; // suyuan fork
+import { threadsShownNow } from "@/suyuan/home";
 import { FilePreviewPanel } from "@/components/FilePreviewPanel";
 import { refreshPublishedApps } from "@/lib/own-published-apps";
 import { serverFetch } from "@/lib/relay-server";
@@ -156,6 +158,7 @@ function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
   useConnectLink(dispatch, Boolean(state.config?.team));
   useExternalChatLinks(state, dispatch); useDesktopNotificationOpens(state, dispatch); useNewBotFromOtherPlace(state.hydrated === true, useCallback(() => dispatch({ type: "newBot" }), [dispatch]));
   usePresence(state, dispatch); useTeamPresence(state);
+  useSuyuan(state, dispatch); // suyuan fork
   usePageLanguage(effectiveLanguage(useLanguageChoice(), state.config?.language), true);
   const [paletteOpen, setPaletteOpen] = useState(false);
   // Stays mounted once opened: a Cloud bought in it can arrive after the sheet is closed.
@@ -232,7 +235,7 @@ function Shell({ viewer }: { viewer: WelcomeViewer | null }) {
         e.preventDefault();
         if (e.shiftKey || newThreadKey) {
           const selected = state.bots.find((bot) => bot.id === state.selectedId && !bot.hidden);
-          if (!e.repeat && selected && selected.yourAccess !== "view") dispatch({ type: "newTask", botId: selected.id });
+          if (!e.repeat && selected && selected.yourAccess !== "view" && threadsShownNow()) dispatch({ type: "newTask", botId: selected.id }); // suyuan fork: no new conversation where the list is hidden
         } else {
           dispatch({ type: "newBot" });
         }

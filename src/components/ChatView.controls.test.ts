@@ -7,10 +7,12 @@ import { CODEX_USAGE_LIMIT_REACHED, CODEX_USAGE_URL } from "../../shared/codex-u
 import { failedTurnTool } from "../../shared/failed-turn";
 import { PROVIDER_SAFETY_GUIDANCE } from "../../shared/provider-safety";
 import { en } from "@/locales";
+import { setVoiceButton } from "@/suyuan/voice-button";
 
 const fixture = vi.hoisted(() => {
   vi.stubGlobal("window", {});
-  vi.stubGlobal("localStorage", { getItem: () => null, setItem: () => {} });
+  const storage = new Map<string, string>();
+  vi.stubGlobal("localStorage", { getItem: (key: string) => storage.get(key) ?? null, setItem: (key: string, value: string) => storage.set(key, value) });
   return { showThreads: true, advanced: true, menus: [] as { ariaLabel: string; items: MenuRow[] }[], dispatch: vi.fn(), canWrite: null as boolean | null, showToolCalls: false, platform: "other", localReasonCode: "cua-driver-unavailable", localMessage: "", model: null as ComponentProps<typeof ModelPicker> | null,
   };
 });
@@ -116,7 +118,7 @@ describe("the header's right side", () => {
       expect(controls).not.toContain("Stop this turn");
       const stop = markup.match(/<button[^>]*data-composer-stop="slot"[^>]*>/)?.[0] ?? "";
       expect(stop).toContain('aria-label="Stop this turn"');
-      expect(markup).toContain('data-call-button="composer"');
+      expect(markup).not.toContain('data-call-button="composer"');
       expect(header({ ...busy, waitingForTeammates: true, busy: false, tasks: (bot.tasks ?? []).map((task) => ({ ...task, busy: false, waitingForTeammates: true })) }).markup)
         .toContain('data-composer-stop="slot"');
     } finally {
@@ -356,14 +358,19 @@ describe("thread control placement", () => {
 
   it.each([true, false])("calls from the composer beside dictation, not the header (advanced %s)", (advanced) => {
     fixture.advanced = advanced;
-    const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
-    const header = markup.slice(markup.indexOf("data-chathead-controls"), markup.indexOf("data-composer-row"));
-    expect(header).not.toContain("data-call-button");
-    expect(markup).not.toContain('data-call-button="header"');
-    const actions = markup.slice(markup.indexOf("data-composer-actions"));
-    expect(actions).toContain('data-call-button="composer"');
-    expect(markup.match(/data-call-button=/g)).toHaveLength(1);
-    fixture.advanced = true;
+    setVoiceButton(true);
+    try {
+      const markup = renderToStaticMarkup(createElement(ChatView, { bot }));
+      const header = markup.slice(markup.indexOf("data-chathead-controls"), markup.indexOf("data-composer-row"));
+      expect(header).not.toContain("data-call-button");
+      expect(markup).not.toContain('data-call-button="header"');
+      const actions = markup.slice(markup.indexOf("data-composer-actions"));
+      expect(actions).toContain('data-call-button="composer"');
+      expect(markup.match(/data-call-button=/g)).toHaveLength(1);
+    } finally {
+      setVoiceButton(false);
+      fixture.advanced = true;
+    }
   });
 
   it("gives the editor its own line above the composer's footer of controls", () => {

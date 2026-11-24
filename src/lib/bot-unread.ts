@@ -1,3 +1,5 @@
+import { foreground } from "@/suyuan/home";
+
 type UnreadBot = {
   unread?: boolean;
   tasks?: ReadonlyArray<{ unread?: boolean; routineRunId?: string; archivedAt?: number; openAsks?: number }> | null;
@@ -5,7 +7,7 @@ type UnreadBot = {
 
 export function botShowsUnread(bot: UnreadBot): boolean {
   if (!bot.tasks?.length) return Boolean(bot.unread);
-  return bot.tasks.some((task) => Boolean(task.unread) && !task.routineRunId && task.archivedAt === undefined);
+  return foreground(bot).tasks!.some((task) => Boolean(task.unread) && !task.routineRunId && task.archivedAt === undefined); // suyuan fork
 }
 
 /** The asks waiting on the person in a bot's conversations: on a team, the ones in their inbox. */

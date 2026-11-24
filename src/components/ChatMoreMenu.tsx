@@ -28,6 +28,7 @@ import { openConversationDialog, shareChoices } from "./conversation-share/conve
 import { askBot } from "@/lib/template-share";
 import { TEMPLATE_SHARE_MESSAGE } from "../../shared/share-card";
 import { sameFields, useStoreDispatch, useStoreSelector } from "@/state/store-select";
+import { oneConversation } from "@/suyuan/home";
 
 /** One item list for the chat's ⋯ menu wherever it sits; it lists the threads whenever the sidebar hides them. The
  * Simple bot panel draws the same items as rows, and its Share button holds the two that export. */
@@ -46,7 +47,7 @@ export function useChatMoreItems(profile: Bot, phoneHeader = false): { items: Si
   const atFreshStart = messages.at(-1)?.compaction?.fresh === true;
   const transcript = () => conversationTranscript({ threadId: bot.threadId, hasMore: bot.hasMore, activeLeafId: bot.activeLeafId, title: bot.name, messages, botName: bot.name, isGroup: false });
   const side = useConversationSide(profile);
-  const threads = showThreads ? [] : orderedThreadList((side ? tasksOfSide(profile, side) : profile.tasks ?? []).filter((task) => !task.routineRunId));
+  const threads = showThreads || oneConversation() ? [] : orderedThreadList((side ? tasksOfSide(profile, side) : profile.tasks ?? []).filter((task) => !task.routineRunId)); // suyuan fork
   const sharing = shareChoices(profile, profile.tasks?.find((task) => task.threadId === bot.threadId), Boolean(useTeamName()));
   const shareItems: SidebarMenuItem[] = [
     { key: TEMPLATE_ITEM, label: t("template.shareAsTemplate"), icon: <LayoutTemplate size={16} />,
@@ -97,7 +98,7 @@ export function useChatMoreItems(profile: Bot, phoneHeader = false): { items: Si
       onSelect: () => requestChatFind(bot.threadId),
     },
     ...phoneScreen,
-    ...(showThreads || side === "team" ? [] : [{
+    ...(showThreads || oneConversation() || side === "team" ? [] : [{ // suyuan fork
       key: "new-thread",
       heading: t("task.list"),
       separatorBefore: true,

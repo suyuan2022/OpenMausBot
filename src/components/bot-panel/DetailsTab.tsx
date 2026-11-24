@@ -13,6 +13,7 @@ import { TryAsking } from "./TryAsking";
 import { Card, CardLabel, LabelAction, panelActionCls, NavRow, RowIcon, rowCls, RowText } from "./rows";
 import { useStoreDispatch, useStoreSelector } from "@/state/store-select";
 import { newChatBot } from "@/state/new-chat";
+import { threadsShownNow } from "@/suyuan/home";
 import { useOwnerOrAdmin } from "@/lib/use-owner-or-admin";
 import { approvalModeFor, modelSwitchNeedsAsk } from "../../../shared/approval-mode";
 
@@ -90,7 +91,7 @@ export function DetailsTab({ bot, derived, onOpen }: {
         />
       </section>
 
-      <BotConversations bot={bot} />
+      {threadsShownNow() && <BotConversations bot={bot} />}
 
       <TryAsking bot={bot} />
 

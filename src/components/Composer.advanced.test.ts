@@ -9,6 +9,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import type { Bot, Group } from "@/state/store";
 import { restoreComposerDraft } from "@/lib/drafts";
 import { setCallMode } from "@/lib/call-mode";
+import { setVoiceButton } from "@/suyuan/voice-button";
 import { BOT_BUTTON, botButtonTone } from "@/lib/bot-button";
 
 const fixture = vi.hoisted(() => ({
@@ -93,6 +94,9 @@ beforeEach(() => {
   fixture.groupCall = null;
   fixture.model = null;
   setCallMode("turns");
+  const voiceStore = new Map<string, string>();
+  vi.stubGlobal("localStorage", { getItem: (key: string) => voiceStore.get(key) ?? null, setItem: (key: string, value: string) => voiceStore.set(key, value) });
+  setVoiceButton(true);
   vi.stubGlobal("ResizeObserver", class { observe() {} disconnect() {} });
   vi.spyOn(HTMLElement.prototype, "scrollIntoView").mockImplementation(() => {});
   for (const id of [`bot:${bot.id}:${bot.threadId}`, `group:${room.id}:${room.threadId}`]) restoreComposerDraft(id, { text: "", attachments: [] });
@@ -218,10 +222,10 @@ describe("the Advanced composer in a bot chat", () => {
     expect(keys().some((key) => key?.startsWith("call:"))).toBe(false);
   });
 
-  it("keeps Stop and the call button while the bot works, with a queued message waiting to send", () => {
+  it("drops Stop while typing and keeps the call button while the bot works, with a queued message waiting to send", () => {
     restoreComposerDraft(`bot:${bot.id}:${bot.threadId}`, { text: "and also this", attachments: [] });
     render({ bot: { ...bot, busy: true } });
-    expect(container.querySelector('button[aria-label="Stop this turn"]')).not.toBeNull();
+    expect(container.querySelector('button[aria-label="Stop this turn"]')).toBeNull();
     expect(fixture.call).toMatchObject({ placement: "composer", modeMenu: false });
   });
 

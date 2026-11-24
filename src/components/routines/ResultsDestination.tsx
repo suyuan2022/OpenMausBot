@@ -6,6 +6,7 @@ import type { Bot } from "@/state/store";
 import { useTeamPeople } from "@/state/team-people";
 import { Select } from "../Select";
 import { sharedChatAudience } from "../TeamPrivateChatsLine";
+import { listedThreads } from "@/suyuan/home";
 
 /** What of the app's state says where a routine's form was opened. */
 export interface RoutinePlace {
@@ -52,7 +53,7 @@ export function ResultsDestination({ bot, value, allowCurrent = false, team, onC
 }) {
   const id = useId(), people = useTeamPeople();
   if (team ?? people !== null) return <TeamResultsDestination id={id} bot={bot} value={value} allowCurrent={allowCurrent} onChange={onChange} />;
-  const tasks = (bot?.tasks ?? []).filter((task) => !task.routineRunId);
+  const tasks = listedThreads(bot, (bot?.tasks ?? []).filter((task) => !task.routineRunId)); // suyuan fork
   const selectedMissing = typeof value === "string" && !tasks.some((task) => task.threadId === value);
   const groups = [...(bot?.projects ?? []), { id: "", name: t("folder.none") }];
   return <div className="min-w-0 space-y-1.5">
