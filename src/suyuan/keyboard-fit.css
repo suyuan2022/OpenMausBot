@@ -12,3 +12,11 @@ html[data-keyboard] #root {
   height: var(--keyboard-room);
   padding-bottom: 0;
 }
+html[data-keyboard] [data-inbox-page] {
+  top: var(--keyboard-top, 0px);
+  bottom: auto;
+  height: var(--keyboard-room);
+}
+html[data-keyboard] [data-inbox-page] [data-inbox-panel="sheet"] {
+  padding-bottom: 0;
+}
