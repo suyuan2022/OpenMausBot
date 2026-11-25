@@ -4,6 +4,7 @@ import type { RequestOutcome, SendTurnInput } from "../../contracts.ts";
 import type { spawnCli } from "../../procs.ts";
 import { noticeFailure } from "../../chat-notices.ts";
 import { errorReplyFailure, type ErrorReplyFailure } from "../engine-errors.ts";
+import { splitAntigravityErrorReply } from "../../suyuan/acp-resilience.ts";
 import type { AcpConfig } from "./core.ts";
 import type { AcpHost, AcpLink } from "./host.ts"; import type { AppliedConfig } from "./applied-config.ts";
 import type { AcpTurnSteering } from "./steer.ts";
@@ -16,6 +17,7 @@ export type AcpAskFinish = (
 ) => RequestOutcome;
 
 export interface AcpTurn {
+  operationSeen?: boolean;
   turnId: string;
   turn: SendTurnInput;
   turnConfig: AcpConfig;
@@ -127,10 +129,12 @@ export interface AcpTurnEnd {
  * nothing to show is a lost turn: a provider may cut a reasoning-only stream and still answer end_turn, and a turn that
  * was talking, then streamed reasoning after its tools without landing a reply after it, went out midstream. Tool-only
  * turns that never said anything, and turns that plainly end on their tools, stay successes. */
-export function endTurn(current: AcpTurn, ok: boolean, stopReason: string | null, ai: string): AcpTurnEnd {
+export function endTurn(current: AcpTurn, ok: boolean, stopReason: string | null, ai: string, driver?: string): AcpTurnEnd {
   const ended = ok && stopReason === null;
-  const errorReply = ended && !current.state.stopped && !current.state.repliedText ? errorReplyFailure(ai, current.state.text) : null;
-  if (!errorReply) current.flushAssistantText();
+  const split = driver === "antigravityAgent" ? splitAntigravityErrorReply(ai, current.state.text) : null;
+  if (split) current.state.text = split.prefix;
+  const errorReply = ended && !current.state.stopped ? split?.failure ?? (!current.state.repliedText ? errorReplyFailure(ai, current.state.text) : null) : null;
+  if (split ? split.prefix.trim() : !errorReply) current.flushAssistantText();
   if (ended && current.state.stopped) return { ok, stopReason: "cancelled" };
   if (errorReply) {
     const { stopReason: failed, ...error } = errorReply;

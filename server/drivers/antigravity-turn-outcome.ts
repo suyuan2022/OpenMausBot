@@ -182,13 +182,13 @@ export function antigravityTurnFailure(
   if (INVALID_THINKING_SIGNATURE.test(text)) {
     return restarting(new AcpReportedFailure({ message: `${provider}'s saved conversation can no longer be sent to the model. The next message starts a fresh ${provider} session with this conversation's context.` }, false), true);
   }
-  if (apiError === null) return restarting(new AcpReportedFailure(engineFailure(provider, "", { kind: "refused", status: null })!, false));
+  if (apiError === null) return Object.assign(restarting(new AcpReportedFailure(engineFailure(provider, "", { kind: "refused", status: null })!, false)), { checkErrorReply: true });
   const [, httpStatus, message, status] = apiError;
   if (httpStatus === "429" || status === "RESOURCE_EXHAUSTED") return restarting(usageLimit(provider, text, now, timeZone));
   const http = Number(httpStatus);
   // A 404 before the model answered is an unknown or unentitled model; after, a transient edge error.
   const transient = http >= 500 || (http === 404 && step?.reachedModel === true);
-  return restarting(new AcpReportedFailure(engineFailure(provider, message!.trim(), { kind: transient ? "server" : "refused", status: http })!, false));
+  return Object.assign(restarting(new AcpReportedFailure(engineFailure(provider, message!.trim(), { kind: transient ? "server" : "refused", status: http })!, false)), { checkErrorReply: transient });
 }
 
 /**

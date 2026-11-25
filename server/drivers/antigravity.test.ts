@@ -1080,9 +1080,11 @@ describe("Antigravity driver over shared ACP", () => {
     });
   });
 
-  it("runs a saved Gemini 4 Argon (High) pick as the base model at High thinking when the runtime offers only the base", async () => {
-    const { calls, selection } = await legacyPickTurn("antigravity-legacy-argon", "gemini-3.8-flash,gemini-4-argon", "gemini-4-argon-high");
-    expect(selection).toEqual({ sessionId: expect.any(String), model: "gemini-4-argon", variant: "high" });
+  it("runs a saved Gemini 4 Argon (High) pick at Medium and omits High from live choices", async () => {
+    const { calls, selection, events } = await legacyPickTurn("antigravity-legacy-argon", "gemini-3.8-flash,gemini-4-argon", "gemini-4-argon-high");
+    expect(selection).toEqual({ sessionId: expect.any(String), model: "gemini-4-argon", variant: "medium" });
+    const live = events.filter((event) => event.type === "session.model-variants" && event.model === "gemini-4-argon-high").at(-1);
+    expect(live).toMatchObject({ variants: { currentValue: "medium", options: [{ id: "low" }, { id: "medium" }] } });
     expect(calls.some((call: any) => call.params.value === "gemini-4-argon-high")).toBe(false);
   });
 

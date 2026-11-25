@@ -5,6 +5,7 @@
 // once per bot and cause, until one of that bot's runs completes.
 // A teammate's failed thread takes the same verdict (host/chief-notices.ts).
 import type { RuntimeEvent } from "../shared/runtime-events.ts";
+import { ANTIGRAVITY_UNAVAILABLE } from "./suyuan/acp-resilience.ts";
 import type { ServerText } from "../shared/server-text.ts";
 import { isCountedSkip, type RoutineRetryCause } from "../shared/routines.ts";
 import { engineFailureKind } from "./drivers/engine-errors.ts";
@@ -74,7 +75,7 @@ const BUSY_CODES = new Set(["thread_busy", "thread_limit", "workspace_busy", "se
 /** Stop reasons of a turn someone ended on purpose (Stop, a typed "stop", a settings change that cut it short), the AI
  * declined, or a tool call the person denied or that failed after its corrective rounds: a second start would undo or
  * repeat it. */
-const NOT_RETRIED_STOPS = new Set(["cancelled", "interrupted", "refusal", "tool_error"]);
+const NOT_RETRIED_STOPS = new Set(["cancelled", "interrupted", "refusal", "tool_error", ANTIGRAVITY_UNAVAILABLE]);
 /** What the provider answered for a reason a second start would meet again. */
 const REFUSED_KINDS = new Set(["refused", "tool_schema", "tool_count"]);
 const OWNER_CAUSES = new Set<RoutineOwnerCause>(["signed_out", "credits", "usage_limit", "setup"]);

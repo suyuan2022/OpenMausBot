@@ -26,6 +26,8 @@ import { applyOneShotEnv, runAcpOneShot } from "./background-text.ts"; import ty
 import { acpCapabilities } from "./capabilities.ts"; import { readAcpMediaLinks } from "./media-links.ts";
 import { acpNativeLogMessage } from "./tool-log.ts";
 import { stripLeakedSystemHarnessMessages } from "../../../shared/system-message-guard.ts";
+import { ANTIGRAVITY_UNAVAILABLE, antigravityReplyDelta, checkedPromptOutcome, retryAuthenticate, retryErrorReply, TransientAcpAuthError } from "../../suyuan/acp-resilience.ts";
+import { visibleThinkingLevels, withoutArgonHigh } from "../../suyuan/argon-thinking.ts";
 import { formatQuietLimit, lastSeenPhrase, LIMIT_WORDS, promptIdleTimeoutMs, type LogSignal } from "./quiet-status.ts"; import { startAcpQuietWatch } from "./quiet-watch.ts"; import { AppliedConfig } from "./applied-config.ts"; import { modelRefused, roomForReadBeside, startupRefresh } from "./startup-refresh.ts"; import { stderrFailureOf, watchStderrFailure, type StderrFailure } from "./harness-failure.ts"; import { timed, turnStartClock, type TurnStartClock } from "../../perf/turn-starts.ts";
 import { acpMissingSession } from "./rpc-error.ts";
 import { readSessionReport } from "./session-reports.ts";
@@ -510,7 +512,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
       // Detach before the final events: a listener may start the next turn synchronously.
         session.current = null; session.settledAt = Date.now();
         active.delete(threadId); if (current.state.stopped) endBackground(threadId, session);
-        const end = endTurn(current, ok, stopReason, support.displayName);
+        const end = endTurn(current, ok, stopReason, support.displayName, DRIVER_KIND);
         if (end.error) emit({ ...base(threadId, current.turnId), type: "runtime.error", ...end.error });
         emit({ ...base(threadId, current.turnId), type: "turn.completed", ok: end.ok, stopReason: end.stopReason, cost: null });
         if (session.child.exitCode === null && !session.closing && !session.dead) {
@@ -563,6 +565,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
         const send = (obj: unknown) => acp.send(obj); const nodeVersion = support.minNodeVersion ? readNodeVersion(env) : undefined;
 
         const handleServerRequest = (msg: any, current: AcpTurn) => {
+          current.operationSeen = true;
           current.state.startupActivity = true; if (current.state.promptSent) current.acknowledge();
           if (msg.method === "fs/read_text_file" || msg.method === "fs/write_text_file") {
             void answerClientFileRequest(msg, { send, cwd, enabled: support.clientFileSystem === true, readRoots: () => support.clientReadRoots?.(current.turn), extraRoots: () => session.additionalDirs });
@@ -723,7 +726,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
           switch (u.sessionUpdate) {
             case "agent_message_chunk": {
               const content = u.content;
-              const delta = content?.text;
+              const rawDelta = content?.text;
               if (content?.type === "image" && typeof content.data === "string" && content.data) {
                 current.flushAssistantText();
                 trackAssistantImage(current.state);
@@ -734,12 +737,14 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
                   data: content.data,
                   alt: "Generated image",
                 });
-              } else if (typeof delta === "string" && delta) {
+              } else if (typeof rawDelta === "string" && rawDelta) {
                 const messageId = typeof u.messageId === "string" ? u.messageId : null;
                 if (support.resendsReasoningReply && messageId && messageId === current.state.textMessageId
-                    && isHermesReasoningReplay(delta, current.state.text)) break;
+                    && isHermesReasoningReplay(rawDelta, current.state.text)) break;
                 current.state.textMessageId = messageId;
-                current.state.text += delta;
+                current.state.text += rawDelta;
+                const delta = antigravityReplyDelta(DRIVER_KIND, current.turn.model, current.state.text, rawDelta);
+                if (!delta) break;
                 const trimmed = current.state.text.trimStart();
                 if (!trimmed.startsWith("<SYSTEM_MESSAGE") &&
                     !trimmed.startsWith("The following is a <SYSTEM_MESSAGE") &&
@@ -756,6 +761,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
               break;
             }
             case "tool_call": {
+              current.operationSeen = true;
               current.flushAssistantText();
               trackRunningTool(current, u, "pending");
               // ACP can send a tool_call already marked completed or failed (e.g. on a denied permission) with no
@@ -775,6 +781,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
               break;
             }
             case "tool_call_update": {
+              current.operationSeen = true;
               trackRunningTool(current, u);
               if (finished) toolEnded((typeof u.toolCallId === "string" && u.toolCallId) ? u.toolCallId : current.unkeyedToolIds.shift());
               break;
@@ -1003,7 +1010,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
           selection: support.selectModel, variants: support.modelVariants === true, displayName: support.displayName,
           model: () => cliTurn.model, reportedModel: () => reportedModel,
           state: () => session.sessionConfigResult, store: (result) => { session.sessionConfigResult = result; },
-          report: (model, variants) => emit({ ...base(threadId, turnId), type: "session.model-variants", model, variants }),
+          report: (model, variants) => emit({ ...base(threadId, turnId), type: "session.model-variants", model, variants: visibleThinkingLevels(DRIVER_KIND, model, variants) }),
         });
         const receiveModelVariants = (result: any, replace = false) => { if (replace) session.appliedConfig.clear(); modelControls.receive(result, replace); };
         const requestedVariantOption = () => modelControls.variant(variant);
@@ -1096,9 +1103,11 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
                 const methodId = support.pickAuthMethod(methods, spawnEnv);
                 if (methodId) {
                   try {
-                    await session.host.once("authenticate", () => request("authenticate", { methodId }, INIT_TIMEOUT));
+                    await retryAuthenticate(DRIVER_KIND, () => state.stopped || state.settled || session.closing,
+                      () => session.host.once("authenticate", () => request("authenticate", { methodId }, INIT_TIMEOUT)));
                     session.authenticated = true;
                   } catch (error) {
+                    if (error instanceof TransientAcpAuthError) throw error;
                     const failed = signIn.authenticateFailed(error, support.authFailure); if (failed) throw failed;
                   }
                 } else if (support.authFailure === "fail") {
@@ -1288,13 +1297,14 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
             }
             if (variant !== undefined && requestedVariantOption().currentValue !== variant) {
               throw new Error(`${support.displayName} changed variant before the prompt`);
-            } const promptOutcome = await support.promptOutcome?.(instanceId, sessionId);
+            } let promptOutcome = await support.promptOutcome?.(instanceId, sessionId);
             if (state.settled || state.stopped || session.closing) throw new Error("turn stopped");
             state.promptSent = true; clock.promptSent(Date.now());
             if (!support.promptUnreachedModel) acknowledge();
             const promptIdleMs = promptIdleTimeoutMs();
             const quiet = startQuietWatch(threadId, session, current);
-            const result = await request(
+            const result = await retryErrorReply(DRIVER_KIND, current, session, promptOutcome,
+              async () => { promptOutcome = await support.promptOutcome?.(instanceId, sessionId); }, () => request(
               "session/prompt",
               { sessionId, prompt: [{ type: "text", text: text + media.note }, ...imageBlocks, ...media.blocks, ...(contextNote ? [{ type: "text", text: contextNote }] : [])] },
               undefined,
@@ -1305,7 +1315,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
                 return `${support.displayName} sent nothing for ${formatQuietLimit(promptIdleMs)} with no tool running, so the turn was stopped as stuck` +
                   `${last ? ` (last seen: ${lastSeenPhrase(last)})` : ""}. Send the message again to retry.`;
               },
-              );
+              ));
             const harnessFailed = stderrFailureOf(session.host); if (harnessFailed) throw harnessFailed;
             const steersOut = current.steering?.promptAnswered();
             if (steersOut && !state.stopped) { current.flushAssistantText(); await steersOut; }
@@ -1339,7 +1349,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
               if (tokens) emit({ ...base(threadId, turnId), type: "thread.token-usage.updated", ...tokens });
             }
             const final = answers.at(-1);
-            const reason = final?.stopReason, reported = await promptOutcome?.(final); if (reported) throw reported;
+            const reason = final?.stopReason, reported = await checkedPromptOutcome(DRIVER_KIND, current, final, promptOutcome); if (reported) throw reported;
             if (reason === "end_turn") settle(threadId, session, true, null);
             else if (reason === "cancelled" || state.stopped) settle(threadId, session, true, "cancelled");
             else {
@@ -1418,7 +1428,8 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
               } else if (staleProcess && !state.promptSent && session.child.exitCode === null && !session.closing) {
                 closeSession(threadId, "stale-models");
               }
-              settle(threadId, session, state.stopped, state.stopped ? "cancelled" : needsAuth ? "auth_required" : (e as any)?.acpUsageLimit === true ? "quota" : "rpc_error");
+              const rpcFailure = e instanceof TransientAcpAuthError ? ANTIGRAVITY_UNAVAILABLE : "rpc_error";
+              settle(threadId, session, state.stopped, state.stopped ? "cancelled" : needsAuth ? "auth_required" : (e as any)?.acpUsageLimit === true ? "quota" : rpcFailure);
             }
           }
         })();
@@ -1508,7 +1519,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
         ...(support.backgroundText === false ? {} : { generateMemoryText }),
         enabled: input.enabled,
         get models() {
-          return catalog.models;
+          return DRIVER_KIND === "antigravityAgent" ? withoutArgonHigh(catalog.models) : catalog.models;
         },
         get modelsUnconfirmed() { return catalog.unconfirmed; },
         get modelsUnreadable() { return catalog.unreadable; },

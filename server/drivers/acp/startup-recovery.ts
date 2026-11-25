@@ -4,6 +4,7 @@
 
 import type { ProviderErrorCode } from "../../contracts.ts";
 import { classifyError } from "../retry.ts";
+import { TransientAcpAuthError } from "../../suyuan/acp-resilience.ts";
 
 const DENIED = /\b(?:(?:permission|access) denied|(?:approval|permission) (?:required|denied|rejected)|requires? (?:approval|permission)|policy (?:restriction|violation)|(?:blocked|denied|restricted) by (?:the )?policy)\b/i;
 
@@ -13,7 +14,7 @@ const DENIED = /\b(?:(?:permission|access) denied|(?:approval|permission) (?:req
 export function startupFailureRecoverable(error: unknown, message: string, code: ProviderErrorCode | undefined,
   turn: { approvalUnconfirmed: boolean; promptSent: boolean; promptUnreachedModel: boolean }): boolean {
   const failure = classifyError({ text: message });
-  const transientStartup = failure.transient || (failure.reason === "unknown" && code === "upstream_outage");
+  const transientStartup = (error instanceof TransientAcpAuthError && error.backupMayConnect) || failure.transient || (failure.reason === "unknown" && code === "upstream_outage");
   const retryableStartup = turn.approvalUnconfirmed || (transientStartup && (!code || code === "upstream_outage")
     && ![-32700, -32600, -32601, -32602].includes((error as any)?.code));
   return ((retryableStartup && !turn.promptSent) || (turn.promptUnreachedModel && (error as any)?.acpPromptStall !== true))

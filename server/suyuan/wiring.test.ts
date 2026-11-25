@@ -8,6 +8,53 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const source = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 
 describe("suyuan-v2 thin-fork wiring", () => {
+  it("filters leaked thought before storage and in older direct and room replies", () => {
+    const guard = source("shared/system-message-guard.ts");
+    expect(guard).toContain('from "./suyuan/thought-leak.ts"');
+    expect(guard).toContain("return stripThoughtLeak(result).trim()");
+    expect(guard).toContain("!hasMarkers && !hasThoughtMark(text)");
+    expect(source("server/drivers/acp/core.ts")).toContain("stripLeakedSystemHarnessMessages(raw)");
+    for (const file of ["ChatView.tsx", "RoomTextMessage.tsx"]) expect(source("src/components/" + file)).toContain("stripLeakedSystemHarnessMessages(");
+    for (const file of ["ChatView.tsx", "GroupView.tsx"]) expect(source("src/components/" + file)).toContain("isPureLeakedSystemHarnessMessage(");
+  });
+
+  it("caps Argon in discovery, saved catalogs, live choices and native session selection", () => {
+    const driver = source("server/drivers/antigravity.ts");
+    expect(driver).toContain('from "../suyuan/argon-thinking.ts"');
+    expect(driver).toContain("return withoutArgonHigh(catalog)");
+    expect(driver).toContain("argonAtMostMedium(normalizeAntigravityTurn(turn, offered, catalog), offered)");
+    const core = source("server/drivers/acp/core.ts");
+    expect(core).toContain('from "../../suyuan/argon-thinking.ts"');
+    expect(core).toContain('DRIVER_KIND === "antigravityAgent" ? withoutArgonHigh(catalog.models)');
+    expect(core).toContain("variants: visibleThinkingLevels(DRIVER_KIND, model, variants)");
+  });
+
+  it("keeps Antigravity retry, final failure, stop and side-effect guards on the ACP turn", () => {
+    const core = source("server/drivers/acp/core.ts");
+    expect(core).toContain('from "../../suyuan/acp-resilience.ts"');
+    expect(core).toContain("endTurn(current, ok, stopReason, support.displayName, DRIVER_KIND)");
+    for (const anchor of ["const handleServerRequest =", 'case "tool_call":', 'case "tool_call_update":']) {
+      expect(core.slice(core.indexOf(anchor), core.indexOf(anchor) + 140)).toContain("current.operationSeen = true");
+    }
+    expect(core).toContain("antigravityReplyDelta(DRIVER_KIND, current.turn.model, current.state.text, rawDelta)");
+    expect(core).toContain("retryAuthenticate(DRIVER_KIND, () => state.stopped || state.settled || session.closing,");
+    expect(core).toContain('() => session.host.once("authenticate", () => request("authenticate", { methodId }, INIT_TIMEOUT))');
+    expect(core).toContain("if (error instanceof TransientAcpAuthError) throw error");
+    expect(core).toContain("retryErrorReply(DRIVER_KIND, current, session, promptOutcome,");
+    expect(core).toContain("promptOutcome = await support.promptOutcome?.(instanceId, sessionId); }, () => request(");
+    expect(core).toContain("checkedPromptOutcome(DRIVER_KIND, current, final, promptOutcome)");
+    const native = source("server/drivers/antigravity-turn-outcome.ts");
+    expect(native).toContain("checkErrorReply: true");
+    expect(native).toContain("checkErrorReply: transient");
+    expect(core).toContain("e instanceof TransientAcpAuthError ? ANTIGRAVITY_UNAVAILABLE");
+    const end = source("server/drivers/acp/turn-state.ts");
+    expect(end).toContain('driver === "antigravityAgent" ? splitAntigravityErrorReply(ai, current.state.text)');
+    expect(end).toContain("current.state.text = split.prefix");
+    expect(end).toContain("split?.failure ??");
+    expect(source("server/drivers/acp/startup-recovery.ts")).toContain("(error instanceof TransientAcpAuthError && error.backupMayConnect) || failure.transient");
+    expect(source("server/routine-recovery.ts")).toMatch(/const NOT_RETRIED_STOPS = .*ANTIGRAVITY_UNAVAILABLE/);
+  });
+
   it("disables speculative warm summary in register.ts and wires core suyuan hooks in server/index.ts", () => {
     const reg = source("server/suyuan/register.ts");
     expect(reg).toContain('OMB_WARM_SUMMARY ??= "0"');

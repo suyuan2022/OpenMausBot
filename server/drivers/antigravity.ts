@@ -59,6 +59,7 @@ import { resolveAntigravityReleaseAsset } from "./antigravity-release.ts";
 import { AntigravityProcesses } from "./antigravity-processes.ts";
 import { VERIFICATION_TEMP_KEY, scheduleAntigravityTempSweep } from "./antigravity-temp.ts";
 import { augmentedPath } from "../env-path.ts";
+import { argonAtMostMedium, withoutArgonHigh } from "../suyuan/argon-thinking.ts";
 import { killCliTree } from "../procs.ts";
 import { bundledEngineCatalog } from "../model-manifest/bundled.ts";
 import { currentEngineCatalog } from "../model-manifest/manifest.ts";
@@ -190,7 +191,7 @@ const support: AcpSupport = {
   spawnArgs: () => [],
   selectModel: { configId: "model" },
   modelVariants: true,
-  normalizeSessionSelection: normalizeAntigravityTurn,
+  normalizeSessionSelection: (turn, offered, catalog) => argonAtMostMedium(normalizeAntigravityTurn(turn, offered, catalog), offered),
   // Google's server reads its new-session default from this variable (agy_acp_server 1.4.3
   // model_selection.get_default_model_id); a later switch re-fetches the model list (1.3-1.8 s).
   sessionModelEnv: "AGY_ACP_DEFAULT_MODEL",
@@ -239,7 +240,7 @@ const support: AcpSupport = {
     }).catch((error: unknown) => { throw native ? nativeDiscoveryError(instanceId, error) : error; });
     accepted?.("in");
     for (const option of catalog.options) offeredModels.add(option.id);
-    return catalog;
+    return withoutArgonHigh(catalog);
   },
 
   pickAuthMethod: (methods) => methods.some((method) => method.id === "oauth-personal")
