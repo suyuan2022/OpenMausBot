@@ -28,8 +28,9 @@
 | 手机手势与控件开关 | 键盘贴合、右滑返回、禁整页缩放、默认隐藏语音钮与任务步骤卡片（可开） | `src/suyuan/keyboard-fit.*`、`swipe-back.ts`、`no-zoom.*`、`voice-button.ts`、`skill-burger.*` | 仅自用 |
 | 手机列表（11-25 他点名要回） | 置顶和主控并排成方块、长按出菜单；按最新消息排；时间写昨天/星期/日期；干活不挂点、只剩未读绿点；行尾不挂模型标识 | `src/suyuan/hero-pins.ts`、`HeroTiles.tsx`、`list-order.ts`、`list-clock.ts`、`quiet-dots.ts`、`quiet-rows.css`、`tile-menu.ts`、`scripts/suyuan/vite-list-clock.ts` | 仅自用 |
 | 打开快、落在最新 | 重开先盖上次画面再无缝接上；点通知直接开那个对话，不先经过上次的；打开对话一律落在最新一条 | `src/suyuan/boot.ts`、`last-frame.ts`、`push-resume.ts`、`open-at-latest.ts` | 仅自用 |
-| 简洁聊天显示 | 英文过程句不显示（11-15 定保留）；中文标点贴星号的加粗补成加粗；干活只剩三个点；群聊名居中浮起；一家一对话下不出现顶栏「+」、收件箱不写「在 主对话标题」 | `src/suyuan/quiet-english.ts`、`cjk-strong.ts`、`quiet-status.css`、`home.ts`；`RoomHeader.tsx` 等小补丁见 `wiring.test.ts` | `cjk-strong` 候选提 PR |
+| 简洁聊天显示 | 英文过程句不显示（11-15 定保留；按轮判断，群聊同样，附件、置顶、链接表格留着）；中文标点贴星号的加粗补成加粗；干活只剩三个点；群聊名居中浮起；一家一对话下不出现顶栏「+」、收件箱不写「在 主对话标题」 | `src/suyuan/quiet-english.ts`、`cjk-strong.ts`、`quiet-status.css`、`home.ts`、`even-sides.ts`；小补丁见 `wiring.test.ts` | `cjk-strong` 候选提 PR |
 | 中文语言包补齐 | 界面不再冒英文；统一叫法（机器人、主控机器人、对话、定时任务、列表、任务步骤卡） | `src/locales/zh.json`、`src/suyuan/zh-complete.suyuan.test.ts` | 候选提 PR |
+| Gemini 思考过滤与断连重试 | Gemini 写进回复的英文思考只留正文（同 v1，对所有机器人的显示生效）；Argon 不给高档思考；Antigravity 临时断连或 502 等 1.5 秒重试一次，已动手或已出字不重发 | `shared/suyuan/thought-leak.ts`、`server/suyuan/argon-thinking.ts`、`acp-resilience.ts` | 仅自用 |
 
 ## 硬红线与仓库外依赖
 
@@ -53,11 +54,13 @@
 - `[2026-11-24]` **iPhone 带表格对话是否仍卡顿**：`.67` 已恢复表格整宽卡片，待真机确认。
 - `[2026-11-25]` **打开快、落在最新**：重开盖上次画面、点通知直达、打开对话落在最新（副本实测重开 0.26 秒出画面）；待手机上确认手感。
 - `[2026-11-25]` **手机列表与简洁聊天恢复项**：置顶并排、按最新排、日期时间、圆点、英文过程句、中文加粗、三个点、群聊胶囊；待手机上确认。
+- `[2026-11-25]` **Gemini 思考过滤与 502 重试**：上线后看 Antigravity 机器人的回复不再夹英文思考、偶发 502 先自动重试。
 
 ## 近期要做
 
 - `[2026-11-24]` **清理两条废弃远端分支**：`origin/fix/sync-retry-flaky`、`origin/feat/routine-one-thread`（删前问夙愿）。
 - `[2026-11-24]` **清理虚拟机残留旧路由文件**：`~/.openmausbot/suyuan-room-router.json` 已不再读取，确认后可删。
+- `[2026-11-25]` **iPhone 语音输入回来黑屏**：模拟器已复现（回来时系统打开一个空窗口），方案见 [`docs/suyuan/ios-blackscreen.md`](docs/suyuan/ios-blackscreen.md)；等真机 R1–R3 和语音识别 A1/A2 拍板。
 
 ## 碰到再说与长期专题
 

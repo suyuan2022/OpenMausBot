@@ -54,7 +54,7 @@ describe("the list, newest message first", () => {
       messages: [{ id: "root", kind: "text", at: 5 }, { id: "old-leaf", parentId: "root", kind: "text", at: 15 }, { id: "other", parentId: "root", kind: "text", at: 40 }],
     };
     const sorted = recentBotsFirst({ sectionedBots: [], unsectionedBots: [branched, bot("mid", 20)] as never[] });
-    expect((sorted?.unsectionedBots as { name: string }[]).map((one) => one.name)).toEqual(["mid", "branched"]);
+    expect((sorted?.unsectionedBots as { name: string }[] | undefined)?.map((one) => one.name)).toEqual(["mid", "branched"]);
   });
 
   it("leaves upstream's order with the thread list shown", () => {

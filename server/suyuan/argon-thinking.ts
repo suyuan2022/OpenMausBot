@@ -1,3 +1,5 @@
+// suyuan fork: Gemini 4 Argon at High thinking wrote its thinking into the reply (shared/suyuan/thought-leak.ts), so
+// High is not offered and a saved High pick runs at Medium. Antigravity only; every other engine's levels stay.
 import type { ModelCatalog, ModelVariantOption, SendTurnInput } from "../contracts.ts";
 
 const ARGON = "gemini-4-argon";
