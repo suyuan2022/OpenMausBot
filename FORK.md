@@ -30,7 +30,7 @@
 | 打开快、落在最新 | 重开先盖上次画面再无缝接上；点通知直接开那个对话，不先经过上次的；打开对话一律落在最新一条 | `src/suyuan/boot.ts`、`last-frame.ts`、`push-resume.ts`、`open-at-latest.ts` | 仅自用 |
 | 简洁聊天显示 | 英文过程句不显示（11-15 定保留；按轮判断，群聊同样，附件、置顶、链接表格留着）；中文标点贴星号的加粗补成加粗；干活只剩三个点；群聊名居中浮起；一家一对话下不出现顶栏「+」、收件箱不写「在 主对话标题」 | `src/suyuan/quiet-english.ts`、`cjk-strong.ts`、`quiet-status.css`、`home.ts`、`even-sides.ts`；小补丁见 `wiring.test.ts` | `cjk-strong` 候选提 PR |
 | 中文语言包补齐 | 界面不再冒英文；统一叫法（机器人、主控机器人、对话、定时任务、列表、任务步骤卡） | `src/locales/zh.json`、`src/suyuan/zh-complete.suyuan.test.ts` | 候选提 PR |
-| Gemini 思考过滤与断连重试 | Gemini 写进回复的英文思考只留正文（同 v1，对所有机器人的显示生效）；Argon 不给高档思考；Antigravity 临时断连或 502 等 1.5 秒重试一次，已动手或已出字不重发 | `shared/suyuan/thought-leak.ts`、`server/suyuan/argon-thinking.ts`、`acp-resilience.ts` | 仅自用 |
+| Gemini 思考过滤与断连重试 | Antigravity 机器人写进回复的英文思考只留正文（同 v1，只在服务端存回复时处理，别的机器人和共用的显示过滤不碰）；Argon 不给高档思考；Antigravity 临时断连或 502 等 1.5 秒重试一次，已动手、已出字或服务端说明了原因的不重发，证书错误不算临时 | `shared/suyuan/thought-leak.ts`、`server/suyuan/argon-thinking.ts`、`acp-resilience.ts` | 仅自用 |
 
 ## 硬红线与仓库外依赖
 
