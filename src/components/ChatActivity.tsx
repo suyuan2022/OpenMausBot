@@ -38,7 +38,7 @@ export function useChatActivity(): ChatActivity {
 /** The messages the chat draws: everything outside Advanced mode; there, without what the person hid. Anything that
  * still needs the person (a pending approval, a waiting or failed run) always stays. */
 export function chatActivityMessages(messages: Message[], advanced: boolean, activity: ChatActivity, pinnedMessageId?: string): Message[] {
-  if (!advanced) return quietChat(messages); // suyuan fork: Simple mode leaves out the bot's English lines along the way
+  if (!advanced) return quietChat(messages, pinnedMessageId); // suyuan fork: Simple mode leaves out the bot's English lines along the way
   if (activity.routines && activity.tools) return messages;
   return messages.filter((message) => {
     if (message.role !== "bot" || message.id === pinnedMessageId) return true;

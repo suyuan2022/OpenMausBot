@@ -1,7 +1,7 @@
 // suyuan fork: the app reopens on the screen it was left on. A home-screen web app or Safari tab that iOS dropped in the background
 // otherwise starts on "Connecting to your bots…" until the bots load, a second or more over the relay. When the app goes
 // out of sight its markup is kept in localStorage; the next start lays that over the page, inert, and lifts it once the
-// bots have loaded. quiet-start.css holds the page's own connecting line back for the first seconds.
+// bots have loaded. quiet-start.css holds the page's own connecting line back for half a second.
 //
 // The app reopens on the last chat at its latest messages, scrolled to the end, with no side panel open, and every other
 // scroller at its top. The frame shows only that, so lifting it moves nothing on screen; left on anything else (the bot
@@ -46,7 +46,9 @@ export interface Frame {
 const TYPED = "input:not([type=range], [type=checkbox], [type=radio], [type=color], [type=button], [type=submit], [type=reset], [type=image])";
 
 /** The copy that may be kept and shown: nothing that could run or load a page, and no typed values (a secret pasted
- * into a password field is in its value attribute). Ids stay inside SVGs, whose gradients, clip paths and Mermaid
+ * into a password field is in its value attribute). The composer's draft still shows through the layer that draws it
+ * (MentionTextarea.tsx): the app keeps drafts in localStorage itself (src/lib/drafts.ts) and puts them back on the
+ * reopened page, so the copy shows what follows it. Ids stay inside SVGs, whose gradients, clip paths and Mermaid
  * styles point at them; elsewhere they are dropped. Handed back as nodes, so what is shown is what was checked: parsing
  * the cleaned markup again could build something new. */
 export function cleanMarkup(doc: Document, html: string): HTMLTemplateElement {
@@ -234,9 +236,11 @@ function start() {
   for (const chat of chats) for (const child of chat.children) pin?.observe(child);
   const timer = setTimeout(() => lift(), HOLD_MS);
   // The first thing drawn into #root is not the app (the pairing page, an error): the frame is chats this page
-  // should not show again, not even fading.
+  // should not show again, not even fading. Watched past the frame's own lift too: a sign-in answer slower than the
+  // hold still means the session ended.
   const watcher = new MutationObserver(() => {
-    if (appShown) return watcher.disconnect();
+    watcher.disconnect();
+    if (appShown) return;
     lift(true);
     forget();
   });
@@ -244,7 +248,6 @@ function start() {
   lift = (now = false) => {
     lift = () => {};
     clearTimeout(timer);
-    watcher.disconnect();
     pin?.disconnect();
     if (now) return cover.remove();
     cover.style.pointerEvents = "none";

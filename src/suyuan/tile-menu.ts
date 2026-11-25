@@ -5,7 +5,10 @@
 // A pinned tile is draggable for the desk's reorder, and iOS lifts a draggable thing under a long press: on a touch
 // phone the tile stops being draggable at the touch, as the list's own drag is off there.
 
-const TOUCH_PHONE = "(hover: none) and (pointer: coarse) and (max-width: 40rem)";
+import { PHONE_LAYOUT } from "@/lib/use-media-query";
+
+/** Where the list is the phone's full-screen one and shows the tiles, a small iPhone held sideways too. */
+const TOUCH_PHONE = `(hover: none) and (pointer: coarse) and ${PHONE_LAYOUT}`;
 const TILE = "[data-sidebar-tile]";
 /** As long as the press that shows a message's buttons (MessageActions.tsx). */
 const HOLD_MS = 500;

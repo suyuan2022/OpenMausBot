@@ -2,7 +2,7 @@
    sidebar's colour and shows no card; the phone's home has the app's colour, where that tile stood out as a grey card
    beside the open one. A long press opens a tile's menu (tile-menu.ts), so iOS's own long-press callout and text
    selection stay off the tile, and on for the field that renames it. */
-@media (hover: none) and (pointer: coarse) and (max-width: 40rem) {
+@media (hover: none) and (pointer: coarse) and (max-width: 767.98px) { /* PHONE_LAYOUT, src/lib/use-media-query.ts */
   [data-sidebar-tile] {
     -webkit-touch-callout: none;
     -webkit-user-select: none;

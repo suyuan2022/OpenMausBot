@@ -27,4 +27,28 @@ describe("Chinese bold in a reply", () => {
   it("leaves English stars alone", () => {
     expect(render("2 ** 3 ** 4")).toContain("2 ** 3 ** 4");
   });
+
+  it("is bold when a link stands between the stars", () => {
+    const html = render("这是**「[参考](https://example.com/ref)」**吗");
+    expect(html).toMatch(/这是<strong>「<a [^>]*href="https:\/\/example.com\/ref"[^>]*>参考<\/a>」<\/strong>吗/);
+    expect(html).not.toContain("**");
+  });
+
+  it("is bold around inline code, and again for a second span after it", () => {
+    const html = render("先**「`pnpm build`」**再**「`pnpm lint`」**");
+    expect(html).toMatch(/先<strong>「<code[^>]*>pnpm build<\/code>」<\/strong>再<strong>「<code[^>]*>pnpm lint<\/code>」<\/strong>/);
+  });
+
+  it("bolds two quoted phrases joined by one character as two, not the character between them", () => {
+    expect(render("把**「设置」**和**「通知」**都打开")).toContain("把<strong>「设置」</strong>和<strong>「通知」</strong>都打开");
+  });
+
+  it("pairs a line's left-over stars in order, a Markdown bold beside them untouched", () => {
+    expect(render("**晚上照常：**21:00，**明天**再说")).toContain("<strong>晚上照常：</strong>21:00，<strong>明天</strong>再说");
+  });
+
+  it("keeps stars written escaped as stars", () => {
+    expect(render("\\*\\*中文\\*\\*")).toContain("**中文**");
+    expect(render("\\*\\*中文\\*\\*")).not.toContain("<strong>");
+  });
 });

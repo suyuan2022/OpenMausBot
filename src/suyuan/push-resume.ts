@@ -10,6 +10,8 @@ export interface PushTarget {
   threadId: string;
 }
 
+let openedOnPush = false;
+
 export function pushTarget(search: string): PushTarget | null {
   const params = new URLSearchParams(search);
   const botId = params.get("pushBot"), threadId = params.get("pushThread");
@@ -20,5 +22,14 @@ export function pushTarget(search: string): PushTarget | null {
  * room (./use-web-push.ts) lands before the first paint. */
 export function resumeOnPushTarget(search: string): void {
   const target = pushTarget(search);
-  if (target) rememberConversation(target.botId);
+  if (!target) return;
+  openedOnPush = true;
+  rememberConversation(target.botId);
+}
+
+/** The page opened from a notification, which decides where the app opens (./use-web-push.ts). The start's own return to
+ * the bot's main conversation (src/state/store.tsx) stands aside: it runs after the notification's switch and, with the
+ * bot left on another of its threads, took the app back to the main one. */
+export function openingOnPush(): boolean {
+  return openedOnPush;
 }

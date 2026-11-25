@@ -24,4 +24,8 @@ describe("chatAlone", () => {
     expect(chatAlone(chat, { ...closed, inboxOpen: true })).toBe(false);
     expect(chatAlone(chat, { ...closed, roomOpen: true })).toBe(false);
   });
+
+  it("fails while a blank new chat is open, which a reopen does not come back to", () => {
+    expect(chatAlone({ ...chat, newChat: { botId: "lizhi", held: [] } as never }, closed)).toBe(false);
+  });
 });

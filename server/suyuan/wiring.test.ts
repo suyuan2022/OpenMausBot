@@ -97,6 +97,10 @@ describe("suyuan-v2 thin-fork wiring", () => {
     expect(source("src/main.tsx")).toMatch(/^import "@\/suyuan\/boot";/m);
     expect(source("src/suyuan/boot.ts")).toContain('import "./last-frame";');
     expect(source("src/suyuan/boot.ts")).toContain("resumeOnPushTarget(location.search)");
+    // Opened from a notification, the start's own return to the bot's main conversation stands aside for it.
+    const store = source("src/state/store.tsx");
+    expect(store).toContain('import { openingOnPush } from "@/suyuan/push-resume";');
+    expect(store).toContain("launched.current = true; if (openingOnPush()) return;");
     // The cover's chat is the transcript's role="log"; the connecting line it holds back is the loading page's.
     expect(source("src/components/ChatView.tsx")).toContain('role="log"');
     expect(source("src/App.tsx")).toContain('<main data-app-loading={loading.text} className="relative flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-3 bg-app text-ink-secondary">');
@@ -105,6 +109,9 @@ describe("suyuan-v2 thin-fork wiring", () => {
     // A conversation opens at its newest message: the shell notes it before the chat reads where to open.
     expect(source("src/hooks/use-transcript-viewport.ts")).toContain("const transcriptKey = `${ownerId}:${threadId}`;");
     expect(source("src/hooks/use-transcript-viewport.ts")).toContain("const remembered = readTranscriptPosition(key);");
+    expect(source("src/suyuan/use-suyuan.ts")).toContain("const shown = shownChat(state);\n  openAtLatest(shown);");
+    // shownChat names the chat as the shell draws it, a blank new chat under its own id.
+    expect(source("src/App.tsx")).toContain("const chatBot = useMemo(() => bot && newChatBot(bot, state.newChat), [bot, state.newChat]);");
     expect(source("src/state/store.tsx")).toContain("readChatSnapshot(store.getState, readLastConversation() ?? undefined)");
     expect(source("src/lib/notify.ts")).toContain("if (pushHandlesNotifications() && !frame.forPerson) return;");
     expect(source("src/components/NotificationSettingsRows.tsx")).toContain("<WebPushRow />");
@@ -130,8 +137,13 @@ describe("suyuan-v2 thin-fork wiring", () => {
     expect(profileMenu).toContain('const nameless = (simple || circle) && initials === "?"');
     expect(profileMenu).toContain("size={rail ? 30 : circle ? 26 : 28} fallback={nameless} />");
     // Simple mode's chat leaves out the bot's English lines along the way: ChatView reads its rows through this.
-    expect(source("src/components/ChatActivity.tsx")).toContain("if (!advanced) return quietChat(messages);");
+    expect(source("src/components/ChatActivity.tsx")).toContain("if (!advanced) return quietChat(messages, pinnedMessageId);");
     expect(source("src/components/ChatView.tsx")).toContain("chatActivityMessages(messages, advanced, activity, bot.pinnedMessageId)");
+    // A room's chat too: its transcript and unread line read the same filtered rows.
+    const groupView = source("src/components/GroupView.tsx");
+    expect(groupView).toContain("const shownMessages = useMemo(() => (advancedMode ? group.messages : quietChat(group.messages, group.pinnedMessageId)), [advancedMode, group.messages, group.pinnedMessageId]);");
+    expect(groupView).toContain("    messages: shownMessages,\n    pinOn: [group.busyBotId, group.working, composerDock.pad],");
+    expect(groupView).toContain("const unreadDivider = useUnreadDivider({ threadId: group.threadId, messages: shownMessages, following });");
     // An inbox line from a bot's one conversation does not name that conversation.
     const inboxView = source("src/components/inbox/inbox-view.ts");
     expect(inboxView).toContain('row.origin?.title && !isHomeThread(row.origin.threadId) ? t("inbox.in", { title: row.origin.title }) : null');
@@ -139,7 +151,8 @@ describe("suyuan-v2 thin-fork wiring", () => {
     expect(source("src/suyuan/use-suyuan.ts")).toContain("noteHomes(state.bots);");
     // Simple mode's room header: the name a floating pill in the middle, as in a bot's chat (v1 #70, #71).
     const room = source("src/components/RoomHeader.tsx");
-    expect(room).toContain('<div data-roomhead-row className="grid grid-cols-[minmax(max-content,1fr)_minmax(0,auto)_minmax(max-content,1fr)] items-center gap-3">');
+    expect(room).toContain('<div data-roomhead-row className="grid grid-cols-[minmax(var(--suyuan-side,max-content),1fr)_minmax(0,auto)_minmax(var(--suyuan-side,max-content),1fr)] items-center gap-3">');
+    expect(room).toContain('<div ref={evenSides} data-roomhead-controls className="flex shrink-0 items-center gap-1.5 justify-self-end">');
     expect(room).toContain('className={cn("group flex min-w-0 max-w-full items-center gap-1 rounded-full px-[13.5px] py-[9.5px]", ELEVATED_FLOAT, ELEVATED_HOVER)}');
     expect(room).toContain('className={cn("flex items-center rounded-full p-[7.5px]", ELEVATED_FLOAT, ELEVATED_HOVER)}');
     // swipe-back.ts finds the room header by these classes to give back the back button's room.
@@ -157,6 +170,7 @@ describe("suyuan-v2 thin-fork wiring", () => {
     expect(layout).toContain("const listedPins = pinsBesideChief(pinnedBots, unsectionedChief, { searching: options?.searching === true, universalPins });");
     expect(layout).toContain("return { unsectionedChief, pinnedBots: listedPins, sectionChiefs, sectionedBots, unsectionedBots };");
     expect(layout).toContain("const recent = recentBotsFirst(parts);");
+    expect(layout).toContain("sectionedBots: recent?.sectionedBots ?? first(parts.sectionedBots), unsectionedBots: recent?.unsectionedBots ?? first(parts.unsectionedBots) };");
     expect(source("src/components/SidebarPhoneHero.tsx")).toContain("if (pins.length > 0) return <HeroTiles chief={bot} pins={pins} onMenu={onMenu} />;");
     // The tiles stand in the hero's place: a tap on the bot already open closes the list, as on upstream's hero.
     expect(source("src/components/Sidebar.tsx")).toContain('event.target.closest("[data-sidebar-bot-row], [data-sidebar-hero]")) onClose();');

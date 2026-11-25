@@ -1,6 +1,6 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { activeLocale, t } from "@/lib/i18n";
-import { useShowThreads } from "@/lib/thread-preferences";
+import { useShowThreads } from "@/lib/thread-preferences"; import { quietChat } from "@/suyuan/quiet-english"; // suyuan fork
 import { Check, ChevronDown, FolderOpen, Loader2, Square } from "lucide-react";
 import {
   api,
@@ -767,7 +767,7 @@ export function GroupView({ group, inForkPanel = false }: { group: Group; inFork
   }, [group.messages, threadWorking, group.name, speaker?.name]);
   const presenceSpeaker =
     speaker ?? awaited ?? members.find((member) => member.id === popping?.botId) ?? members[0];
-
+  const shownMessages = useMemo(() => (advancedMode ? group.messages : quietChat(group.messages, group.pinnedMessageId)), [advancedMode, group.messages, group.pinnedMessageId]); // suyuan fork: as a bot's chat (ChatActivity.tsx)
   const {
     scrollRef,
     transcriptRef,
@@ -784,12 +784,12 @@ export function GroupView({ group, inForkPanel = false }: { group: Group; inFork
   } = useTranscriptViewport({
     ownerId: group.id,
     threadId: group.threadId,
-    messages: group.messages,
+    messages: shownMessages,
     pinOn: [group.busyBotId, group.working, composerDock.pad],
     transcriptShown: !setupPending,
     hasMore: group.hasMore, rests: staysInView,
   });
-  const unreadDivider = useUnreadDivider({ threadId: group.threadId, messages: group.messages, following });
+  const unreadDivider = useUnreadDivider({ threadId: group.threadId, messages: shownMessages, following });
 
   useEffect(() => setFolderOpen(false), [group.id]);
   useEffect(() => setMembersOpen(false), [group.id]);

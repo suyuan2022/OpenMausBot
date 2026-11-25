@@ -1,6 +1,6 @@
 /* suyuan fork: on a phone every row of the bot list carried its model's mark after the preview. Nearly every bot runs the
    same model, and the mark took width from the preview. The model stays in the row's title and in the chat's menu. */
-@media (hover: none) and (pointer: coarse) and (max-width: 40rem) {
+@media (hover: none) and (pointer: coarse) and (max-width: 767.98px) { /* PHONE_LAYOUT, src/lib/use-media-query.ts */
   [data-sidebar-section-id] [data-testid="model-badge"] {
     display: none;
   }

@@ -2,6 +2,8 @@
 // newest message comes first, working or done, so the list says which bot to read next. Pinned bots keep upstream's
 // order (sidebar-layout.ts, activeBotsFirst).
 import { lastNonReceipt } from "@/lib/receipts";
+import { visibleMessages } from "@/state/snapshot-navigation";
+import type { Bot } from "@/state/store";
 
 import { homeOf, oneConversation } from "./home";
 
@@ -9,13 +11,15 @@ type Owner = {
   threadId?: string;
   mainThreadId?: string;
   tasks?: ReadonlyArray<{ threadId?: string; updatedAt?: number }> | null;
-  messages?: readonly { kind: string; at: number }[];
+  messages?: Bot["messages"];
+  activeLeafId?: Bot["activeLeafId"];
 };
 
-/** When a bot's row last moved: its last message on hand, unless the app holds one of its background runs, whose
- * messages say nothing of the bot's own conversation; then the last time its home moved. */
+/** When a bot's row last moved: the last message of the branch on screen, the one whose time the row shows
+ * (Sidebar.tsx), unless the app holds one of its background runs, whose messages say nothing of the bot's own
+ * conversation; then the last time its home moved. */
 export function rowAt(bot: Owner): number {
-  const at = lastNonReceipt(bot.messages)?.at ?? 0;
+  const at = lastNonReceipt(visibleMessages({ messages: bot.messages ?? [], activeLeafId: bot.activeLeafId ?? null }))?.at ?? 0;
   const home = homeOf(bot);
   if (home === undefined || bot.threadId === home) return at;
   return bot.tasks?.find((task) => task.threadId === home)?.updatedAt ?? at;

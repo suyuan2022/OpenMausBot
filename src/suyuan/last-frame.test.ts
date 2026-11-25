@@ -307,6 +307,22 @@ describe("a start with a kept frame", () => {
       vi.useRealTimers();
     }
   });
+
+  it("still forgets the frame when the sign-in page comes after the frame lifted by itself", async () => {
+    vi.useFakeTimers();
+    try {
+      keepFrame();
+      const { HOLD_MS, FADE_MS } = await fresh();
+      vi.advanceTimersByTime(HOLD_MS + FADE_MS);
+      expect(cover()).toBeNull();
+      expect(localStorage.getItem(KEY)).not.toBeNull();
+      document.getElementById("root")!.innerHTML = "<form>pairing</form>";
+      await Promise.resolve();
+      expect(localStorage.getItem(KEY)).toBeNull();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });
 
 describe("keeping a frame", () => {

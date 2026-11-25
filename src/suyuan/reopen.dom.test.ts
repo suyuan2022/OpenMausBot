@@ -1,8 +1,9 @@
 // @vitest-environment happy-dom
 // suyuan fork: a conversation opens at its newest message, and a tapped notification's fresh page opens on that bot.
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 import { LAST_CONVERSATION_KEY } from "@/lib/last-conversation";
 import { forgetTranscriptPositions, readTranscriptPosition, rememberTranscriptPosition } from "@/lib/transcript-follow";
+import { newChatThreadId } from "@/state/new-chat";
 import { forgetShownChat, openAtLatest, shownChat } from "./open-at-latest";
 import { pushTarget, resumeOnPushTarget } from "./push-resume";
 
@@ -25,6 +26,16 @@ describe("a conversation opens at its newest message", () => {
     expect(shownChat(state("ns"))).toEqual({ ownerId: "ns", threadId: "ns-home" });
     expect(shownChat(state("gone"))).toEqual({ ownerId: "lizhi", threadId: "home" });
     expect(shownChat(state("ns", "routines"))).toBeNull();
+  });
+
+  it("names a blank new chat by its own id, so going back to the bot's conversation opens it at the newest message", () => {
+    const blank = { ...state("ns"), newChat: { botId: "ns", held: [] } } as unknown as Parameters<typeof shownChat>[0];
+    expect(shownChat(blank)).toEqual({ ownerId: "ns", threadId: newChatThreadId("ns") });
+    openAtLatest(shownChat(state("ns")));
+    rememberTranscriptPosition("ns:ns-home", { atEnd: false, rowId: "older" });
+    openAtLatest(shownChat(blank));
+    openAtLatest(shownChat(state("ns")));
+    expect(readTranscriptPosition("ns:ns-home")).toEqual({ atEnd: true });
   });
 
   it("forgets where the reader left a conversation when it is opened again, and keeps the place within one visit", () => {
@@ -60,5 +71,14 @@ describe("a notification's fresh page", () => {
     expect(localStorage.getItem(LAST_CONVERSATION_KEY)).toBe("ns");
     resumeOnPushTarget("");
     expect(localStorage.getItem(LAST_CONVERSATION_KEY)).toBe("ns");
+  });
+
+  it("has the start's return to a bot's main conversation stand aside, only on a page a notification opened", async () => {
+    vi.resetModules();
+    const fresh = await import("./push-resume");
+    fresh.resumeOnPushTarget("");
+    expect(fresh.openingOnPush()).toBe(false);
+    fresh.resumeOnPushTarget("?pushBot=ns&pushThread=ns-run");
+    expect(fresh.openingOnPush()).toBe(true);
   });
 });
