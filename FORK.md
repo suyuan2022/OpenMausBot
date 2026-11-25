@@ -26,6 +26,10 @@
 | 精简收件箱（Inbox） | 只留待处理与未读、后台任务随主对话已读、手机整屏独立页、补中文空态 | `src/suyuan/inbox-unread.ts`、`server/suyuan/inbox-read.ts`、`src/suyuan/phone-inbox.ts` | 仅自用 |
 | 手机排版与表格稳定 | 宽排气泡、表格稳定与独立整宽卡片、防撑宽、未读分割线即时标记 | `src/suyuan/wide-replies.css`、`steady-tables.css`、`table-plate.ts`、`divider-seen.ts` | `steady-tables` 候选提 PR |
 | 手机手势与控件开关 | 键盘贴合、右滑返回、禁整页缩放、默认隐藏语音钮与任务步骤卡片（可开） | `src/suyuan/keyboard-fit.*`、`swipe-back.ts`、`no-zoom.*`、`voice-button.ts`、`skill-burger.*` | 仅自用 |
+| 手机列表（11-25 他点名要回） | 置顶和主控并排成方块、长按出菜单；按最新消息排；时间写昨天/星期/日期；干活不挂点、只剩未读绿点；行尾不挂模型标识 | `src/suyuan/hero-pins.ts`、`HeroTiles.tsx`、`list-order.ts`、`list-clock.ts`、`quiet-dots.ts`、`quiet-rows.css`、`tile-menu.ts`、`scripts/suyuan/vite-list-clock.ts` | 仅自用 |
+| 打开快、落在最新 | 重开先盖上次画面再无缝接上；点通知直接开那个对话，不先经过上次的；打开对话一律落在最新一条 | `src/suyuan/boot.ts`、`last-frame.ts`、`push-resume.ts`、`open-at-latest.ts` | 仅自用 |
+| 简洁聊天显示 | 英文过程句不显示（11-15 定保留）；中文标点贴星号的加粗补成加粗；干活只剩三个点；群聊名居中浮起；一家一对话下不出现顶栏「+」、收件箱不写「在 主对话标题」 | `src/suyuan/quiet-english.ts`、`cjk-strong.ts`、`quiet-status.css`、`home.ts`；`RoomHeader.tsx` 等小补丁见 `wiring.test.ts` | `cjk-strong` 候选提 PR |
+| 中文语言包补齐 | 界面不再冒英文；统一叫法（机器人、主控机器人、对话、定时任务、列表、任务步骤卡） | `src/locales/zh.json`、`src/suyuan/zh-complete.suyuan.test.ts` | 候选提 PR |
 
 ## 硬红线与仓库外依赖
 
@@ -41,13 +45,14 @@
 - **待定给上游提 PR 的通用修复**：`acp-extra-dirs`、`steady-tables.css`、`attachment-cache`（开不开由夙愿定）。
 - **合上游时明确跳过 / 不拿的项**（决定跳过某条上游改动时，记清特征与原因，防下次误合）：
   - **聊天内展示压缩过程卡片**（如旧上游 `a5cf727f6` 类改动）：夙愿不要在聊天流里看到压缩过程提示卡片。
+- **合上游时的中文包**：`zh.json` 冲突以我们的译文和叫法为准，键顺序跟 `en.json`；上游新加的键当场补译，`zh-complete` 测试钉住不缺键。
 
 ## 等夙愿真机确认
 
 - `[2026-11-24]` **`.68` 手机整屏收件箱**：点收件箱盖住整屏、关掉回 bot 列表，只有点条目才进对话；上线后待确认手感。
-- `[2026-11-24]` **删掉假首屏后的首屏速度**：`last-frame` 已移除，待手机实测上游首屏是否够快，慢了再考虑轻骨架屏。
-- `[2026-11-24]` **上游原生列表排序与首页**：旧版“按最新消息排 + 头像方块”未搬，先试用几天再定。
 - `[2026-11-24]` **iPhone 带表格对话是否仍卡顿**：`.67` 已恢复表格整宽卡片，待真机确认。
+- `[2026-11-25]` **打开快、落在最新**：重开盖上次画面、点通知直达、打开对话落在最新（副本实测重开 0.26 秒出画面）；待手机上确认手感。
+- `[2026-11-25]` **手机列表与简洁聊天恢复项**：置顶并排、按最新排、日期时间、圆点、英文过程句、中文加粗、三个点、群聊胶囊；待手机上确认。
 
 ## 近期要做
 
@@ -66,5 +71,5 @@
 - **不做改名对外分发（2026-11-24 定调）**：T3 线程「老板个人助理私教定位与方案评估」已给出结论——不走删 `enterprise/` 改名对外维护发行版，本改造版只自用与演示；私教走定制服务。
 - **Antigravity 中途发消息进队列（2026-11-19 定维持现状）**：谷歌 ACP 桥未暴露中途插话接口，等上游补接口再看。
 - **v2 退场 — 群聊路由与自建压缩栈**：`room-router`（改用原生 `decider`）、`steady-prompt` / `native-compact` / `compact-volatile`（改用原生压缩 + `OMB_WARM_SUMMARY=0`）。
-- **v2 退场 — 重度界面与消息流魔改**：`Sidebar.tsx` / `ChatView.tsx` 补丁、`SidebarTiles`、`last-frame`、`quiet-*`、`tray-at-finger`、`relay`、`BackgroundRunBar`、`PassedOnFrom`、`PhoneInboxButton`。
+- **v2 退场 — 重度界面与消息流魔改**：`Sidebar.tsx` / `ChatView.tsx` 补丁、`tray-at-finger`、`relay`、`BackgroundRunBar`、`PassedOnFrom`、`PhoneInboxButton`。11-25 他说「自己加的东西又被去掉了」，置顶方块、`last-frame`、`quiet-english`、`quiet-status` 不改那两个文件重新接回（见上表）。
 - **v2 退场 — 后台与收件箱重补丁**：`recent-work`、`waiting-on`、`self-thread`、`relay-gate`、`idle-archive`（收件箱只保留轻量的已读离开与整屏页）。

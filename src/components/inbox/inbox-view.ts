@@ -5,6 +5,7 @@ import { liveCardKind } from "../../../shared/live-approval";
 import { t } from "@/lib/i18n";
 import { dismissResponse, type CardResponse } from "@/lib/card-answer";
 import { accessRequestWords, cardAnswerFor } from "../bot-access/access-card";
+import { isHomeThread } from "@/suyuan/home";
 
 /** The Needs you lines the inbox's card in the chat shows, the newest first. */
 export const CARD_ROWS = 3;
@@ -39,7 +40,7 @@ export function senderLabel(row: Pick<InboxRow, "from" | "workingFor" | "askedBy
 }
 
 /** The conversation a line came from, when its subject doesn't already say it. */
-export const placeOf = (row: Pick<InboxRow, "kind" | "origin">): string | null => (row.kind !== "message" && row.origin?.title ? t("inbox.in", { title: row.origin.title }) : null);
+export const placeOf = (row: Pick<InboxRow, "kind" | "origin">): string | null => (row.kind !== "message" && row.origin?.title && !isHomeThread(row.origin.threadId) ? t("inbox.in", { title: row.origin.title }) : null); // suyuan fork: not the bot's one conversation
 
 /** What an ask asks: an approval, a question, or something to review where it was asked; null for anything else or an
  * ask already settled. */
@@ -50,7 +51,7 @@ export function subjectOf(row: InboxRow): string {
   if (row.kind === "ask") return row.card?.tool ? t("inbox.subject.approval") : row.card?.requestType === "question" || row.card?.questionRequest ? t("inbox.subject.question") : row.card?.title || t("inbox.subject.approval");
   if (row.kind === "result") return t("inbox.subject.result");
   if (row.kind === "notice") return t("inbox.subject.notice");
-  return row.origin?.title ?? t("inbox.subject.message");
+  return (isHomeThread(row.origin?.threadId) ? undefined : row.origin?.title) ?? t("inbox.subject.message"); // suyuan fork
 }
 
 /** The choices a question offers as buttons, when one tap answers it: a single question, one pick. */

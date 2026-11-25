@@ -4,6 +4,8 @@ import { t } from "./i18n";
 import type { LocaleKey } from "@/locales";
 import type { DefaultBotFields } from "../../shared/default-bot";
 import { hiddenFromSidebar, someoneElsesDefaultBot } from "./default-bot";
+import { pinsBesideChief } from "@/suyuan/hero-pins";
+import { recentBotsFirst } from "@/suyuan/list-order";
 
 export const PINNED_SECTION_ID = "builtin:pinned";
 export const CHANNELS_SECTION_ID = "builtin:channels";
@@ -128,7 +130,8 @@ export function partitionSidebarBots<T extends SidebarBot>(
   const unsectionedBots = visible.filter(
     (bot) => (!bot.chiefOfStaff || (options?.searching === true && bot !== unsectionedChief)) && !bot.section && !pinnedIds.has(bot.id),
   );
-  return { unsectionedChief, pinnedBots, sectionChiefs, sectionedBots, unsectionedBots };
+  const listedPins = pinsBesideChief(pinnedBots, unsectionedChief, { searching: options?.searching === true, universalPins });
+  return { unsectionedChief, pinnedBots: listedPins, sectionChiefs, sectionedBots, unsectionedBots };
 }
 
 export function withPrimaryTile<T extends SidebarBot>(parts: ReturnType<typeof partitionSidebarBots<T>>, defaultBotId: string | undefined) {
@@ -148,7 +151,8 @@ export function activeBotsFirst<T>(parts: { pinnedBots: T[]; sectionedBots: T[];
     const flags = bots.map(active);
     return [...bots.filter((_, index) => flags[index]), ...bots.filter((_, index) => !flags[index])];
   };
-  return { pinnedBots: first(parts.pinnedBots), sectionedBots: first(parts.sectionedBots), unsectionedBots: first(parts.unsectionedBots) };
+  const recent = recentBotsFirst(parts);
+  return { pinnedBots: first(parts.pinnedBots), sectionedBots: recent?.sectionedBots ?? first(parts.sectionedBots), unsectionedBots: recent?.unsectionedBots ?? first(parts.unsectionedBots) };
 }
 
 export function partitionSidebarGroups<T extends SidebarGroup>(groups: T[]) {

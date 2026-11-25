@@ -2,12 +2,16 @@ import { Crown, MoreHorizontal } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { stateForBot } from "@/lib/mascot";
 import type { Bot } from "@/state/store";
+import { heroPins } from "@/suyuan/hero-pins";
+import { HeroTiles } from "@/suyuan/HeroTiles";
 import { BotAvatar } from "./Avatar";
 import { openBotContextMenu, useVisibleMessages, type MenuState } from "./Sidebar";
 
 /** The phone's home leads with the chief of staff, large and centred, instead of a row. */
 export function PhoneHero({ bot, selected, onOpen, onMenu }: { bot: Bot; selected: boolean; onOpen: () => void; onMenu: (menu: MenuState) => void }) {
   const visible = useVisibleMessages(bot);
+  const pins = heroPins(bot);
+  if (pins.length > 0) return <HeroTiles chief={bot} pins={pins} onMenu={onMenu} />;
   return (
     <div className="relative mb-2 flex flex-col items-center pb-2 pt-1">
       <button

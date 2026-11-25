@@ -638,7 +638,7 @@ export function SidebarProfileMenu({ iconOnly = false, rail = false, circle = fa
   const noteworthy = update && updateNoteworthy(update.phase, update.pending) && !updateHasButton(update.phase);
   const needsYou = account?.automationsNeedYou === true;
   const initials = profileInitials(profile);
-  const nameless = simple && initials === "?" ? <UserRound size={16} aria-hidden /> : undefined;
+  const nameless = (simple || circle) && initials === "?" ? <UserRound size={16} aria-hidden /> : undefined; // suyuan fork: the phone's round button too
   const label = accountLabel(name, { automationsNeedYou: needsYou, update: simple && noteworthy && update ? update.label : null, move: move.kind, announcements: news.unread });
   const dot = accountDot({ automationsNeedYou: needsYou, update: noteworthy ? (update.phase === "error" ? "failed" : "news") : null, move: move.kind, announcements: news.unread });
   // Advanced's full row has its own update badge: its avatar's dot is the move's and the announcements' alone.
@@ -674,7 +674,7 @@ export function SidebarProfileMenu({ iconOnly = false, rail = false, circle = fa
               open ? "bg-raised" : "hover:bg-raised/50",
             )}
           >
-            <InitialsAvatar initials={initials} avatarUrl={profile?.avatarUrl} size={rail ? 30 : circle ? 26 : 28} />
+            <InitialsAvatar initials={initials} avatarUrl={profile?.avatarUrl} size={rail ? 30 : circle ? 26 : 28} fallback={nameless} />
             {dot && <span aria-hidden data-account-dot={dot} className={cn("absolute end-1 top-1 size-2.5 rounded-full ring-2 ring-app", DOT_COLOR[dot])} />}
           </span>
         ) : (

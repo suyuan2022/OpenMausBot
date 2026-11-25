@@ -4,6 +4,7 @@ import { Switch } from "./SettingsPrimitives";
 import { t } from "@/lib/i18n";
 import type { Message } from "@/state/store";
 import { useStoreDispatch } from "@/state/store-select";
+import { quietChat } from "@/suyuan/quiet-english";
 
 /** Advanced mode's "Chat activity": whether routine updates and finished tool entries show in the chat, kept on this device. */
 export interface ChatActivity {
@@ -37,7 +38,8 @@ export function useChatActivity(): ChatActivity {
 /** The messages the chat draws: everything outside Advanced mode; there, without what the person hid. Anything that
  * still needs the person (a pending approval, a waiting or failed run) always stays. */
 export function chatActivityMessages(messages: Message[], advanced: boolean, activity: ChatActivity, pinnedMessageId?: string): Message[] {
-  if (!advanced || (activity.routines && activity.tools)) return messages;
+  if (!advanced) return quietChat(messages); // suyuan fork: Simple mode leaves out the bot's English lines along the way
+  if (activity.routines && activity.tools) return messages;
   return messages.filter((message) => {
     if (message.role !== "bot" || message.id === pinnedMessageId) return true;
     const approval = message.kind === "options" && message.card?.requestId && message.card.tool ? message.card : undefined;

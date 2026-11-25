@@ -93,7 +93,19 @@ describe("suyuan-v2 thin-fork wiring", () => {
     expect(app).toContain("threadsShownNow()");
 
     expect(source("src/main.tsx")).toContain('import "@/suyuan/theme-color";');
-    expect(source("src/main.tsx")).not.toContain("last-frame");
+    // The reopen cover and the notification's chat run before the app's script loads: main.tsx imports them first.
+    expect(source("src/main.tsx")).toMatch(/^import "@\/suyuan\/boot";/m);
+    expect(source("src/suyuan/boot.ts")).toContain('import "./last-frame";');
+    expect(source("src/suyuan/boot.ts")).toContain("resumeOnPushTarget(location.search)");
+    // The cover's chat is the transcript's role="log"; the connecting line it holds back is the loading page's.
+    expect(source("src/components/ChatView.tsx")).toContain('role="log"');
+    expect(source("src/App.tsx")).toContain('<main data-app-loading={loading.text} className="relative flex h-full min-w-0 flex-1 flex-col items-center justify-center gap-3 bg-app text-ink-secondary">');
+    expect(source("src/App.tsx")).toContain('{loading.busy && <Loader2 size={20} className="animate-spin" />}');
+    expect(source("src/App.tsx")).toContain('<div className="text-[14px]">{t(loading.text)}</div>');
+    // A conversation opens at its newest message: the shell notes it before the chat reads where to open.
+    expect(source("src/hooks/use-transcript-viewport.ts")).toContain("const transcriptKey = `${ownerId}:${threadId}`;");
+    expect(source("src/hooks/use-transcript-viewport.ts")).toContain("const remembered = readTranscriptPosition(key);");
+    expect(source("src/state/store.tsx")).toContain("readChatSnapshot(store.getState, readLastConversation() ?? undefined)");
     expect(source("src/lib/notify.ts")).toContain("if (pushHandlesNotifications() && !frame.forPerson) return;");
     expect(source("src/components/NotificationSettingsRows.tsx")).toContain("<WebPushRow />");
     const appPages = source("src/components/settings/pages/AppPages.tsx");
@@ -112,10 +124,53 @@ describe("suyuan-v2 thin-fork wiring", () => {
     expect(source("src/components/ChatMoreMenu.tsx")).toContain("oneConversation()");
     expect(source("src/components/RoomMoreMenu.tsx")).toContain("oneConversation()");
     expect(source("src/components/SidebarBotMenu.tsx")).toContain("oneConversation()");
+    expect(source("src/components/NewThreadHeaderButton.tsx")).toContain("if (oneConversation()) return null;");
+    // The phone's round account button shows a person, not "?", for a person with no name.
+    const profileMenu = source("src/components/SidebarProfileMenu.tsx");
+    expect(profileMenu).toContain('const nameless = (simple || circle) && initials === "?"');
+    expect(profileMenu).toContain("size={rail ? 30 : circle ? 26 : 28} fallback={nameless} />");
+    // Simple mode's chat leaves out the bot's English lines along the way: ChatView reads its rows through this.
+    expect(source("src/components/ChatActivity.tsx")).toContain("if (!advanced) return quietChat(messages);");
+    expect(source("src/components/ChatView.tsx")).toContain("chatActivityMessages(messages, advanced, activity, bot.pinnedMessageId)");
+    // An inbox line from a bot's one conversation does not name that conversation.
+    const inboxView = source("src/components/inbox/inbox-view.ts");
+    expect(inboxView).toContain('row.origin?.title && !isHomeThread(row.origin.threadId) ? t("inbox.in", { title: row.origin.title }) : null');
+    expect(inboxView).toContain('return (isHomeThread(row.origin?.threadId) ? undefined : row.origin?.title) ?? t("inbox.subject.message");');
+    expect(source("src/suyuan/use-suyuan.ts")).toContain("noteHomes(state.bots);");
+    // Simple mode's room header: the name a floating pill in the middle, as in a bot's chat (v1 #70, #71).
+    const room = source("src/components/RoomHeader.tsx");
+    expect(room).toContain('<div data-roomhead-row className="grid grid-cols-[minmax(max-content,1fr)_minmax(0,auto)_minmax(max-content,1fr)] items-center gap-3">');
+    expect(room).toContain('className={cn("group flex min-w-0 max-w-full items-center gap-1 rounded-full px-[13.5px] py-[9.5px]", ELEVATED_FLOAT, ELEVATED_HOVER)}');
+    expect(room).toContain('className={cn("flex items-center rounded-full p-[7.5px]", ELEVATED_FLOAT, ELEVATED_HOVER)}');
+    // swipe-back.ts finds the room header by these classes to give back the back button's room.
+    expect(room).toContain('className="@container/roomhead px-5 py-2.5 pl-11 md:pl-5"');
+    // Chinese bold the Markdown rule leaves as stars is made bold after parsing.
+    expect(source("src/components/ChatMarkdown.tsx")).toContain("[[remarkGfm, GFM_OPTIONS], remarkMath, remarkCjkStrong, ");
     expect(source("src/components/bot-panel/DetailsTab.tsx")).toContain("{threadsShownNow() && <BotConversations bot={bot} />}");
     expect(source("src/components/routines/ResultsDestination.tsx")).toContain("listedThreads(");
     expect(source("src/lib/bot-unread.ts")).toContain("foreground(bot).tasks");
     expect(source("src/state/thread-navigation.ts")).toContain("foreground(bot).tasks");
+  });
+
+  it("keeps the phone's list as he set it: pins beside the chief, newest first, quiet dots, dated times", () => {
+    const layout = source("src/lib/sidebar-layout.ts");
+    expect(layout).toContain("const listedPins = pinsBesideChief(pinnedBots, unsectionedChief, { searching: options?.searching === true, universalPins });");
+    expect(layout).toContain("return { unsectionedChief, pinnedBots: listedPins, sectionChiefs, sectionedBots, unsectionedBots };");
+    expect(layout).toContain("const recent = recentBotsFirst(parts);");
+    expect(source("src/components/SidebarPhoneHero.tsx")).toContain("if (pins.length > 0) return <HeroTiles chief={bot} pins={pins} onMenu={onMenu} />;");
+    // The tiles stand in the hero's place: a tap on the bot already open closes the list, as on upstream's hero.
+    expect(source("src/components/Sidebar.tsx")).toContain('event.target.closest("[data-sidebar-bot-row], [data-sidebar-hero]")) onClose();');
+    const markers = source("src/components/SidebarRowMarkers.tsx");
+    expect(markers).toContain('(activity === "working" || activity === "teammate") && !busyDotShown()');
+    expect(markers).toContain('waiting ? "bg-warning" : unreadTone()');
+    const tiles = source("src/components/SidebarTiles.tsx");
+    expect(tiles).toContain('working ? busyDotShown() ? dot("working-dot", "bg-success")');
+    expect(tiles).toContain(': unread ? dot("unread-dot", unreadTone())');
+    expect(source("src/components/SidebarBotMenu.tsx")).toContain("() => { onRename(bot.id); announceRename(bot.id); }");
+    expect(source("src/suyuan/use-suyuan.ts")).toContain('import "./quiet-rows.css";');
+    // The list's times: the build points Sidebar.tsx's calls of the clock at src/suyuan/list-clock.ts.
+    expect(source("vite.config.ts")).toContain("sidebarListClock()");
+    expect(source("src/components/Sidebar.tsx")).toContain("{formatTime(last.at)}");
   });
 
   it("keeps the Skill Burger card off until Settings turns it on", () => {
@@ -139,7 +194,9 @@ describe("suyuan-v2 thin-fork wiring", () => {
     expect(panel).not.toContain("finishedThreads(");
     // What stays of upstream's panel: the pinned conversations, the active ones, and the Done line at the foot.
     for (const kept of ["<PinnedThreads ", "<InboxActive ", "<section data-inbox-done ", "openInChat(row);"]) expect(panel).toContain(kept);
-    expect(source("src/suyuan/use-suyuan.ts")).toContain("useInboxCatchUp(inboxCatchUpKey(state), state.hydrated === true);");
+    const hook = source("src/suyuan/use-suyuan.ts");
+    expect(hook).toContain("const loaded = state.hydrated === true;");
+    expect(hook).toContain("useInboxCatchUp(inboxCatchUpKey(state), loaded);");
     const place = source("server/host/place-inbox.ts");
     expect(place).toContain("readsWith?(lineThread: string, opened: string): boolean;");
     expect(place).toContain("if (!line.seen && (line.threadId === threadId || deps.readsWith?.(line.threadId, threadId)) && lineFor(auth, line))");
@@ -172,7 +229,7 @@ describe("suyuan-v2 thin-fork wiring", () => {
 
   it("loads every CSS overlay from the one frontend hook", () => {
     const hook = source("src/suyuan/use-suyuan.ts");
-    for (const sheet of ["chat-wrap", "keyboard-fit", "no-zoom", "phone-code", "phone-tables", "skill-burger", "steady-tables", "wide-replies"]) {
+    for (const sheet of ["chat-wrap", "keyboard-fit", "no-zoom", "phone-code", "phone-tables", "quiet-rows", "quiet-status", "skill-burger", "steady-tables", "wide-replies"]) {
       expect(hook).toContain(`import "./${sheet}.css";`);
     }
     // chat-wrap.css undoes this upstream rule; if upstream drops or rewords it, the overlay needs another look.
@@ -202,5 +259,14 @@ describe("suyuan-v2 thin-fork wiring", () => {
     expect(source("src/components/CodeBlock.tsx")).toContain("chat-code-block");
     expect(source("src/components/CodeBlock.tsx")).toContain("data-code-plate");
     expect(source("src/components/MessageActions.tsx")).toContain('data-testid="message-actions"');
+    // phone-tiles.css and tile-menu.ts find the tiles, quiet-rows.css the model mark on the list's rows.
+    expect(source("src/components/SidebarTiles.tsx")).toContain("data-sidebar-tile");
+    expect(source("src/components/Sidebar.tsx")).toContain("data-sidebar-section-id");
+    expect(source("src/components/BotModelBadge.tsx")).toContain('data-testid="model-badge"');
+    // quiet-status.css draws Simple mode's working line as three dots: it finds the line by these.
+    const presence = source("src/components/TurnPresence.tsx");
+    expect(presence).toContain('<span className="turn-phrase turn-phrase-quiet relative grid min-w-0" title={hover}');
+    expect(presence).toContain("data-turn-status");
+    expect(presence).toContain('className={cn("turn-now-chevron", open && "rotate-180")}');
   });
 });

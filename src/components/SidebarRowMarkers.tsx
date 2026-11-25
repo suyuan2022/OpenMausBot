@@ -1,5 +1,6 @@
 import { cn } from "@/lib/cn";
 import { t } from "@/lib/i18n";
+import { busyDotShown, unreadTone } from "@/suyuan/quiet-dots";
 
 /** The colour behind a Simple row, which the status dot on its avatar is ring-cut against. */
 export function rowSurface(selected: boolean): string {
@@ -22,7 +23,7 @@ const ACTIVITY = {
 
 /** Working, waiting on a teammate or queued: a small dot on the avatar's corner. */
 export function AvatarActivityDot({ activity }: { activity: RowActivity | null }) {
-  if (!activity) return null;
+  if (!activity || ((activity === "working" || activity === "teammate") && !busyDotShown())) return null;
   const { tone, label, testId } = ACTIVITY[activity];
   return <span aria-hidden="true" data-testid={testId} title={label()} className={cn("absolute bottom-0.5 right-0.5 size-2 rounded-full ring-2 ring-[var(--row)]", tone)} />;
 }
@@ -39,7 +40,7 @@ export function AvatarCornerDot({ activity, large }: { activity: Exclude<RowActi
  * or focus. A touch screen always shows the ⋯, so there the dot sits just before it, at the end of the name line. */
 export function RowDot({ waiting = false }: { waiting?: boolean }) {
   const label = waiting ? t("sidebar.preview.waiting") : t("task.unread");
-  const tone = cn("size-2 shrink-0 rounded-full", waiting ? "bg-warning" : "bg-accent");
+  const tone = cn("size-2 shrink-0 rounded-full", waiting ? "bg-warning" : unreadTone());
   return (
     <>
       <span aria-hidden="true" data-row-dot="" className="pointer-events-none absolute right-[3px] top-1.5 flex size-6 items-center justify-center transition-opacity group-hover:opacity-0 group-focus-within:opacity-0 touch:opacity-0 max-md:hidden">

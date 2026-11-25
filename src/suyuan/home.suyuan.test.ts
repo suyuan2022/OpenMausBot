@@ -2,10 +2,12 @@
 // home and anything waiting on the person, and the app offers no new/switch thread controls in Simple mode.
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
 
+import { placeOf, subjectOf } from "@/components/inbox/inbox-view";
 import { botShowsUnread, botUnreadCount } from "@/lib/bot-unread";
+import { t } from "@/lib/i18n";
 import { markedThread } from "@/state/thread-navigation";
 import type { Bot } from "@/state/store";
-import { foreground, homeOf, listedThreads, noteThreadsShown, oneConversation, threadsShownNow } from "./home";
+import { foreground, homeOf, listedThreads, noteHomes, noteThreadsShown, oneConversation, threadsShownNow } from "./home";
 
 type Thread = NonNullable<Bot["tasks"]>[number];
 const home: Thread = { threadId: "home", title: "Home", createdAt: 1 };
@@ -92,5 +94,23 @@ describe("one conversation per bot and room", () => {
     expect(ids(listedThreads(undefined, bot.tasks!))).toEqual(["home", "work", "reply"]);
     noteThreadsShown(true);
     expect(ids(listedThreads(bot, bot.tasks!))).toEqual(["home", "work", "reply"]);
+  });
+});
+
+describe("an inbox line from a bot's one conversation", () => {
+  const bots = [lizhi([])];
+  const row = (kind: "message" | "result", threadId: string) => ({ kind, origin: { botId: "lizhi", threadId, title: "你看一下今天的时间应该要去挂号了吧" } }) as never;
+
+  it("does not name the conversation it came from, which is the bot's only one", () => {
+    noteHomes(bots);
+    expect(placeOf(row("result", "home"))).toBeNull();
+    expect(subjectOf(row("message", "home"))).toBe(t("inbox.subject.message"));
+  });
+
+  it("still names a background run, and every conversation with the thread list shown", () => {
+    noteHomes(bots);
+    expect(placeOf(row("result", "run"))).toBe(t("inbox.in", { title: "你看一下今天的时间应该要去挂号了吧" }));
+    noteThreadsShown(true);
+    expect(placeOf(row("result", "home"))).not.toBeNull();
   });
 });

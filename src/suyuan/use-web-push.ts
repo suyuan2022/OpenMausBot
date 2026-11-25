@@ -1,10 +1,11 @@
 // suyuan fork: what Web Push needs from the open app. Its worker is registered, a tapped notification opens its chat
 // (a running page gets a message from the worker, a fresh one ?pushBot=&pushThread=), and while push is on here the
 // server hears which conversation this device shows, so a reply in it doesn't buzz the phone already open on it.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useFinishedNotifications, useNotificationSounds } from "@/lib/notification-preferences";
 import { useShowThreads } from "@/lib/thread-preferences";
 import { openThread, type Action, type AppState, type ThreadTarget } from "@/state/store";
+import { pushTarget } from "./push-resume";
 import { visibleNotificationThread } from "@/state/thread-navigation";
 import { PUSH_CHANGED, pushWorker, reportViewing, resendSubscription, webPushSupported, workingSubscription } from "./web-push";
 
@@ -12,14 +13,14 @@ import { PUSH_CHANGED, pushWorker, reportViewing, resendSubscription, webPushSup
 const HEARTBEAT_MS = 10_000;
 
 function targetInUrl(): ThreadTarget | null {
+  const target = pushTarget(location.search);
+  if (!target) return null;
   const params = new URLSearchParams(location.search);
-  const botId = params.get("pushBot"), threadId = params.get("pushThread");
-  if (!botId || !threadId) return null;
   params.delete("pushBot");
   params.delete("pushThread");
   const rest = params.toString();
   history.replaceState(history.state, "", `${location.pathname}${rest ? `?${rest}` : ""}${location.hash}`);
-  return { botId, threadId };
+  return target;
 }
 
 const inFront = () => document.visibilityState === "visible" && document.hasFocus();
@@ -84,7 +85,9 @@ export function useWebPush(state: AppState, dispatch: (action: Action) => void):
     if (endpointRef.current) void resendSubscription().catch(() => {});
   }, [finished, sounds]);
 
-  useEffect(() => {
+  // Before the paint: a fresh page opens on the notification's bot (./push-resume.ts), and a thread or room of it replaces
+  // that chat before anyone sees it.
+  useLayoutEffect(() => {
     if (!target || !state.hydrated) return;
     setTarget(null);
     openThread(dispatch, target, state, showThreads);

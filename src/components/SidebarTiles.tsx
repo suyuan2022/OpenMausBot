@@ -8,6 +8,7 @@ import { stateForBot } from "@/lib/mascot";
 import { useShowThreads } from "@/lib/thread-preferences";
 import { api, openBotRow, useStore, type Bot } from "@/state/store";
 import { useChiefStepOpen } from "@/lib/default-bot";
+import { busyDotShown, unreadTone } from "@/suyuan/quiet-dots";
 
 import { BotAvatar } from "./Avatar"; import { useMotionBeat } from "./mascot-beat";
 import { botTooltip } from "./BotModelBadge";
@@ -100,11 +101,11 @@ export const SidebarBotTile = memo(function SidebarBotTile({ primary = false, dr
           </span>
         ) : waiting ? (
           <span data-testid="waiting-dot" aria-hidden="true" className={cn("absolute -right-1 -top-1 flex size-4 items-center justify-center rounded-full bg-warning text-[11px] font-black leading-none text-panel", RING)}>!</span>
-        ) : working ? dot("working-dot", "bg-success")
+        ) : working ? busyDotShown() ? dot("working-dot", "bg-success") : unread ? dot("unread-dot", unreadTone()) : null
           : failed ? dot("failed-dot", "bg-danger")
-          : teammateWait ? dot("teammate-wait-dot", "bg-accent")
+          : teammateWait ? busyDotShown() ? dot("teammate-wait-dot", "bg-accent") : unread ? dot("unread-dot", unreadTone()) : null
           : queued ? dot("queued-dot", "bg-ink-tertiary")
-          : unread ? dot("unread-dot", "bg-accent")
+          : unread ? dot("unread-dot", unreadTone())
           : null}
         {deleting && (
           <span className="absolute inset-0 flex items-center justify-center rounded-full bg-panel/60 text-ink-secondary">

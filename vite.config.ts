@@ -7,6 +7,7 @@ import tailwindcss from "@tailwindcss/vite";
 import { DurationSequencer } from "./scripts/testing/duration-sequencer.ts";
 import { hostE2eOnly, portableE2eFiles } from "./scripts/testing/host-e2e.ts";
 import { hostTimeout } from "./server/testing/host-timeout.ts";
+import { sidebarListClock } from "./scripts/suyuan/vite-list-clock.ts";
 
 // The About dialog's version, inlined at build time: the preload bridge is
 // absent in dev.
@@ -45,7 +46,7 @@ const include = [
 ];
 
 export default defineConfig({
-  plugins: [react(), tailwindcss(), railPage()],
+  plugins: [react(), tailwindcss(), railPage(), sidebarListClock()],
   build: {
     rollupOptions: { input: { index: page("./index.html"), rail: page("./rail.html") } },
   },

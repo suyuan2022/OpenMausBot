@@ -22,6 +22,7 @@ import { signInGateShown } from "./lib/sign-in-gate";
 import { startDesktopLaunchMarks } from "./lib/launch-marks";
 import { serverFetch } from "./lib/relay-server";
 import "./styles.css";
+import "@/suyuan/boot"; // suyuan fork: reopen on the last screen, or the tapped notification's chat, while the bots load
 import "@/suyuan/theme-color"; // suyuan fork: an installed app's title bar takes the skin's color, not near-black
 
 // Before first paint; settleInterfaceMode must run before applySkin writes omb-skin.

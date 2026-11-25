@@ -45,6 +45,22 @@ export function foreground<B extends Owner>(bot: B): B {
   return kept.length === bot.tasks.length ? bot : { ...bot, tasks: kept };
 }
 
+// The bots' homes, as the app shell last saw them (useSuyuan): an inbox line names the conversation it came from, which
+// says nothing when that is the bot's one conversation.
+let homes: ReadonlySet<string> = new Set();
+let homesFrom: readonly Owner[] | null = null;
+
+export function noteHomes(bots: readonly Owner[]): void {
+  if (bots === homesFrom) return;
+  homesFrom = bots;
+  homes = new Set(bots.flatMap((bot) => (bot.mainThreadId ? [bot.mainThreadId] : [])));
+}
+
+/** Whether a thread is a bot's one conversation while each bot has one; false with the thread list shown. */
+export function isHomeThread(threadId: string | undefined): boolean {
+  return !threadsShown && threadId !== undefined && homes.has(threadId);
+}
+
 /** The threads a picker lists for a bot: with the thread list hidden, the home alone. */
 export function listedThreads<T extends Thread>(bot: Owner | undefined, tasks: T[]): T[] {
   const home = bot ? homeOf(bot) : undefined;

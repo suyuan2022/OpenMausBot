@@ -7,6 +7,7 @@ import { cn } from "@/lib/cn";
 import { useHeldMenuMotion } from "./MenuMotion";
 import { t } from "@/lib/i18n";
 import { copyText } from "@/lib/copy-text";
+import { announceRename } from "@/suyuan/hero-pins";
 import { allThreadRows, BotDeleteMenuItem, useDeleteAllThreads } from "./BotMenuDelete";
 import { DemoteDefaultBotItem, HideDefaultBotItem } from "./DefaultBotControls";
 import { navigateThreadMenu } from "./BotProjects";
@@ -260,7 +261,7 @@ export function BotContextMenu({
       </button>
     );
     const moveToSection = mayMove ? flyoutButton("move", moveRef, <FolderPlus size={16} className="text-ink-secondary" />, t("sidebar.bot.moveToSection")) : null;
-    const rename = onRename && (team ? mayRename(bot, team) : !state.config?.team) && item(<SquarePen size={16} className="text-ink-secondary" />, t("sidebar.bot.rename"), () => onRename(bot.id));
+    const rename = onRename && (team ? mayRename(bot, team) : !state.config?.team) && item(<SquarePen size={16} className="text-ink-secondary" />, t("sidebar.bot.rename"), () => { onRename(bot.id); announceRename(bot.id); });
     const editProfile = item(<Pencil size={16} className="text-ink-secondary" />, t("sidebar.bot.simple.editProfile"), () => {
       openForSettings();
       if (!state.settingsOpen) dispatch({ type: "toggleSettings", open: true });

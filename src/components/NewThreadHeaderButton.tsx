@@ -1,9 +1,11 @@
 import { Plus } from "lucide-react";
 import { t } from "@/lib/i18n";
 import { useStoreDispatch } from "@/state/store-select";
+import { oneConversation } from "@/suyuan/home";
 
 export function NewThreadHeaderButton({ botId }: { botId: string }) {
   const dispatch = useStoreDispatch();
+  if (oneConversation()) return null; // suyuan fork: one conversation per bot offers no way to start another (src/suyuan/home.ts)
   return (
     <button
       type="button"

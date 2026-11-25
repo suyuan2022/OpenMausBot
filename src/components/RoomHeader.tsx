@@ -16,6 +16,7 @@ import type { RoomQueueEntry } from "../../shared/wire";
 import { BotAvatar } from "./Avatar";
 import { RoomContextBadge } from "./ContextWarning";
 import { ConversationTurnLimit } from "./ConversationTurnLimit";
+import { ELEVATED_FLOAT, ELEVATED_HOVER } from "./elevated"; // suyuan fork
 import { useCaptionChrome } from "./DesktopCapabilities";
 import { ExportTranscriptMenu } from "./ExportTranscriptMenu";
 import { RoomHeaderCallButton } from "./GroupCallView";
@@ -166,9 +167,12 @@ export function RoomHeader({
   if (simple) {
     const more = members.length - SIMPLE_FACES;
     return (
-      <div {...headerDragProps} className="@container/roomhead px-5 py-3 pl-11 md:pl-5">
-        <div data-roomhead-row className="flex items-center justify-between gap-3">
-          <div data-roomhead-identity className="flex min-w-0 flex-col items-start" style={headerNoDragStyle}>
+      <div {...headerDragProps} className="@container/roomhead px-5 py-2.5 pl-11 md:pl-5">
+        {/* suyuan fork: the name floats as a pill in the middle of the screen, as in a bot's chat; two equal side columns
+            centre it. */}
+        <div data-roomhead-row className="grid grid-cols-[minmax(max-content,1fr)_minmax(0,auto)_minmax(max-content,1fr)] items-center gap-3">
+          <span aria-hidden="true" />
+          <div data-roomhead-identity className="flex min-w-0 justify-center" style={headerNoDragStyle}>
             <button
               type="button"
               data-room-name
@@ -177,14 +181,15 @@ export function RoomHeader({
               aria-label={t("room.panel.openAria", { name: group.name })}
               aria-haspopup="dialog"
               style={headerNoDragStyle}
-              className="group -mx-2 flex min-w-0 max-w-[calc(100%+1rem)] items-center gap-1 rounded-lg px-2 py-0.5 hover:bg-raised/60 focus-visible:bg-raised/60"
+              className={cn("group flex min-w-0 max-w-full items-center gap-1 rounded-full px-[13.5px] py-[9.5px]", ELEVATED_FLOAT, ELEVATED_HOVER)} // suyuan fork: the floating pill of a bot's chat
             >
-              <span className="truncate text-[15px] font-semibold text-ink">{group.name}</span>
+              <span className="truncate text-[14px] font-medium leading-5 text-ink">{group.name}</span>
+              {group.description && <span aria-hidden="true" className="shrink-0 text-ink-tertiary">·</span>}
+              {group.description && <span className="min-w-0 max-w-[180px] truncate text-[14px] font-medium leading-5 text-ink-secondary">{group.description}</span>}
               <ChevronRight size={14} aria-hidden="true" className="-ml-1 w-0 shrink-0 text-ink-secondary opacity-0 transition-[width,margin,opacity] duration-150 group-hover:ml-0 group-hover:w-3.5 group-hover:opacity-100 group-focus-visible:ml-0 group-focus-visible:w-3.5 group-focus-visible:opacity-100" />
             </button>
-            {group.description && <p className="max-w-full truncate text-[12px] leading-4 text-ink-secondary">{group.description}</p>}
           </div>
-          <div data-roomhead-controls className="flex shrink-0 items-center gap-1.5">
+          <div data-roomhead-controls className="flex shrink-0 items-center gap-1.5 justify-self-end">
             <ThreadPresenceFaces threadId={group.threadId} />
             {pinned}
             <button
@@ -195,7 +200,7 @@ export function RoomHeader({
               title={t("room.members.manage")}
               aria-label={membersLabel}
               style={headerNoDragStyle}
-              className="flex items-center rounded-full py-0.5 pl-1 pr-1.5 hover:bg-raised/60"
+              className={cn("flex items-center rounded-full p-[7.5px]", ELEVATED_FLOAT, ELEVATED_HOVER)} // suyuan fork
             >
               <span className="flex items-center -space-x-1.5">
                 {faces.slice(0, SIMPLE_FACES)}
