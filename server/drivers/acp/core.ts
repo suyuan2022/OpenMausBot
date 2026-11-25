@@ -26,7 +26,7 @@ import { applyOneShotEnv, runAcpOneShot } from "./background-text.ts"; import ty
 import { acpCapabilities } from "./capabilities.ts"; import { readAcpMediaLinks } from "./media-links.ts";
 import { acpNativeLogMessage } from "./tool-log.ts";
 import { stripLeakedSystemHarnessMessages } from "../../../shared/system-message-guard.ts";
-import { ANTIGRAVITY_UNAVAILABLE, antigravityReplyDelta, checkedPromptOutcome, retryAuthenticate, retryErrorReply, TransientAcpAuthError } from "../../suyuan/acp-resilience.ts";
+import { ANTIGRAVITY_UNAVAILABLE, antigravityReplyDelta, antigravityText, checkedPromptOutcome, retryAuthenticate, retryErrorReply, TransientAcpAuthError } from "../../suyuan/acp-resilience.ts";
 import { visibleThinkingLevels, withoutArgonHigh } from "../../suyuan/argon-thinking.ts";
 import { formatQuietLimit, lastSeenPhrase, LIMIT_WORDS, promptIdleTimeoutMs, type LogSignal } from "./quiet-status.ts"; import { startAcpQuietWatch } from "./quiet-watch.ts"; import { AppliedConfig } from "./applied-config.ts"; import { modelRefused, roomForReadBeside, startupRefresh } from "./startup-refresh.ts"; import { stderrFailureOf, watchStderrFailure, type StderrFailure } from "./harness-failure.ts"; import { timed, turnStartClock, type TurnStartClock } from "../../perf/turn-starts.ts";
 import { acpMissingSession } from "./rpc-error.ts";
@@ -1018,7 +1018,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
         const flushAssistantText = () => {
           const raw = state.text;
           state.text = "";
-          const text = stripLeakedSystemHarnessMessages(raw);
+          const text = antigravityText(DRIVER_KIND, stripLeakedSystemHarnessMessages(raw));
           if (!text.trim()) return;
           trackAssistantWords(state);
           emit({ ...base(threadId, turnId), type: "item.completed", itemType: "assistant_text", text });
@@ -1349,7 +1349,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
               if (tokens) emit({ ...base(threadId, turnId), type: "thread.token-usage.updated", ...tokens });
             }
             const final = answers.at(-1);
-            const reason = final?.stopReason, reported = await checkedPromptOutcome(DRIVER_KIND, current, final, promptOutcome); if (reported) throw reported;
+            const reason = final?.stopReason, reported = await checkedPromptOutcome(DRIVER_KIND, current, final, promptOutcome, support.displayName); if (reported) throw reported;
             if (reason === "end_turn") settle(threadId, session, true, null);
             else if (reason === "cancelled" || state.stopped) settle(threadId, session, true, "cancelled");
             else {
@@ -1428,7 +1428,7 @@ export function createAcpDriver(support: AcpSupport): ProviderDriver<AcpConfig> 
               } else if (staleProcess && !state.promptSent && session.child.exitCode === null && !session.closing) {
                 closeSession(threadId, "stale-models");
               }
-              const rpcFailure = e instanceof TransientAcpAuthError ? ANTIGRAVITY_UNAVAILABLE : "rpc_error";
+              const rpcFailure = e instanceof TransientAcpAuthError || (e as any)?.antigravityUnavailable === true ? ANTIGRAVITY_UNAVAILABLE : "rpc_error";
               settle(threadId, session, state.stopped, state.stopped ? "cancelled" : needsAuth ? "auth_required" : (e as any)?.acpUsageLimit === true ? "quota" : rpcFailure);
             }
           }

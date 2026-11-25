@@ -75,10 +75,26 @@ describe("a notification's fresh page", () => {
 
   it("has the start's return to a bot's main conversation stand aside, only on a page a notification opened", async () => {
     vi.resetModules();
+    vi.stubGlobal("PushManager", class {});
+    vi.stubGlobal("Notification", class {});
+    Object.defineProperty(navigator, "serviceWorker", { configurable: true, value: {} });
+    try {
+      const fresh = await import("./push-resume");
+      fresh.resumeOnPushTarget("");
+      expect(fresh.openingOnPush()).toBe(false);
+      fresh.resumeOnPushTarget("?pushBot=ns&pushThread=ns-run");
+      expect(fresh.openingOnPush()).toBe(true);
+    } finally {
+      vi.unstubAllGlobals();
+      Reflect.deleteProperty(navigator, "serviceWorker");
+    }
+  });
+
+  it("leaves the start's return alone where push does not run, so nothing reads the address", async () => {
+    vi.resetModules();
     const fresh = await import("./push-resume");
-    fresh.resumeOnPushTarget("");
-    expect(fresh.openingOnPush()).toBe(false);
     fresh.resumeOnPushTarget("?pushBot=ns&pushThread=ns-run");
-    expect(fresh.openingOnPush()).toBe(true);
+    expect(fresh.webPushSupported()).toBe(false);
+    expect(fresh.openingOnPush()).toBe(false);
   });
 });

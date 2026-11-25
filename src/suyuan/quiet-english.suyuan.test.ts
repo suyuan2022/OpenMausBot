@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from "vitest";
 
 import { noteThreadsShown } from "./home";
-import { allEnglish, quietChat, withoutEnglishSteps } from "./quiet-english";
+import { allEnglish, endsShown, noteUnreadLine, quietChat, quietLive, withoutEnglishSteps } from "./quiet-english";
 
 const person = (id: string, text: string) => ({ id, role: "user", kind: "text", text });
 const bot = (id: string, text: string) => ({ id, role: "bot", kind: "text", text });
@@ -67,7 +67,7 @@ describe("withoutEnglishSteps", () => {
       bot("f", "Checking."),
       bot("g", "发你了。"),
     ];
-    expect(ids(withoutEnglishSteps(turn, "b"))).toEqual(["p", "a", "b", "c", "d", "e", "g"]);
+    expect(ids(withoutEnglishSteps(turn, ["b"]))).toEqual(["p", "a", "b", "c", "d", "e", "g"]);
   });
 
   it("in a room, a bot's line goes only for that bot's later line", () => {
@@ -79,6 +79,25 @@ describe("withoutEnglishSteps", () => {
   it("gives back the same array when nothing is left out", () => {
     const turn = [person("p", "hi"), bot("a", "你好")];
     expect(withoutEnglishSteps(turn)).toBe(turn);
+  });
+
+  it("keeps the last line of a turn that ended unmarked, the server stopped mid-turn, once something came after it", () => {
+    const cut = [person("p", "查一下"), inTurn("a", "Reading the log.", "t1"), inTurn("b", "Found it: the disk is full.", "t1")];
+    expect(ids(withoutEnglishSteps(cut))).toEqual(["p"]);
+    const restarted = [...cut, { id: "r", role: "bot", kind: "activity" }];
+    expect(ids(withoutEnglishSteps(restarted))).toEqual(["p", "b", "r"]);
+  });
+
+  it("keeps a line that carries a card or a report, and a table without outer pipes", () => {
+    const turn = [
+      person("p", "看看"),
+      { ...bot("a", "Inbox item."), inbox: { id: "i1" } },
+      { ...bot("b", "Daily report."), automation: { routineId: "r1" } },
+      bot("c", "Name | Result\n--- | ---\nBuild | Pass"),
+      bot("d", "Checking."),
+      bot("e", "好了。"),
+    ];
+    expect(ids(withoutEnglishSteps(turn))).toEqual(["p", "a", "b", "c", "e"]);
   });
 });
 
@@ -93,5 +112,27 @@ describe("quietChat", () => {
 
   it("is upstream's chat while the thread list shows", () => {
     expect(quietChat(turn)).toBe(turn);
+  });
+
+  it("keeps the first unread line, so the new-messages line has a row to sit above", () => {
+    noteThreadsShown(false);
+    noteUnreadLine("a");
+    try {
+      expect(ids(quietChat(turn))).toEqual(["p", "a", "b"]);
+    } finally {
+      noteUnreadLine(null);
+    }
+  });
+
+  it("holds back a running turn's English words as they arrive, and counts a window as at the end past left-out lines", () => {
+    noteThreadsShown(false);
+    expect(quietLive("Checking the files.")).toBe(true);
+    expect(quietLive("正在看文件。")).toBe(false);
+    const running = [person("p", "查一下"), inTurn("a", "Reading the log now.", "t1")];
+    expect(endsShown([running[0]!], running)).toBe(true);
+    expect(endsShown([running[0]!], [...running, bot("z", "另一句")])).toBe(false);
+    noteThreadsShown(true);
+    expect(quietLive("Checking the files.")).toBe(false);
+    expect(endsShown([running[0]!], running)).toBe(false);
   });
 });

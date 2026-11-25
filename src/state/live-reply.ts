@@ -8,6 +8,7 @@ import type { RuntimeEvent } from "../../shared/runtime-events";
 import { isClientCancellation } from "../../shared/client-cancel";
 import { redactSecretsInText } from "../../shared/redact";
 import { isPureLeakedSystemHarnessMessage } from "../../shared/system-message-guard";
+import { endsShown, quietLive } from "@/suyuan/quiet-english"; // suyuan fork
 import type { Message } from "@/state/store";
 
 export interface LiveReplyItem {
@@ -283,7 +284,7 @@ export function liveReplyRows(items: readonly LiveReplyItem[], transcript: reado
  * so one saved outside the window is not drawn again; and live rows follow the newest message, so a window that stops
  * short of it (scrolled back, or opened at a found or pinned message) draws none. */
 function windowWith(drawn: { rows: Message[]; settled: string[] }, windowed: Message[], transcript: readonly Message[]): { rows: Message[]; settled: string[] } {
-  const atEnd = windowed.at(-1)?.id === transcript.at(-1)?.id;
+  const atEnd = windowed.at(-1)?.id === transcript.at(-1)?.id || endsShown(windowed, transcript); // suyuan fork: past lines Simple mode leaves out
   return { rows: atEnd && drawn.rows.length ? [...windowed, ...drawn.rows] : windowed, settled: drawn.settled };
 }
 
@@ -310,7 +311,7 @@ const sameShape = (a: LiveRowShape, b: LiveRowShape) =>
 
 function shapeOf(item: LiveReplyItem): LiveRowShape {
   const text = shownText(item);
-  return { key: item.key, itemId: item.itemId, savedAs: item.savedAs, turnId: item.turnId, botId: item.botId, at: item.at, shown: text.trim() !== "", harness: isPureLeakedSystemHarnessMessage(text) ? text : "" };
+  return { key: item.key, itemId: item.itemId, savedAs: item.savedAs, turnId: item.turnId, botId: item.botId, at: item.at, shown: text.trim() !== "" && !quietLive(text), harness: isPureLeakedSystemHarnessMessage(text) ? text : "" };
 }
 
 /** The thread's live rows as shapes, the same array for as long as no shape changes: a new word keeps it. */

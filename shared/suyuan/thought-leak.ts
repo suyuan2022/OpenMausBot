@@ -2,10 +2,10 @@
 // as reply text, so nothing on the wire tells the two apart (seen 2026-11-10 and 11-15 on gemini-4-argon at High, which
 // no longer runs: server/suyuan/argon-thinking.ts). The cut goes by the shape, not by a mark the model makes up as it goes
 // ("💡 Thought", "[-thought-]", a lone "</thought>"): English sentences before the reply turns to Chinese, or a short
-// "thought"/"thinking" label at the very start, are thinking. A reply only of thinking becomes empty and is not shown.
-// shared/system-message-guard.ts calls it, so the server stores replies without it and the chat draws older ones
-// without it; as in the v1 fork, that guard draws every bot's replies, and an English sentence or more opening a Chinese
-// reply goes with them.
+// "thought"/"thinking" label at the very start, are thinking. A reply only of thinking becomes empty and is not stored.
+// Only Antigravity's replies go through it, as the server stores them (server/suyuan/acp-resilience.ts, antigravityText):
+// v1 ran it on every bot's replies in the chat, where a Claude or Codex reply quoting an English error before its
+// Chinese lost the quote.
 const CLOSING = "</thought>";
 const HAN = /[㐀-䶿一-鿿]/;
 const LABEL = /^\s*(?:[^\p{L}\p{N}\s]{1,4}\s*)?[^\s㐀-䶿一-鿿]{0,16}?(?:thoughts?|thinking)[^\p{L}\p{N}\s]{0,3}(?::[ \t]*|[ \t]*\r?\n|(?=[㐀-䶿一-鿿]))/iu;
@@ -88,7 +88,16 @@ export function stripThoughtLeak(text: string): string {
   return at < 0 ? (label ? "" : reply) : rest.slice(at);
 }
 
-/** Whether a reply holds thinking by the same rules: the chat hides a stored reply that was only thinking. */
+/** Whether a reply holds thinking by the same rules. */
 export function hasThoughtMark(text: string): boolean {
   return stripThoughtLeak(text) !== text;
+}
+
+/** Whether a reply still arriving may open with thinking, so none of it shows yet: nothing Chinese so far, a thinking
+ * label or tag, or English sentences before the first Chinese character. A Chinese reply that opens with a number, a
+ * name or a code block shows as it comes. Settled once the first Chinese character is in, so what shows keeps showing. */
+export function mayOpenWithThinking(text: string): boolean {
+  if (LABEL.test(text) || /<\/?thought>/.test(words(text))) return true;
+  const first = words(text).search(HAN);
+  return first < 0 || englishProse(text.slice(0, first));
 }

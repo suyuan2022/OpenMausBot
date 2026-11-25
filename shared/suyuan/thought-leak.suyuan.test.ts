@@ -2,7 +2,7 @@
 // The fixtures are replies a bot on gemini-4-argon wrote on 2026-11-10 and 2026-11-15, as stored then.
 import { describe, expect, it } from "vitest";
 import { isPureLeakedSystemHarnessMessage, stripLeakedSystemHarnessMessages } from "../system-message-guard.ts";
-import { stripThoughtLeak } from "./thought-leak.ts";
+import { mayOpenWithThinking, stripThoughtLeak } from "./thought-leak.ts";
 
 const REACTION = "要是能把公众号后台的单篇转化、投流加热和流量主数据也像 X 那样一键拉下来，以后复盘就省事太多了 👀 我先看一眼 `x-analytics` 的结构和控制你电脑 Chrome 的方式，再去探探公众号后台能抓哪些数据。";
 // The thinking quotes a first draft of the reply in Chinese, then the reply follows its last full stop.
@@ -26,7 +26,6 @@ describe("stripThoughtLeak", () => {
       "`ps` 里看到机器上其实已经挂着 2 个 `claude` 进程，每个连带它的辅助 node 进程大约占 650 MB 到 750 MB 内存；我再看一眼 Gemini（`antigravity`）进程占多少。",
     ]) {
       expect(stripThoughtLeak(`🫧thought\n${reply}`)).toBe(reply);
-      expect(isPureLeakedSystemHarnessMessage(`🫧thought\n${reply}`)).toBe(false);
     }
     expect(stripThoughtLeak("🧠 Thought\nLet's check `ps` first.")).toBe("");
   });
@@ -83,16 +82,23 @@ describe("stripThoughtLeak", () => {
   });
 });
 
-describe("the guard every reply goes through", () => {
-  it("cuts the thinking: the server stores replies and the chat draws them through it", () => {
-    expect(stripLeakedSystemHarnessMessages(LISTED)).toBe(FOUND);
-    expect(stripLeakedSystemHarnessMessages(`<SYSTEM_MESSAGE>task done</SYSTEM_MESSAGE>${DRAFTED}`)).toBe(REACTION);
+describe("a reply still arriving", () => {
+  it("waits while it may open with thinking: nothing Chinese yet, a label, or English sentences before the Chinese", () => {
+    expect(mayOpenWithThinking("Let's check where")).toBe(true);
+    expect(mayOpenWithThinking("💡 Thought\n")).toBe(true);
+    expect(mayOpenWithThinking(LISTED.slice(0, LISTED.indexOf("看到你") + 3))).toBe(true);
+    expect(mayOpenWithThinking("```\npnpm build\n```")).toBe(true);
   });
 
-  it("hides a stored reply that was only thinking, and no other", () => {
-    expect(isPureLeakedSystemHarnessMessage("💡 Thought\n Forgot `FULL=1`! Let's run with `FULL=1`.")).toBe(true);
-    expect(isPureLeakedSystemHarnessMessage(LISTED)).toBe(false);
-    expect(isPureLeakedSystemHarnessMessage("Thoughtful question.")).toBe(false);
+  it("shows a Chinese reply as it comes, also one opening with a number, a name or a code block", () => {
+    for (const text of ["看到你", "401 表示登录失效", "OpenMausBot 已更新", "```\npnpm build\n```\n这样就能打包"]) expect(mayOpenWithThinking(text), text).toBe(false);
   });
+});
 
+describe("the chat's own guard", () => {
+  it("leaves the thinking cut to the server's Antigravity replies: other engines' English quotes stay", () => {
+    const quoted = "The file cannot be opened because it is in use.\n这个文件正被占用，关掉别的程序再试。";
+    expect(stripLeakedSystemHarnessMessages(quoted)).toBe(quoted);
+    expect(isPureLeakedSystemHarnessMessage("Afterthought:\nPlease keep the receipt.")).toBe(false);
+  });
 });

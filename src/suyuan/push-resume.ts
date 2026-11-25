@@ -23,8 +23,14 @@ export function pushTarget(search: string): PushTarget | null {
 export function resumeOnPushTarget(search: string): void {
   const target = pushTarget(search);
   if (!target) return;
-  openedOnPush = true;
+  // Where push does not run, ./use-web-push.ts never reads the address, so nothing else decides where the app opens.
+  openedOnPush = webPushSupported();
   rememberConversation(target.botId);
+}
+
+/** Whether this page can take push notifications at all (./web-push.ts and ./use-web-push.ts ask the same). */
+export function webPushSupported(): boolean {
+  return typeof window !== "undefined" && !window.ogb && "serviceWorker" in navigator && "PushManager" in window && typeof Notification !== "undefined";
 }
 
 /** The page opened from a notification, which decides where the app opens (./use-web-push.ts). The start's own return to

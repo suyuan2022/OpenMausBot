@@ -4,7 +4,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { useFinishedNotifications, useNotificationSounds } from "@/lib/notification-preferences";
 import { useShowThreads } from "@/lib/thread-preferences";
-import { openThread, type Action, type AppState, type ThreadTarget } from "@/state/store";
+import { botOpensTo, openBot, openThread, type Action, type AppState, type ThreadTarget } from "@/state/store";
 import { pushTarget } from "./push-resume";
 import { visibleNotificationThread } from "@/state/thread-navigation";
 import { PUSH_CHANGED, pushWorker, reportViewing, resendSubscription, webPushSupported, workingSubscription } from "./web-push";
@@ -90,7 +90,11 @@ export function useWebPush(state: AppState, dispatch: (action: Action) => void):
   useLayoutEffect(() => {
     if (!target || !state.hydrated) return;
     setTarget(null);
-    openThread(dispatch, target, state, showThreads);
+    if (openThread(dispatch, target, state, showThreads) || state.bots.some((bot) => bot.id === target.botId)) return;
+    // The notification's thread and bot are both gone: the start's own return to the main conversation, which stood
+    // aside for it (./push-resume.ts), happens here.
+    const bot = state.bots.find((candidate) => candidate.id === state.selectedId);
+    if (bot && state.activeView === "chat" && botOpensTo(bot, showThreads) !== bot.threadId) openBot(dispatch, bot, showThreads);
   }, [target, state, showThreads, dispatch]);
 
   const viewing = endpoint && present ? visibleNotificationThread(state) : null;

@@ -1,13 +1,21 @@
 // suyuan fork: distinguish transient network/SSL/timeout errors during ACP authenticate from real sign-out,
 // and catch Antigravity's raw "Agent execution error: ... 502 Bad Gateway" replies that arrive with end_turn.
+// Gemini's thinking written into an Antigravity reply (shared/suyuan/thought-leak.ts) is cut here too, on that engine
+// only: every other engine's replies keep an English sentence that opens them.
 import { classifyError } from "../drivers/retry.ts";
 import type { AcpSession, AcpTurn } from "../drivers/acp/turn-state.ts";
+import { AcpReportedFailure } from "../drivers/acp/failure-words.ts";
+import { mayOpenWithThinking, stripThoughtLeak } from "../../shared/suyuan/thought-leak.ts";
 
 const TRANSIENT_TRANSPORT = /\b(?:ssl(?:eof|error|zero|want)|eof occurred in violation of protocol|max retries exceeded|remotedisconnected|connection aborted|broken pipe|tlsv1|handshake failure|temporary failure in name resolution)\b/i;
 const OFFLINE = /\bnetwork is unreachable\b/i;
+/** A certificate the machine does not trust: retrying later meets it again, and the person has something to fix. */
+const CERTIFICATE = /certificate[_ ]verify[_ ]failed|certificate verify failed|self[- ]signed certificate|unable to get local issuer certificate/i;
+const CHINESE = /\p{Script=Han}/u;
 
 const ANTIGRAVITY_ERROR_REPLY = /^Agent execution error:\s*([\s\S]+)$/i;
-const ANTIGRAVITY_TRAILING_ERROR = /Agent execution error:\s*([\s\S]+)$/i;
+/** The engine's error on a line of its own at the end, after whatever reply came before it. */
+const ANTIGRAVITY_TRAILING_ERROR = /(^|\n)[ \t]*(Agent execution error:\s*[\s\S]+)$/i;
 const HTTP_STATUS_IN_BODY = /\b(?:HTTP(?:\/[\d.]+)?\s+|Error\s+|Status:\s*)([45]\d{2})\b/i;
 const QUOTE_OR_CODE_BEFORE = /[`"'「『([]$/;
 const TRAILING_PROSE = /[。！？!?`"'」』)\]]$/;
@@ -17,19 +25,31 @@ type AntigravityFailure = { message: string; stopReason: typeof ANTIGRAVITY_UNAV
 
 type PromptOutcome = ((result: unknown) => Promise<Error | undefined>) | undefined;
 
-export async function checkedPromptOutcome(driver: string, current: AcpTurn, result: unknown, outcome: PromptOutcome) {
+/** What the session log says of an ended prompt, read beside an error the engine wrote into the reply. Before the one
+ * retry (`provider` not given) a log failure the reply's own error explains does not stop it. On the turn's last word
+ * (`provider` given) it stays a failure, in the reply's friendly words, so the log's restart of the runtime
+ * (antigravity-turn-outcome.ts, `restarting`) still happens after the retry failed too. */
+export async function checkedPromptOutcome(driver: string, current: AcpTurn, result: unknown, outcome: PromptOutcome, provider?: string) {
   const reported = await outcome?.(result);
   if (!reported || driver !== "antigravityAgent" || (result as { stopReason?: string } | null)?.stopReason !== "end_turn") return reported;
-  const split = splitAntigravityErrorReply("Antigravity", current.state.text);
+  const split = splitAntigravityErrorReply(provider ?? "Antigravity", current.state.text);
   if (!split) return reported;
-  if ("checkErrorReply" in reported && reported.checkErrorReply === true) return undefined;
+  const explained = "checkErrorReply" in reported && reported.checkErrorReply === true;
+  if (explained && provider === undefined) return undefined;
   current.state.text = split.prefix;
-  return reported;
+  if (!explained) return reported;
+  const restart = (reported as { acpSessionFailure?: boolean }).acpSessionFailure === true;
+  return Object.assign(new AcpReportedFailure({ message: split.failure.message }, false), { antigravityUnavailable: true }, restart ? { acpSessionFailure: true } : {});
+}
+
+/** An Antigravity reply as the chat keeps it: without Gemini's thinking. Other engines' replies as they are. */
+export function antigravityText(driver: string, text: string): string {
+  return driver === "antigravityAgent" ? stripThoughtLeak(text).trim() : text;
 }
 
 export function isTransientAcpAuthError(error: unknown): boolean {
   const text = error instanceof Error ? `${error.message}${error.cause ? ` ${String(error.cause)}` : ""}` : String(error ?? "");
-  if (/\binvalid_grant\b/i.test(text)) return false;
+  if (/\binvalid_grant\b/i.test(text) || CERTIFICATE.test(text)) return false;
   const classification = classifyError({ text });
   if (classification.transient) return true;
   if (classification.reason !== "unknown") return false;
@@ -43,9 +63,10 @@ export function splitAntigravityErrorReply(
   const trimmed = text.trimEnd();
   const match = ANTIGRAVITY_TRAILING_ERROR.exec(trimmed);
   if (!match) return null;
-  const errorText = match[0];
-  const prefix = trimmed.slice(0, match.index);
-  if (prefix && QUOTE_OR_CODE_BEFORE.test(prefix.trimEnd())) return null;
+  const errorText = match[2]!;
+  const prefix = trimmed.slice(0, match.index + match[1]!.length);
+  // Chinese after it is the bot talking about the error, not the engine's error.
+  if (CHINESE.test(errorText) || (prefix && QUOTE_OR_CODE_BEFORE.test(prefix.trimEnd()))) return null;
   if (TRAILING_PROSE.test(errorText) && !/\bDetails:\s*\[\]$/.test(errorText)) return null;
   const statusMatch = HTTP_STATUS_IN_BODY.exec(errorText);
   if (statusMatch ? Number(statusMatch[1]) < 500 : !isTransientAcpAuthError(errorText) && !/failed to connect to backend api/i.test(errorText)) return null;
@@ -118,7 +139,7 @@ export function antigravityReplyDelta(driver: string, model: string | undefined,
   const gemini = !model || model.startsWith("gemini-");
   const marker = "agent execution error:";
   function visibleLength(text: string): number {
-    if (gemini && !/^[\s\p{P}\p{S}]*\p{Script=Han}/u.test(text)) return 0;
+    if (gemini && mayOpenWithThinking(text)) return 0;
     const at = text.search(/agent execution error:/i);
     if (at >= 0) return at;
     const tail = text.slice(-marker.length).toLowerCase();

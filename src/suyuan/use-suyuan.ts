@@ -12,6 +12,7 @@ import { noteHomes, noteThreadsShown } from "./home";
 import { inboxCatchUpKey, useInboxCatchUp } from "./inbox-unread";
 import { liftFrame, noteApp, noteAppGone } from "./last-frame";
 import { openAtLatest, shownChat } from "./open-at-latest";
+import { noteUnreadLine } from "./quiet-english";
 import "./chat-wrap.css";
 import "./keyboard-fit.css";
 import { installKeyboardFit } from "./keyboard-fit";
@@ -40,6 +41,7 @@ export function useSuyuan(state: AppState, dispatch: (action: Action) => void): 
   notePhoneHome(useMediaQuery(PHONE_LAYOUT, false));
   const shown = shownChat(state);
   openAtLatest(shown);
+  noteUnreadLine(state.unreadDivider?.messageId ?? null);
   useWebPush(state, dispatch);
   const loaded = state.hydrated === true;
   useInboxCatchUp(inboxCatchUpKey(state), loaded);

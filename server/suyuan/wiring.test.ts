@@ -8,14 +8,9 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const source = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 
 describe("suyuan-v2 thin-fork wiring", () => {
-  it("filters leaked thought before storage and in older direct and room replies", () => {
-    const guard = source("shared/system-message-guard.ts");
-    expect(guard).toContain('from "./suyuan/thought-leak.ts"');
-    expect(guard).toContain("return stripThoughtLeak(result).trim()");
-    expect(guard).toContain("!hasMarkers && !hasThoughtMark(text)");
-    expect(source("server/drivers/acp/core.ts")).toContain("stripLeakedSystemHarnessMessages(raw)");
-    for (const file of ["ChatView.tsx", "RoomTextMessage.tsx"]) expect(source("src/components/" + file)).toContain("stripLeakedSystemHarnessMessages(");
-    for (const file of ["ChatView.tsx", "GroupView.tsx"]) expect(source("src/components/" + file)).toContain("isPureLeakedSystemHarnessMessage(");
+  it("cuts Gemini's leaked thinking from Antigravity's replies as the server stores them, and nowhere else", () => {
+    expect(source("server/drivers/acp/core.ts")).toContain("const text = antigravityText(DRIVER_KIND, stripLeakedSystemHarnessMessages(raw));");
+    expect(source("shared/system-message-guard.ts")).not.toContain("thought-leak");
   });
 
   it("caps Argon in discovery, saved catalogs, live choices and native session selection", () => {
@@ -42,11 +37,11 @@ describe("suyuan-v2 thin-fork wiring", () => {
     expect(core).toContain("if (error instanceof TransientAcpAuthError) throw error");
     expect(core).toContain("retryErrorReply(DRIVER_KIND, current, session, promptOutcome,");
     expect(core).toContain("promptOutcome = await support.promptOutcome?.(instanceId, sessionId); }, () => request(");
-    expect(core).toContain("checkedPromptOutcome(DRIVER_KIND, current, final, promptOutcome)");
+    expect(core).toContain("checkedPromptOutcome(DRIVER_KIND, current, final, promptOutcome, support.displayName)");
     const native = source("server/drivers/antigravity-turn-outcome.ts");
     expect(native).toContain("checkErrorReply: true");
     expect(native).toContain("checkErrorReply: transient");
-    expect(core).toContain("e instanceof TransientAcpAuthError ? ANTIGRAVITY_UNAVAILABLE");
+    expect(core).toContain("e instanceof TransientAcpAuthError || (e as any)?.antigravityUnavailable === true ? ANTIGRAVITY_UNAVAILABLE");
     const end = source("server/drivers/acp/turn-state.ts");
     expect(end).toContain('driver === "antigravityAgent" ? splitAntigravityErrorReply(ai, current.state.text)');
     expect(end).toContain("current.state.text = split.prefix");
@@ -191,6 +186,10 @@ describe("suyuan-v2 thin-fork wiring", () => {
     expect(groupView).toContain("const shownMessages = useMemo(() => (advancedMode ? group.messages : quietChat(group.messages, group.pinnedMessageId)), [advancedMode, group.messages, group.pinnedMessageId]);");
     expect(groupView).toContain("    messages: shownMessages,\n    pinOn: [group.busyBotId, group.working, composerDock.pad],");
     expect(groupView).toContain("const unreadDivider = useUnreadDivider({ threadId: group.threadId, messages: shownMessages, following });");
+    // The words still arriving: a running turn's English stays out, and they still draw after lines the chat leaves out.
+    const liveReply = source("src/state/live-reply.ts");
+    expect(liveReply).toContain("|| endsShown(windowed, transcript); // suyuan fork");
+    expect(liveReply).toContain('shown: text.trim() !== "" && !quietLive(text),');
     // An inbox line from a bot's one conversation does not name that conversation.
     const inboxView = source("src/components/inbox/inbox-view.ts");
     expect(inboxView).toContain('row.origin?.title && !isHomeThread(row.origin.threadId) ? t("inbox.in", { title: row.origin.title }) : null');

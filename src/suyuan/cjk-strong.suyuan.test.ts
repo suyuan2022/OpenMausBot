@@ -47,6 +47,17 @@ describe("Chinese bold in a reply", () => {
     expect(render("**晚上照常：**21:00，**明天**再说")).toContain("<strong>晚上照常：</strong>21:00，<strong>明天</strong>再说");
   });
 
+  it("keeps one escaped star a star and still bolds the rest of the line", () => {
+    const html = render("转义星号 \\*，然后按**「设置」**继续");
+    expect(html).toContain("转义星号 *，然后按<strong>「设置」</strong>继续");
+  });
+
+  it("leaves a bold written with underscores as it is, and splits two bold quotes around a link", () => {
+    expect(render("把**「设置」__和__「通知」**都打开")).toContain("<strong>和</strong>");
+    const linked = render("把**「设置」**和**[「通知」](https://example.com/notice)**都打开");
+    expect(linked).toMatch(/把<strong>「设置」<\/strong>和<strong><a [^>]*>「通知」<\/a><\/strong>都打开/);
+  });
+
   it("keeps stars written escaped as stars", () => {
     expect(render("\\*\\*中文\\*\\*")).toContain("**中文**");
     expect(render("\\*\\*中文\\*\\*")).not.toContain("<strong>");

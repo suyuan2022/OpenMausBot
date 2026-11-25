@@ -9,6 +9,7 @@ import { classifyRoutineFailure } from "../routine-recovery.ts";
 import { endTurn, type AcpTurn } from "../drivers/acp/turn-state.ts";
 import {
   antigravityErrorReplyFailure,
+  antigravityText,
   isTransientAcpAuthError,
   checkedPromptOutcome,
   retryAuthenticate,
@@ -94,6 +95,33 @@ describe("antigravityErrorReplyFailure", () => {
     const quota = new Error("quota");
     await expect(check(quota)).resolves.toBe(quota);
     expect(current.state.text.trim()).toBe("已找到两条。");
+  });
+
+  it("keeps the log's runtime restart when the retry has failed too, in the reply's friendly words", async () => {
+    const current = { state: { text: "已找到两条。\nAgent execution error: HTTP/1.0 502 Bad Gateway" } } as AcpTurn;
+    const native = Object.assign(new Error("HTTP 502"), { checkErrorReply: true, acpSessionFailure: true });
+    const failure = await checkedPromptOutcome("antigravityAgent", current, { stopReason: "end_turn" }, async () => native, "Google Gemini (Antigravity)");
+    expect(failure).toMatchObject({ message: "Google Gemini (Antigravity) 暂时连不上服务（HTTP 502），请稍后再试。", acpSessionFailure: true, antigravityUnavailable: true });
+    expect(current.state.text.trim()).toBe("已找到两条。");
+  });
+
+  it("does not take a reply that explains a 502, or quotes one mid-sentence, for the engine's error", () => {
+    const explained = "Agent execution error: HTTP/1.0 502 Bad Gateway\n这通常是临时网络故障，过一会儿再试就好。";
+    expect(shouldRetryAntigravityErrorReply(explained)).toBe(false);
+    expect(antigravityErrorReplyFailure("Google Gemini (Antigravity)", explained)).toBeNull();
+    expect(antigravityErrorReplyFailure("Google Gemini (Antigravity)", "这条日志的完整原文是 Agent execution error: HTTP/1.0 502 Bad Gateway")).toBeNull();
+  });
+
+  it("does not call a certificate the machine does not trust a passing blip", () => {
+    expect(isTransientAcpAuthError(new Error("Max retries exceeded with url: /token (Caused by SSLError(SSLCertVerificationError(1, '[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate')))"))).toBe(false);
+  });
+
+  it("cuts Gemini's thinking from Antigravity's stored replies only", () => {
+    const leaked = "💡 Thought\n Let's check the tabs first and then tell the user what we found in one sentence.看到你 Chrome 里开着公众号后台。";
+    expect(antigravityText("antigravityAgent", leaked)).toBe("看到你 Chrome 里开着公众号后台。");
+    const quoted = "The file cannot be opened because it is in use.\n这个文件正被占用。";
+    expect(antigravityText("claudeAgent", quoted)).toBe(quoted);
+    expect(antigravityText("codex", leaked)).toBe(leaked);
   });
 
   it("ignores normal replies that merely discuss 502 errors", () => {

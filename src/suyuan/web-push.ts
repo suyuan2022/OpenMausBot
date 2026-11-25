@@ -2,6 +2,7 @@
 // the notifications public/suyuan-push-sw.js.
 import { finishedNotificationsEnabled, notificationSoundsEnabled } from "@/lib/notification-preferences";
 import { api } from "@/state/api";
+import { webPushSupported } from "./push-resume";
 
 const WORKER = "/suyuan-push-sw.js";
 /** Fired on window when this device turns push on or off, so the open app starts or stops reporting what it shows. */
@@ -9,9 +10,7 @@ export const PUSH_CHANGED = "suyuan-push-changed";
 
 /** The desktop app shows notifications itself, and a Safari tab on iOS has no PushManager until the page is added to
  * the home screen and opened from there. */
-export function webPushSupported(): boolean {
-  return typeof window !== "undefined" && !window.ogb && "serviceWorker" in navigator && "PushManager" in window && typeof Notification !== "undefined";
-}
+export { webPushSupported };
 
 /** An iPhone or iPad in a Safari tab: push needs Add to Home Screen first. */
 export function needsHomeScreen(): boolean {
