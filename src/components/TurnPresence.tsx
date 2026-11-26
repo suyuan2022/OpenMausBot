@@ -134,16 +134,20 @@ export function TurnPresence({
   const toggle = useRef<HTMLButtonElement>(null);
   const cardId = useId();
   const statusId = useId();
+  // suyuan fork (11-26): opening another chat while a bot works carried its working line over to fade out under the new
+  // chat's last message, which then dropped down as it went. Another thread's line goes at once. wiring.test.ts pins it.
+  const shownFor = useRef(threadId);
 
   useEffect(() => {
     if (visible) {
+      shownFor.current = threadId;
       setMounted(true);
       setPhase(answering ? "answer" : "think");
       wasAnswering.current = answering;
       return;
     }
     if (!mounted) return;
-    const handoff = wasAnswering.current;
+    const handoff = wasAnswering.current || shownFor.current !== threadId;
     wasAnswering.current = false;
     if (handoff) {
       setMounted(false);
@@ -152,7 +156,7 @@ export function TurnPresence({
     setPhase("out");
     const timer = setTimeout(() => setMounted(false), 280);
     return () => clearTimeout(timer);
-  }, [visible, answering, mounted]);
+  }, [visible, answering, mounted, threadId]);
 
   const showWorking = presencePhase === "think";
   const expandable = Boolean(card) && showWorking;
@@ -175,7 +179,7 @@ export function TurnPresence({
   const lead = label ?? t("chat.activity.working");
   const now = phrases && phrases.length > 0 ? phrases : null;
   const { current, previous } = useRotatingPhrase(now ?? NOTHING, phase ?? now?.[0] ?? "", seed, mounted && showWorking && now !== null);
-  if (!mounted) return null;
+  if (!mounted || (!visible && shownFor.current !== threadId)) return null;
   const status = showWorking && simple ? (
     <span id={statusId} className="flex min-w-0 items-baseline gap-x-1.5 text-[14px] leading-[22px] text-ink-tertiary" data-turn-status>
       <span className="turn-phrase turn-phrase-quiet relative grid min-w-0" title={hover} data-turn-now={now ? "" : undefined}>

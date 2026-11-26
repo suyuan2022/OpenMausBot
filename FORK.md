@@ -27,7 +27,7 @@
 | 手机排版与表格稳定 | 宽排气泡、表格稳定与独立整宽卡片、防撑宽、未读分割线即时标记 | `src/suyuan/wide-replies.css`、`steady-tables.css`、`table-plate.ts`、`divider-seen.ts` | `steady-tables` 候选提 PR |
 | 手机手势与控件开关 | 键盘贴合、右滑返回（11-26 放宽：左边 44 像素内起手、斜 60° 内都算）、禁整页缩放、默认隐藏语音钮与任务步骤卡片（可开） | `src/suyuan/keyboard-fit.*`、`swipe-back.ts`、`no-zoom.*`、`voice-button.ts`、`skill-burger.*` | 仅自用 |
 | 手机列表（11-25 他点名要回） | 置顶和主控并排成方块、长按出菜单；按最新消息排（含行上显示的另开对话）；时间写昨天/星期/日期；干活不挂点、只剩未读绿点；行尾不挂模型标识 | `src/suyuan/hero-pins.ts`、`HeroTiles.tsx`、`list-order.ts`、`list-clock.ts`、`quiet-dots.ts`、`quiet-rows.css`、`tile-menu.ts`、`scripts/suyuan/vite-list-clock.ts` | 仅自用 |
-| 打开快、落在最新 | 重开先盖上次画面再无缝接上；点通知直接开那个对话，不先经过上次的；打开对话一律落在最新一条 | `src/suyuan/boot.ts`、`last-frame.ts`、`push-resume.ts`、`open-at-latest.ts` | 仅自用 |
+| 打开快、落在最新 | 重开先盖上次画面再无缝接上；点通知直接开那个对话，不先经过上次的；打开对话一律落在最新一条；从干活的 bot 切过来不带「工作中」行淡出（11-26） | `src/suyuan/boot.ts`、`last-frame.ts`、`push-resume.ts`、`open-at-latest.ts`、`TurnPresence.tsx` | 仅自用 |
 | 简洁聊天显示 | 英文过程句不显示（11-15 定保留；按轮判断，群聊同样，附件、置顶、链接表格留着）；中文标点贴星号的加粗补成加粗；干活只剩三个点；群聊名居中浮起；一家一对话下不出现顶栏「+」、收件箱不写「在 主对话标题」 | `src/suyuan/quiet-english.ts`、`cjk-strong.ts`、`quiet-status.css`、`home.ts`、`even-sides.ts`；小补丁见 `wiring.test.ts` | `cjk-strong` 候选提 PR |
 | 收掉几处多余 | 聊天顶上「之前的消息」卡片和压缩摘要卡片（含「开个新对话」）不再出现，压缩照常；手机上输入框旁的记忆用量圆环不显示，电脑保留（11-26 他圈出来要去掉） | `src/suyuan/no-clutter.css` | 仅自用 |
 | 中文语言包补齐 | 界面不再冒英文；统一叫法（机器人、主控机器人、对话、定时任务、列表、任务步骤卡） | `src/locales/zh.json`、`src/suyuan/zh-complete.suyuan.test.ts` | 候选提 PR |
