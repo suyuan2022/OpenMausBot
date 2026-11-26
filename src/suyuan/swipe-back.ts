@@ -2,16 +2,24 @@
 // top left, which touch phones no longer show. The list is a drawer (aside[data-sidebar], src/components/Sidebar.tsx) parked off screen to the left; the swipe
 // drags it in under the finger and, let go far or fast enough, opens it through that button (src/App.tsx), so the
 // app's own state follows. iOS gives a home-screen web app no back gesture, so the edge is free.
+// 11-26: he found it worked one time and not the next ("稍微往下滑一点，它就一会儿行一会儿不行"). The edge was 24px and a
+// swipe had to stay within 45° of level over its first 10px, where a thumb still wobbles; now 44px and 60°, a quick
+// flick has to have gone somewhere, and a table scrolled sideways keeps a swipe that starts on it.
 import { t } from "@/lib/i18n";
 
-/** How far in from the left edge a swipe may start. */
-export const EDGE_PX = 24;
+/** How far in from the left edge a swipe may start: a fingertip's width, as iOS sizes what a finger hits. */
+export const EDGE_PX = 44;
 /** How far the finger moves before the swipe counts as sideways, or as a scroll left to the page. */
 const DECIDE_PX = 10;
+/** How steep, up or down, a swipe may be over those first pixels and still count as sideways: tan 60°. A steeper one is
+ * a scroll. Taken for sideways by mistake, a scroll only peeks the list in and lets it slide back. */
+const STEEPEST = Math.tan(Math.PI / 3);
 /** Let go past this share of the screen's width, the list opens. */
 const OPEN_SHARE = 1 / 3;
-/** Or flicked at least this fast, in px per ms. */
+/** Or flicked at least this fast, in px per ms, */
 const FLING = 0.5;
+/** having gone at least this far. */
+const FLING_PX = 32;
 /** Where the list is a drawer: below Tailwind's md. */
 const PHONE = "(max-width: 767px)";
 /** Where the swipe stands in for the button: a touch screen with the drawer. */
@@ -39,6 +47,14 @@ function parts(doc: Document): { drawer: HTMLElement; button: HTMLButtonElement 
   return button && drawer && button.getAttribute("aria-expanded") !== "true" ? { drawer, button } : null;
 }
 
+/** Whether the finger lands on something scrolled sideways (a wide table, a code block), which a swipe right scrolls back. */
+function onScrolledAside(target: EventTarget | null): boolean {
+  for (let node = target instanceof Element ? target : null; node; node = node.parentElement) {
+    if (node.scrollLeft > 0) return true;
+  }
+  return false;
+}
+
 /** Listens for the swipe; returns what stops listening. */
 export function installSwipeBack(doc: Document = document): () => void {
   let drag: Drag | null = null;
@@ -49,6 +65,7 @@ export function installSwipeBack(doc: Document = document): () => void {
     drag = null;
     if (!sideways) return;
     drawer.style.transition = "";
+    drawer.style.removeProperty("will-change");
     if (open) button.click();
     // The drawer's class says where it rests; dropping the finger's position lets it slide there from under the finger.
     requestAnimationFrame(() => drawer.style.removeProperty("translate"));
@@ -58,6 +75,7 @@ export function installSwipeBack(doc: Document = document): () => void {
     drag = null;
     const touch = event.touches[0];
     if (event.touches.length !== 1 || !touch || touch.clientX > EDGE_PX || !matchMedia(PHONE).matches) return;
+    if (onScrolledAside(event.target)) return;
     const found = parts(doc);
     if (!found) return;
     drag = { ...found, startX: touch.clientX, startY: touch.clientY, sideways: false, x: touch.clientX, at: event.timeStamp, speed: 0 };
@@ -70,12 +88,13 @@ export function installSwipeBack(doc: Document = document): () => void {
     if (!drag.sideways) {
       const dy = touch.clientY - drag.startY;
       if (Math.hypot(dx, dy) < DECIDE_PX) return;
-      if (dx <= Math.abs(dy)) {
+      if (dx <= 0 || Math.abs(dy) > dx * STEEPEST) {
         drag = null;
         return;
       }
       drag.sideways = true;
       drag.drawer.style.transition = "none";
+      drag.drawer.style.willChange = "translate";
     }
     event.preventDefault();
     const elapsed = event.timeStamp - drag.at;
@@ -88,7 +107,7 @@ export function installSwipeBack(doc: Document = document): () => void {
   const end = () => {
     if (!drag) return;
     const dx = drag.x - drag.startX;
-    settle(dx > window.innerWidth * OPEN_SHARE || drag.speed > FLING);
+    settle(dx > window.innerWidth * OPEN_SHARE || (drag.speed > FLING && dx >= FLING_PX));
   };
   const cancel = () => settle(false);
 

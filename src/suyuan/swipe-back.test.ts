@@ -23,16 +23,16 @@ afterEach(() => {
 const drawer = () => document.querySelector<HTMLElement>("aside")!;
 const frame = () => new Promise((resolve) => requestAnimationFrame(resolve));
 
-function touch(type: string, x: number, y: number, at: number): TouchEvent {
+function touch(type: string, x: number, y: number, at: number, on: EventTarget = document): TouchEvent {
   const event = new TouchEvent(type, { bubbles: true, cancelable: true, touches: type === "touchend" ? [] : [{ clientX: x, clientY: y } as Touch] });
   Object.defineProperty(event, "timeStamp", { value: at });
-  document.dispatchEvent(event);
+  on.dispatchEvent(event);
   return event;
 }
 
 /** A finger from (x0, y) along the given x positions, 16ms apart, then lifted. */
-function swipe(x0: number, y: number, xs: number[], { dy = 0 } = {}): TouchEvent[] {
-  touch("touchstart", x0, y, 0);
+function swipe(x0: number, y: number, xs: number[], { dy = 0, on = document as EventTarget } = {}): TouchEvent[] {
+  touch("touchstart", x0, y, 0, on);
   const moves = xs.map((x, index) => touch("touchmove", x, y + dy * (index + 1), 16 * (index + 1)));
   touch("touchend", xs.at(-1)!, y, 16 * xs.length);
   return moves;
@@ -68,15 +68,42 @@ describe("swipe back", () => {
     expect(opened).toBe(1);
   });
 
-  it("leaves a vertical scroll from the edge to the page", () => {
-    const moves = swipe(8, 400, [12, 14, 16], { dy: 30 });
-    expect(moves.some((event) => event.defaultPrevented)).toBe(false);
+  it("does not open on a flick that has hardly moved", () => {
+    swipe(8, 400, [20, 30]);
+    expect(opened).toBe(0);
+  });
+
+  it("takes a swipe that leans down as much as 60° over its first pixels, a thumb's wobble, as sideways", () => {
+    touch("touchstart", 8, 400, 0);
+    expect(touch("touchmove", 14, 409, 16).defaultPrevented).toBe(true);
+    touch("touchmove", 200, 430, 300);
+    touch("touchend", 200, 430, 400);
+    expect(opened).toBe(1);
+  });
+
+  it("leaves a scroll steeper than 60° from the edge to the page", () => {
+    for (const dy of [30, 11, -11]) {
+      const moves = swipe(8, 400, [13, 14, 16], { dy });
+      expect(moves.some((event) => event.defaultPrevented)).toBe(false);
+    }
     expect(drawer().style.translate).toBe("");
     expect(opened).toBe(0);
   });
 
+  it("leaves a swipe that starts on a table scrolled sideways to the table", () => {
+    document.getElementById("root")!.insertAdjacentHTML("beforeend", '<div id="wide"><table><tr><td id="cell">x</td></tr></table></div>');
+    const wide = document.getElementById("wide")!;
+    wide.scrollLeft = 40;
+    expect(wide.scrollLeft).toBe(40);
+    swipe(8, 400, [100, 200, 300], { on: document.getElementById("cell")! });
+    expect(opened).toBe(0);
+    wide.scrollLeft = 0;
+    swipe(8, 400, [100, 200, 300], { on: document.getElementById("cell")! });
+    expect(opened).toBe(1);
+  });
+
   it("ignores a swipe that starts away from the edge, with the list open, or on a wide screen", () => {
-    swipe(40, 400, [100, 200, 300]);
+    swipe(50, 400, [100, 200, 300]);
     document.querySelector("button")!.setAttribute("aria-expanded", "true");
     swipe(8, 400, [100, 200, 300]);
     document.querySelector("button")!.setAttribute("aria-expanded", "false");
