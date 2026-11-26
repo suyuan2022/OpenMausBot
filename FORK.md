@@ -59,8 +59,6 @@
 
 ## 近期要做
 
-- `[2026-11-24]` **清理两条废弃远端分支**：`origin/fix/sync-retry-flaky`、`origin/feat/routine-one-thread`（删前问夙愿）。
-- `[2026-11-24]` **清理虚拟机残留旧路由文件**：`~/.openmausbot/suyuan-room-router.json` 已不再读取，确认后可删。
 - `[2026-11-25]` **iPhone 语音输入回来黑屏**：模拟器已复现（回来时系统打开一个空窗口），方案见 [`docs/suyuan/ios-blackscreen.md`](docs/suyuan/ios-blackscreen.md)；等真机 R1–R3 和语音识别 A1/A2 拍板。
 
 ## 碰到再说与长期专题
