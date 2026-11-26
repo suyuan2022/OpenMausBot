@@ -25,6 +25,7 @@ import "./quiet-rows.css";
 import "./quiet-status.css";
 import { installPreviewZoom } from "./preview-zoom";
 import "./skill-burger.css";
+import { installSteadyImages } from "./steady-images";
 import "./steady-tables.css";
 import { hideBackButton, installSwipeBack } from "./swipe-back";
 import { installTablePlate } from "./table-plate";
@@ -62,6 +63,7 @@ export function useSuyuan(state: AppState, dispatch: (action: Action) => void): 
   useEffect(() => installPreviewZoom(), []);
   useEffect(() => installTablePlate(), []);
   useEffect(() => installTileMenu(), []);
+  useEffect(() => installSteadyImages(), []);
   const backLabel = t("app.openBotList");
   useEffect(() => hideBackButton(backLabel), [backLabel]);
 }

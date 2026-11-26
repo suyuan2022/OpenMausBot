@@ -24,7 +24,7 @@
 | Chief 只读队友对话 | Chief（荔枝）用 `team_threads` / `team_thread_read` 只读队友进展 | `server/suyuan/chief-read-*.ts`、`thread-facts.ts` | 仅自用 |
 | 瘦身版「一个 bot 一个家」 | 保持 1 bot 1 家门面与未读逻辑，且零改动 `Sidebar.tsx` / `ChatView.tsx` | `server/suyuan/home.ts`、`src/suyuan/home.ts` | 仅自用 |
 | 精简收件箱（Inbox） | 只留待处理与未读、后台任务随主对话已读、手机整屏独立页、补中文空态 | `src/suyuan/inbox-unread.ts`、`server/suyuan/inbox-read.ts`、`src/suyuan/phone-inbox.ts` | 仅自用 |
-| 手机排版与表格稳定 | 宽排气泡、表格稳定与独立整宽卡片、防撑宽、未读分割线即时标记 | `src/suyuan/wide-replies.css`、`steady-tables.css`、`table-plate.ts`、`divider-seen.ts` | `steady-tables` 候选提 PR |
+| 手机排版与表格稳定 | 宽排气泡、表格稳定与独立整宽卡片、防撑宽、未读分割线即时标记；往上翻时上方图片加载变高不再把画面挤走（11-26） | `src/suyuan/wide-replies.css`、`steady-tables.css`、`table-plate.ts`、`divider-seen.ts`、`steady-images.ts` | `steady-tables` 候选提 PR |
 | 手机手势与控件开关 | 键盘贴合、右滑返回（11-26 放宽：左边 44 像素内起手、斜 60° 内都算）、禁整页缩放、默认隐藏语音钮与任务步骤卡片（可开） | `src/suyuan/keyboard-fit.*`、`swipe-back.ts`、`no-zoom.*`、`voice-button.ts`、`skill-burger.*` | 仅自用 |
 | 手机列表（11-25 他点名要回） | 置顶和主控并排成方块、长按出菜单；按最新消息排（含行上显示的另开对话）；时间写昨天/星期/日期；干活不挂点、只剩未读绿点；行尾不挂模型标识 | `src/suyuan/hero-pins.ts`、`HeroTiles.tsx`、`list-order.ts`、`list-clock.ts`、`quiet-dots.ts`、`quiet-rows.css`、`tile-menu.ts`、`scripts/suyuan/vite-list-clock.ts` | 仅自用 |
 | 打开快、落在最新 | 重开先盖上次画面再无缝接上；点通知直接开那个对话，不先经过上次的；打开对话一律落在最新一条；从干活的 bot 切过来不带「工作中」行淡出（11-26） | `src/suyuan/boot.ts`、`last-frame.ts`、`push-resume.ts`、`open-at-latest.ts`、`TurnPresence.tsx` | 仅自用 |

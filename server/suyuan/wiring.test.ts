@@ -295,6 +295,10 @@ describe("suyuan-v2 thin-fork wiring", () => {
     // no-clutter.css hides the 「之前的消息」 card and, on a phone, the composer's context ring by these markers.
     expect(source("src/components/UnreadContextCard.tsx")).toContain('<div className="w-full px-5" data-unread-context-card data-testid="unread-context-card">');
     expect(source("src/components/ComposerContextMenu.tsx")).toContain('<span ref={root} data-composer-context className="relative flex shrink-0">');
+    // steady-images.ts finds the chat scrollers, their anchoring off, and the image tiles by these.
+    expect(source("src/suyuan/use-suyuan.ts")).toContain("useEffect(() => installSteadyImages(), []);");
+    expect(source("src/components/ChatView.tsx")).toContain('className="glass-scroller h-full overflow-x-hidden overflow-y-auto overscroll-y-contain px-4 [overflow-anchor:none]"');
+    expect(source("src/components/AttachmentPreview.tsx")).toContain('className={cn("group/image relative block aspect-[4/3]');
     // Another chat's working line goes at once instead of fading out under the chat just opened (presence-switch test).
     expect(source("src/components/TurnPresence.tsx")).toContain("if (!mounted || (!visible && shownFor.current !== threadId)) return null;");
     // ...and the compaction cards by their test ids, which the build keeps.
