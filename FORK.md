@@ -14,7 +14,7 @@
 
 | 模块 | 为什么留（解决什么问题） | 主要位置 | 上游去向 |
 |---|---|---|---|
-| 分叉运维、守卫与更新源 | 增量 CI、自动发包、零中断部署、隔离真机测试；更新检测指本 fork | `.github/workflows/suyuan-*.yml`、`scripts/suyuan/`、`wiring.test.ts`、`update-check.ts` | 仅自用 |
+| 分叉运维、守卫与更新源 | 增量 CI、自动发包、零中断部署（装完顺手重开 MacBook 上的 MausBot Safari，11-26 他说 Cmd+Q 关不掉）、隔离真机测试；更新检测指本 fork | `.github/workflows/suyuan-*.yml`、`scripts/suyuan/`、`wiring.test.ts`、`update-check.ts` | 仅自用 |
 | 自建网页推送（Web Push） | 闭源 iOS App 无法自托管推送；Safari PWA 收通知，撤销设备时退订 | `public/suyuan-push-sw.js`、`server/suyuan/web-push*.ts`、`src/suyuan/*web-push*` | 可问上游 |
 | 关闭投机预总结 | 默认 `OMB_WARM_SUMMARY=0`，防抢跑折叠丢上下文，其余交上游原生 | `server/suyuan/register.ts` | 仅自用 |
 | ACP 额外目录穿透 | 让 Antigravity 等非 Claude 引擎读工作区与共用技能并隔离会话键 | `server/suyuan/acp-extra-dirs.ts` | 候选提 PR |
@@ -26,7 +26,7 @@
 | 精简收件箱（Inbox） | 只留待处理与未读、后台任务随主对话已读、手机整屏独立页、补中文空态 | `src/suyuan/inbox-unread.ts`、`server/suyuan/inbox-read.ts`、`src/suyuan/phone-inbox.ts` | 仅自用 |
 | 手机排版与表格稳定 | 宽排气泡、表格稳定与独立整宽卡片、防撑宽、未读分割线即时标记 | `src/suyuan/wide-replies.css`、`steady-tables.css`、`table-plate.ts`、`divider-seen.ts` | `steady-tables` 候选提 PR |
 | 手机手势与控件开关 | 键盘贴合、右滑返回（11-26 放宽：左边 44 像素内起手、斜 60° 内都算）、禁整页缩放、默认隐藏语音钮与任务步骤卡片（可开） | `src/suyuan/keyboard-fit.*`、`swipe-back.ts`、`no-zoom.*`、`voice-button.ts`、`skill-burger.*` | 仅自用 |
-| 手机列表（11-25 他点名要回） | 置顶和主控并排成方块、长按出菜单；按最新消息排；时间写昨天/星期/日期；干活不挂点、只剩未读绿点；行尾不挂模型标识 | `src/suyuan/hero-pins.ts`、`HeroTiles.tsx`、`list-order.ts`、`list-clock.ts`、`quiet-dots.ts`、`quiet-rows.css`、`tile-menu.ts`、`scripts/suyuan/vite-list-clock.ts` | 仅自用 |
+| 手机列表（11-25 他点名要回） | 置顶和主控并排成方块、长按出菜单；按最新消息排（含行上显示的另开对话）；时间写昨天/星期/日期；干活不挂点、只剩未读绿点；行尾不挂模型标识 | `src/suyuan/hero-pins.ts`、`HeroTiles.tsx`、`list-order.ts`、`list-clock.ts`、`quiet-dots.ts`、`quiet-rows.css`、`tile-menu.ts`、`scripts/suyuan/vite-list-clock.ts` | 仅自用 |
 | 打开快、落在最新 | 重开先盖上次画面再无缝接上；点通知直接开那个对话，不先经过上次的；打开对话一律落在最新一条 | `src/suyuan/boot.ts`、`last-frame.ts`、`push-resume.ts`、`open-at-latest.ts` | 仅自用 |
 | 简洁聊天显示 | 英文过程句不显示（11-15 定保留；按轮判断，群聊同样，附件、置顶、链接表格留着）；中文标点贴星号的加粗补成加粗；干活只剩三个点；群聊名居中浮起；一家一对话下不出现顶栏「+」、收件箱不写「在 主对话标题」 | `src/suyuan/quiet-english.ts`、`cjk-strong.ts`、`quiet-status.css`、`home.ts`、`even-sides.ts`；小补丁见 `wiring.test.ts` | `cjk-strong` 候选提 PR |
 | 收掉两处多余 | 聊天顶上「之前的消息」卡片不再出现；手机上输入框旁的记忆用量圆环不显示，电脑保留（11-26 他圈出来要去掉） | `src/suyuan/no-clutter.css` | 仅自用 |
@@ -40,6 +40,7 @@
   - **2026-11-13，Claude 会话保留**：虚拟机 `~/.claude/settings.json` 设 `cleanupPeriodDays: 3650`（防默认 30 天删旧会话影响回搜原文；备份 `settings.json.bak-20261113-keep-sessions`）。
   - **2026-11-24，`lcu` 非 Claude 补丁**：虚拟机 `~/.local/share/lcu/current/adapters/claude.mjs`（当前 `lcu 0.13.5-7d17e28f4418`）打了 `fallbackNonClaudeContext`，供 Antigravity 调 `lcu`；升级 `lcu` 时复核。
   - **2026-11-24，群聊路由迁入原生配置**：原 `suyuan-room-router.json` 参数已迁入 `config.json` 的 `decider`（备份 `config.json.bak-20261124-suyuan-v2`）。
+  - **2026-11-26，深度研究头像**：表情「思考」在菱形这类头像上一直显示成三个点，改回默认（备份 `bots.json.bak-20261126-deep-research-face`）；虚拟机加 `~/.openmausbot-releases/desk-app-host`（内容 `macbook`），删掉即停用装完重开。
   - **2026-11-26，北京中转机隧道保活**：`bj-relay` 加 `/etc/ssh/sshd_config.d/60-tunnel-keepalive.conf`（ClientAliveInterval 15×3），防虚拟机断线后死会话占住 18799/18813 致 `bot.tokenic.cn` 打不开；撤销删该文件后 `systemctl reload ssh`。
 
 ## 上游同步与跳过清单

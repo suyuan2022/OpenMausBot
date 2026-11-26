@@ -57,6 +57,16 @@ describe("the list, newest message first", () => {
     expect((sorted?.unsectionedBots as { name: string }[] | undefined)?.map((one) => one.name)).toEqual(["mid", "branched"]);
   });
 
+  it("goes by whichever is newer, the bot's home or the other conversation of its own the row shows (11-26 Maus 工程师 sank)", () => {
+    noteThreadsShown(false);
+    const away = (name: string, shownAt: number, homeAt: number) => ({
+      name, threadId: "run", mainThreadId: "home", messages: [{ kind: "text", at: shownAt }],
+      tasks: [{ threadId: "home", updatedAt: homeAt }, { threadId: "run", updatedAt: shownAt }],
+    });
+    const sorted = recentBotsFirst({ sectionedBots: [], unsectionedBots: [bot("mid", 20), away("run-newer", 30, 5), away("home-newer", 1, 25)] as never[] });
+    expect((sorted?.unsectionedBots as { name: string }[] | undefined)?.map((one) => one.name)).toEqual(["run-newer", "home-newer", "mid"]);
+  });
+
   it("leaves upstream's order with the thread list shown", () => {
     noteThreadsShown(true);
     expect(recentBotsFirst({ sectionedBots: [], unsectionedBots: [bot("a", 1), bot("b", 2)] })).toBeNull();

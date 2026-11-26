@@ -77,6 +77,19 @@ wake_engineer() {
   echo "could not reach Maus 工程师's after-install automation" >&2
 }
 
+# The MacBook's MausBot Safari web app keeps the page it loaded and Cmd+Q does not always close it (11-26), so a new
+# build reaches it only when it is closed and opened again. $STORE/desk-app-host names the ssh host; the app opens behind
+# the windows in front, and is left alone when it was not running.
+reopen_desk_app() {
+  [[ -r $STORE/desk-app-host ]] || return 0
+  ssh -o ConnectTimeout=5 -o BatchMode=yes "$(<"$STORE/desk-app-host")" '
+    app="$HOME/Applications/MausBot Safari.app"; mark="bundlepath $app"
+    pgrep -f "$mark" >/dev/null || exit 0
+    pkill -f "$mark"; for _ in 1 2 3 4 5; do pgrep -f "$mark" >/dev/null || break; sleep 1; done
+    pkill -9 -f "$mark"; sleep 1; open -g "$app"' </dev/null \
+    && echo "reopened MausBot Safari on the MacBook" || echo "could not reopen MausBot Safari on the MacBook" >&2
+}
+
 if [[ $target == rollback ]]; then
   target=$(cat "$STORE/previous" 2>/dev/null) || { echo "no earlier install recorded in $STORE/previous" >&2; exit 1; }
 else
@@ -167,9 +180,11 @@ if ! restart; then
   [[ -n $earlier ]] && echo "$earlier" > "$STORE/previous"
   restart || { echo "${back:t} is not answering either; look at the server's log" >&2; exit 1; }
   echo "openmausbot $before -> $(openmausbot --version): back on ${back:t}, since ${target:t} did not start" >&2
+  reopen_desk_app
   wake_engineer rolled-back
   exit 1
 fi
 echo "openmausbot $before -> $(openmausbot --version)"
+reopen_desk_app
 wake_engineer installed
 ls -t "$STORE"/*.tgz 2>/dev/null | tail -n +6 | while read -r old; do trash "$old" 2>/dev/null || true; done

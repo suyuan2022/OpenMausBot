@@ -15,14 +15,15 @@ type Owner = {
   activeLeafId?: Bot["activeLeafId"];
 };
 
-/** When a bot's row last moved: the last message of the branch on screen, the one whose time the row shows
- * (Sidebar.tsx), unless the app holds one of its background runs, whose messages say nothing of the bot's own
- * conversation; then the last time its home moved. */
+/** When a bot's row last moved: the last message of the branch on screen, the one whose time and words the row shows
+ * (Sidebar.tsx). While the app holds another conversation of the bot's own, the later of that message and the last time
+ * its home moved: the row reads that conversation's last words, so a bot whose row says something new sinking under
+ * older ones looks out of order (11-26, Maus 工程师's release report sat in a run it opened itself). */
 export function rowAt(bot: Owner): number {
   const at = lastNonReceipt(visibleMessages({ messages: bot.messages ?? [], activeLeafId: bot.activeLeafId ?? null }))?.at ?? 0;
   const home = homeOf(bot);
   if (home === undefined || bot.threadId === home) return at;
-  return bot.tasks?.find((task) => task.threadId === home)?.updatedAt ?? at;
+  return Math.max(at, bot.tasks?.find((task) => task.threadId === home)?.updatedAt ?? 0);
 }
 
 /** The main and department lists, newest first, while the app keeps one conversation per bot; null elsewhere. */
