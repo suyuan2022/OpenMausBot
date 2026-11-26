@@ -295,6 +295,11 @@ describe("suyuan-v2 thin-fork wiring", () => {
     // no-clutter.css hides the 「之前的消息」 card and, on a phone, the composer's context ring by these markers.
     expect(source("src/components/UnreadContextCard.tsx")).toContain('<div className="w-full px-5" data-unread-context-card data-testid="unread-context-card">');
     expect(source("src/components/ComposerContextMenu.tsx")).toContain('<span ref={root} data-composer-context className="relative flex shrink-0">');
+    // ...and the compaction cards by their test ids, which the build keeps.
+    for (const id of ["engine-compaction-chip", "compaction-chip", "new-chat-hint"]) {
+      expect(source("src/components/DigestChip.tsx")).toContain(`data-testid="${id}"`);
+      expect(source("src/suyuan/no-clutter.css")).toContain(`[data-testid="${id}"]`);
+    }
     // chat-wrap.css undoes this upstream rule; if upstream drops or rewords it, the overlay needs another look.
     expect(source("src/styles.css")).toMatch(/\[data-chat-bubble="simple"\],\n\.chat-md :is\(p, li, blockquote\) \{\n\s*text-wrap: pretty;/);
     expect(source("src/suyuan/chat-wrap.css")).toMatch(/:root \[data-chat-bubble="simple"\],\n:root \.chat-md :is\(p, li, blockquote\) \{\n\s*text-wrap: wrap;/);

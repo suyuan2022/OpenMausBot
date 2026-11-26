@@ -9,6 +9,16 @@
   display: none !important;
 }
 
+/* The compaction cards (DigestChip.tsx): 「对话已压缩成摘要」 when an engine compacts on its own (Claude at
+   OMB_CLAUDE_AUTOCOMPACT), the summary card when the server folds a conversation, and 「开个新对话可以省 token」 under
+   them. He kept them out of the chat before the v2 rebuild (FORK.md, skipped from upstream) and on 11-26 they came back:
+   the compaction itself goes on as it did, only the cards are gone. */
+[data-testid="engine-compaction-chip"],
+[data-testid="compaction-chip"],
+[data-testid="new-chat-hint"] {
+  display: none !important;
+}
+
 @media (hover: none) and (pointer: coarse) and (max-width: 767px) {
   [data-composer-context] {
     display: none !important;
