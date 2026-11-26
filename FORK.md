@@ -40,6 +40,7 @@
   - **2026-11-13，Claude 会话保留**：虚拟机 `~/.claude/settings.json` 设 `cleanupPeriodDays: 3650`（防默认 30 天删旧会话影响回搜原文；备份 `settings.json.bak-20261113-keep-sessions`）。
   - **2026-11-24，`lcu` 非 Claude 补丁**：虚拟机 `~/.local/share/lcu/current/adapters/claude.mjs`（当前 `lcu 0.13.5-7d17e28f4418`）打了 `fallbackNonClaudeContext`，供 Antigravity 调 `lcu`；升级 `lcu` 时复核。
   - **2026-11-24，群聊路由迁入原生配置**：原 `suyuan-room-router.json` 参数已迁入 `config.json` 的 `decider`（备份 `config.json.bak-20261124-suyuan-v2`）。
+  - **2026-11-26，北京中转机隧道保活**：`bj-relay` 加 `/etc/ssh/sshd_config.d/60-tunnel-keepalive.conf`（ClientAliveInterval 15×3），防虚拟机断线后死会话占住 18799/18813 致 `bot.tokenic.cn` 打不开；撤销删该文件后 `systemctl reload ssh`。
 
 ## 上游同步与跳过清单
 
