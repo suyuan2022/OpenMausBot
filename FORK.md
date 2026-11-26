@@ -29,6 +29,7 @@
 | 手机列表（11-25 他点名要回） | 置顶和主控并排成方块、长按出菜单；按最新消息排；时间写昨天/星期/日期；干活不挂点、只剩未读绿点；行尾不挂模型标识 | `src/suyuan/hero-pins.ts`、`HeroTiles.tsx`、`list-order.ts`、`list-clock.ts`、`quiet-dots.ts`、`quiet-rows.css`、`tile-menu.ts`、`scripts/suyuan/vite-list-clock.ts` | 仅自用 |
 | 打开快、落在最新 | 重开先盖上次画面再无缝接上；点通知直接开那个对话，不先经过上次的；打开对话一律落在最新一条 | `src/suyuan/boot.ts`、`last-frame.ts`、`push-resume.ts`、`open-at-latest.ts` | 仅自用 |
 | 简洁聊天显示 | 英文过程句不显示（11-15 定保留；按轮判断，群聊同样，附件、置顶、链接表格留着）；中文标点贴星号的加粗补成加粗；干活只剩三个点；群聊名居中浮起；一家一对话下不出现顶栏「+」、收件箱不写「在 主对话标题」 | `src/suyuan/quiet-english.ts`、`cjk-strong.ts`、`quiet-status.css`、`home.ts`、`even-sides.ts`；小补丁见 `wiring.test.ts` | `cjk-strong` 候选提 PR |
+| 收掉两处多余 | 聊天顶上「之前的消息」卡片不再出现；手机上输入框旁的记忆用量圆环不显示，电脑保留（11-26 他圈出来要去掉） | `src/suyuan/no-clutter.css` | 仅自用 |
 | 中文语言包补齐 | 界面不再冒英文；统一叫法（机器人、主控机器人、对话、定时任务、列表、任务步骤卡） | `src/locales/zh.json`、`src/suyuan/zh-complete.suyuan.test.ts` | 候选提 PR |
 | Gemini 思考过滤与断连重试 | Antigravity 机器人写进回复的英文思考只留正文（同 v1，只在服务端存回复时处理，别的机器人和共用的显示过滤不碰）；Argon 不给高档思考；Antigravity 临时断连或 502 等 1.5 秒重试一次，已动手、已出字或服务端说明了原因的不重发，证书错误不算临时 | `shared/suyuan/thought-leak.ts`、`server/suyuan/argon-thinking.ts`、`acp-resilience.ts` | 仅自用 |
 

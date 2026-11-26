@@ -289,9 +289,12 @@ describe("suyuan-v2 thin-fork wiring", () => {
 
   it("loads every CSS overlay from the one frontend hook", () => {
     const hook = source("src/suyuan/use-suyuan.ts");
-    for (const sheet of ["chat-wrap", "keyboard-fit", "no-zoom", "phone-code", "phone-tables", "quiet-rows", "quiet-status", "skill-burger", "steady-tables", "wide-replies"]) {
+    for (const sheet of ["chat-wrap", "keyboard-fit", "no-clutter", "no-zoom", "phone-code", "phone-tables", "quiet-rows", "quiet-status", "skill-burger", "steady-tables", "wide-replies"]) {
       expect(hook).toContain(`import "./${sheet}.css";`);
     }
+    // no-clutter.css hides the 「之前的消息」 card and, on a phone, the composer's context ring by these markers.
+    expect(source("src/components/UnreadContextCard.tsx")).toContain('<div className="w-full px-5" data-unread-context-card data-testid="unread-context-card">');
+    expect(source("src/components/ComposerContextMenu.tsx")).toContain('<span ref={root} data-composer-context className="relative flex shrink-0">');
     // chat-wrap.css undoes this upstream rule; if upstream drops or rewords it, the overlay needs another look.
     expect(source("src/styles.css")).toMatch(/\[data-chat-bubble="simple"\],\n\.chat-md :is\(p, li, blockquote\) \{\n\s*text-wrap: pretty;/);
     expect(source("src/suyuan/chat-wrap.css")).toMatch(/:root \[data-chat-bubble="simple"\],\n:root \.chat-md :is\(p, li, blockquote\) \{\n\s*text-wrap: wrap;/);

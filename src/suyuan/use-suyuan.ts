@@ -16,6 +16,7 @@ import { noteUnreadLine } from "./quiet-english";
 import "./chat-wrap.css";
 import "./keyboard-fit.css";
 import { installKeyboardFit } from "./keyboard-fit";
+import "./no-clutter.css";
 import "./no-zoom.css";
 import { installNoZoom } from "./no-zoom";
 import "./phone-code.css";

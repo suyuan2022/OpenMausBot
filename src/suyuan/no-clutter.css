@@ -1,0 +1,16 @@
+/* suyuan fork (11-26): two things he circled on the phone and asked to take away ("这两个玩意给我去掉然后上线").
+   The card over the top of a chat, 「之前的消息」 with 前往来源 and 关闭 (UnreadContextCard.tsx): upstream brings back his
+   line from above the unread divider when a chat opens below it, and this fork opens every chat at its newest message
+   (open-at-latest.ts), so the card came up on most opens. Gone everywhere.
+   The ring beside the send button (ComposerContextMenu.tsx): how full the bot's context is, opening 压缩上下文 and
+   重新开始; on the phone it read as a spinner. Gone on touch phones, where 重新开始 stays in the chat's 「…」 menu and the
+   engines compact on their own; a computer keeps it. wiring.test.ts pins both markers. */
+[data-unread-context-card] {
+  display: none !important;
+}
+
+@media (hover: none) and (pointer: coarse) and (max-width: 767px) {
+  [data-composer-context] {
+    display: none !important;
+  }
+}
