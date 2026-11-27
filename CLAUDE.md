@@ -76,6 +76,7 @@ node scripts/build-npm-package.mjs && (cd release/npm && npm pack)
 ## 隔离验证与部署纪律
 
 - **严禁在验证阶段碰生产环境**：`lizhi-vm:8799`、虚拟机 `~/.openmausbot`、公网 `bot.tokenic.cn` 只承载真实服务。隔离联调必须用 `scripts/control-omb.ts`、`scripts/suyuan/phone-test.sh`，或独立的 `--data-dir` + 高端口（如 `18900`）数据副本，且演练副本不得开启定时任务与真实 Web Push 订阅，验证完彻底清理进程与 `/tmp` 临时目录。
+- **改了模型看到的内容，用真模型验收**：提示拼装、补发历史、图片、说明文字这类改动，假引擎只证明内容送到了；上线前在隔离副本接真模型，改前改后跑同一场景对比回复，做法见 [`docs/suyuan/real-model-check.md`](docs/suyuan/real-model-check.md)（11-27 旧图旁注假引擎全绿，真 Claude 3 次仍 1 次认错）。
 - **线上部署**：在 MacBook 跑 `scripts/suyuan/deploy-vm.sh`（经 MacBook 下载 release 再传到虚拟机安装；有 bot 忙碌会自动排队等空闲；异常自动回滚 `--rollback`）。在虚拟机内由「Maus 工程师」触发时用 `scripts/suyuan/deploy-self.sh`。
 - **切忌在文档或日志里输出任何密钥、API Key、Webhook Token 或订阅凭证。**
 
