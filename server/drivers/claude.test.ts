@@ -688,35 +688,6 @@ describe("ClaudeDriver turns (fake CLI)", () => {
     expect(recorder.events.some((e) => e.type === "item.completed" && e.itemType === "tool")).toBe(true);
   });
 
-  it("puts an image's note right before that image, after none of the others", async () => {
-    await create();
-    const dump = join(scratch, "dump-noted-images.json");
-    process.env.FAKE_CLAUDE_DUMP = dump;
-    const old = Buffer.from([0x89, 0x50, 0x4e, 0x47, 9, 9]);
-    const now = Buffer.from([0x89, 0x50, 0x4e, 0x47, 8, 8]);
-    const oldPath = join(scratch, "old.png");
-    const nowPath = join(scratch, "now.png");
-    writeFileSync(oldPath, old);
-    writeFileSync(nowPath, now);
-
-    await instance.adapter.sendTurn({
-      threadId: "t-noted-images",
-      text: "and this one?",
-      images: [
-        { path: oldPath, mime: "image/png", bytes: old.length, note: "[The next image is from an earlier message.]" },
-        { path: nowPath, mime: "image/png", bytes: now.length },
-      ],
-    });
-    await recorder.until((e) => e.type === "turn.completed");
-
-    expect(JSON.parse(readFileSync(dump, "utf8")).prompt.message.content).toEqual([
-      { type: "text", text: "[The next image is from an earlier message.]" },
-      { type: "image", source: { type: "base64", media_type: "image/png", data: old.toString("base64") } },
-      { type: "image", source: { type: "base64", media_type: "image/png", data: now.toString("base64") } },
-      { type: "text", text: "and this one?" },
-    ]);
-  });
-
   it("names the CLI process while a long tool runs, and no process once the turn is over", async () => {
     const release = join(scratch, "release");
     await create(undefined, {

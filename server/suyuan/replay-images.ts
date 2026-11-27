@@ -1,38 +1,25 @@
-// suyuan fork: a fresh engine session gets the person's earlier pictures again; mark each one where the model sees it, and keep a re-opened one out of the reply.
+// suyuan fork: a fresh engine session gets the person's earlier pictures as files to open, not as pictures of the latest message; a re-opened one stays out of the reply.
 import { resolve, sep } from "node:path";
 
 import { ATTACHMENTS_DIR } from "../attachments.ts";
-import type { TurnImageInput, TurnVideoInput } from "../contracts.ts";
-import { extractReplayImages, REPLAYED_IMAGE_NOTE, type ExtractTurnImagesOptions } from "../turn-images.ts";
+import { extractTurnImages, type ExtractTurnImagesOptions } from "../turn-images.ts";
 
-const ATTACHMENT_TAG_LINE = /^[\t ]*<attached-(?:image|file)\b[^\n]*\/>[\t ]*$/gm;
-const QUOTE_CHARS = 40;
+/** Put where an earlier message's image was. A model takes any image in the turn for one sent with the latest message, even beside a note saying otherwise, so the image itself stays out. */
+export const EARLIER_IMAGE_NOTE =
+  "[The person attached an image to this earlier message. It is not attached to the latest message. To look at it again, open the file below with your file-reading tool.]";
 
-function quoteOf(text: string): string {
-  const words = text.replace(ATTACHMENT_TAG_LINE, "").replace(/\s+/g, " ").trim();
-  return words.length > QUOTE_CHARS ? `${words.slice(0, QUOTE_CHARS)}…` : words;
+function withImageFiles<T extends { role: "user" | "assistant"; text: string }>(entry: T, options: ExtractTurnImagesOptions): T {
+  if (entry.role !== "user") return entry;
+  const item = extractTurnImages(entry.text, { ...options, maxCount: Infinity, maxBytes: Infinity, imageNote: EARLIER_IMAGE_NOTE });
+  return item.images.length ? { ...entry, text: item.text } : entry;
 }
 
-export function replayedImageNote(messageText: string): string {
-  const quote = quoteOf(messageText);
-  const from = quote ? `an earlier message in this conversation (「${quote}」)` : "an earlier message in this conversation";
-  return `[The next image is from ${from}, attached again only so you can still see it. It is not new: it was not sent with the latest message.]`;
-}
-
-/** extractReplayImages, with each re-attached image carrying a note that names the message it came from. */
-export function extractLabelledReplayImages<T extends { role: "user" | "assistant"; text: string }>(
+/** Stands in for extractReplayImages: the replayed messages name their images as files, and no image rides on the turn. */
+export function replayImagesAsFiles<T extends { role: "user" | "assistant"; text: string }>(
   transcript: readonly T[],
-  current: readonly TurnImageInput[],
   options: ExtractTurnImagesOptions = {},
-  clips: readonly TurnVideoInput[] = [],
-): { transcript: T[]; images: TurnImageInput[] } {
-  const replay = extractReplayImages(transcript, current, options, clips);
-  const notes = replay.transcript.flatMap((entry, index) => {
-    const original = transcript[index]!;
-    if (entry === original) return [];
-    return Array.from({ length: entry.text.split(REPLAYED_IMAGE_NOTE).length - 1 }, () => replayedImageNote(original.text));
-  });
-  return { transcript: replay.transcript, images: replay.images.map((image, index) => ({ ...image, note: notes[index] ?? replayedImageNote("") })) };
+): { transcript: T[]; images: [] } {
+  return { transcript: transcript.map((entry) => withImageFiles(entry, options)), images: [] };
 }
 
 // Claude Code 2.1.x keeps the images of a prompt it was sent under <tmp>/claude-<uid>/<project>/<session>/images/ and names that path in the prompt.

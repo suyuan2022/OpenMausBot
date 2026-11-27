@@ -91,8 +91,6 @@ export interface TurnImageInput {
   bytes: number;
   /** Set on a frame sampled from an attached video, so a content-type router can tell it apart from a person's own picture. */
   source?: "video-frame";
-  /** Words a driver that can mix text and images puts right before this image, such as which earlier message a replayed picture came from. */
-  note?: string;
 }
 
 /** A video already admitted to the private attachment store; a driver with `nativeImageInput` gets it as the clip within its `nativeVideoBytes`. Otherwise, best effort, a driver with `nativeImageInput` gets TurnImageInput frames when the turn has image slots left and ffprobe and ffmpeg can sample it, and none when they can't. */

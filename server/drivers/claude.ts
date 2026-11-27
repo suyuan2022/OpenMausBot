@@ -655,14 +655,14 @@ function claudeUserMessage(
   images: readonly ClaudeImage[] | undefined,
 ): ClaudeUserMessage {
   if (!images?.length) return { type: "user", message: { role: "user", content: text } };
-  const content: ClaudeUserContent[] = images.flatMap((image) => [...(image.note ? [{ type: "text" as const, text: image.note }] : []), {
-    type: "image" as const,
+  const content: ClaudeUserContent[] = images.map((image) => ({
+    type: "image",
     source: {
-      type: "base64" as const,
+      type: "base64",
       media_type: image.mime,
       data: readFileSync(image.path).toString("base64"),
     },
-  }]);
+  }));
   if (text) content.push({ type: "text", text });
   return { type: "user", message: { role: "user", content } };
 }

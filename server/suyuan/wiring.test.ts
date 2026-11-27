@@ -8,15 +8,13 @@ const ROOT = join(dirname(fileURLToPath(import.meta.url)), "..", "..");
 const source = (rel: string) => readFileSync(join(ROOT, rel), "utf8");
 
 describe("suyuan-v2 thin-fork wiring", () => {
-  it("labels each replayed picture beside it and keeps a re-opened picture out of Claude's reply", () => {
+  it("replays earlier pictures as files to open and keeps a re-opened picture out of Claude's reply", () => {
     const index = source("server/index.ts");
-    expect(index).toContain('import { extractLabelledReplayImages } from "./suyuan/replay-images.ts";');
-    expect(index).toContain("? extractLabelledReplayImages(selection.inline, turnImages, {}, turnVideos)");
+    expect(index).toContain('import { replayImagesAsFiles } from "./suyuan/replay-images.ts";');
+    expect(index).toContain("? replayImagesAsFiles(selection.inline)");
     expect(index).not.toContain("extractReplayImages(");
-    expect(source("server/contracts.ts")).toContain("  note?: string;");
     const claude = source("server/drivers/claude.ts");
     expect(claude).toContain('import { rememberToolUse, shownToolImages } from "../suyuan/replay-images.ts";');
-    expect(claude).toContain("...(image.note ? [{ type: \"text\" as const, text: image.note }] : [])");
     expect(claude).toContain("rememberToolUse(b.id, b.name, b.input);");
     expect(claude).toContain("for (const img of shownToolImages(b.tool_use_id, extractMcpImages(b.content)))");
   });

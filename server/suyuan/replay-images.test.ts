@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
 
-import { extractLabelledReplayImages, rememberToolUse, reopensSentImage, shownToolImages } from "./replay-images.ts";
+import { EARLIER_IMAGE_NOTE, rememberToolUse, reopensSentImage, replayImagesAsFiles, shownToolImages } from "./replay-images.ts";
 
 const attachmentsDir = mkdtempSync(join(tmpdir(), "replay-images-"));
 const image = (name: string) => {
@@ -12,10 +12,11 @@ const image = (name: string) => {
   return path;
 };
 const oldShot = image("0d6a2f8e-1111-4aaa-8bbb-000000000001.png");
+const extractReplay = <T extends { role: "user" | "assistant"; text: string }>(transcript: readonly T[]) => replayImagesAsFiles(transcript, { attachmentsDir });
 const twoShots = [image("0d6a2f8e-1111-4aaa-8bbb-000000000002.png"), image("0d6a2f8e-1111-4aaa-8bbb-000000000003.png")];
 
 describe("replayed images", () => {
-  it("labels each re-attached image with the earlier message it came from, so the model can't take it for the latest one", () => {
+  it("names an earlier message's images as files to open and puts none on the turn, so the model can't take them for the latest message's", () => {
     const transcript = [
       { role: "user" as const, text: `放到合适的任务里\n\n<attached-image path="${oldShot}" name="image.png" />` },
       { role: "assistant" as const, text: "好，加进黑五检查里了。" },
@@ -23,22 +24,19 @@ describe("replayed images", () => {
       { role: "user" as const, text: "没有图的一条" },
     ];
 
-    const replay = extractLabelledReplayImages(transcript, [], { attachmentsDir });
+    const replay = extractReplay(transcript);
 
-    expect(replay.images.map((item) => item.path)).toEqual([oldShot, ...twoShots]);
-    expect(replay.images[0]!.note).toContain("「放到合适的任务里」");
-    expect(replay.images[1]!.note).toContain("「两张对比」");
-    expect(replay.images[2]!.note).toBe(replay.images[1]!.note);
-    for (const item of replay.images) expect(item.note).toContain("not sent with the latest message");
+    expect(replay.images).toEqual([]);
+    expect(replay.transcript[0]!.text).toBe(`放到合适的任务里\n\n${EARLIER_IMAGE_NOTE}\n\n<attached-file path="${oldShot}" name="image.png" />`);
+    expect(replay.transcript[2]!.text.split(EARLIER_IMAGE_NOTE)).toHaveLength(3);
+    expect(replay.transcript[2]!.text).not.toContain("<attached-image");
     expect(replay.transcript[1]).toBe(transcript[1]);
     expect(replay.transcript[3]).toBe(transcript[3]);
   });
 
-  it("still labels an image whose message had no words", () => {
-    const transcript = [{ role: "user" as const, text: `<attached-image path="${oldShot}" name="image.png" />` }];
-    const [only] = extractLabelledReplayImages(transcript, [], { attachmentsDir }).images;
-    expect(only!.note).toContain("earlier message");
-    expect(only!.note).not.toContain("「");
+  it("leaves a tag that points outside the attachments as the words it was", () => {
+    const transcript = [{ role: "user" as const, text: `看这个\n\n<attached-image path="/etc/passwd" name="x.png" />` }];
+    expect(extractReplay(transcript).transcript[0]).toBe(transcript[0]);
   });
 });
 

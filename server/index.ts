@@ -330,7 +330,7 @@ import { turnStartLogLine } from "./turn-log.ts";
 import { TurnStops, logFailedTurn, outwardActions, stoppedTurnOutcome, turnEvidence } from "./turn-outcome.ts";
 import { buildRecoveryText, buildTurnContext, replaysNatively } from "./turn-context.ts"; import { resumePlan } from "./resume-plan.ts";
 import { Handoffs, isContextMessage, recordHanded, renderUnseen, sessionStart, withUnseenMessages, type ContextMessage } from "./delta-context.ts"; import { isFreshStart, sinceFreshStart } from "./fresh-start.ts";
-import { extractTurnImages, nativeClips, turnMedia, videoFramesWithin } from "./turn-images.ts"; import { extractLabelledReplayImages } from "./suyuan/replay-images.ts"; // suyuan fork
+import { extractTurnImages, nativeClips, turnMedia, videoFramesWithin } from "./turn-images.ts"; import { replayImagesAsFiles } from "./suyuan/replay-images.ts"; // suyuan fork
 import { callTitleExcerpt } from "./thread-title.ts";
 import { generateThreadTitle } from "./thread-title-generate.ts"; import { createHandedThreadTitle } from "./host/handed-thread-title.ts";
 import { engineCommandCpuMs, engineProcessExited, engineProcessGone, ENGINE_EXIT_STALL_MS, stallLimitMs, stallNotice, TurnWatchdog } from "./turn-watchdog.ts"; import { createIdleThreads } from "./host/idle-threads.ts"; import { createDispatchClaims } from "./host/dispatch-claims.ts";
@@ -7743,7 +7743,7 @@ async function beginTurn(
         userNameFor(threadId),
       ), personLine ? activeMessages : [], skipTranscript, userNameFor(threadId)), lineLabels(threadId));
       const replay = usesNativeImageInput
-        ? extractLabelledReplayImages(selection.inline, turnImages, {}, turnVideos)
+        ? replayImagesAsFiles(selection.inline)
         : { transcript: selection.inline, images: [] };
       const decideContext = (config: string) => {
         const handedStale = resuming.stale(config);

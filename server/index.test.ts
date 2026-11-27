@@ -36,6 +36,7 @@ import {
   type PhoneSecretContext,
 } from "./phone-secret.ts";
 import { workerPort } from "./testing/worker-port.ts";
+import { EARLIER_IMAGE_NOTE } from "./suyuan/replay-images.ts";
 
 const SERVER_DIR = dirname(fileURLToPath(import.meta.url));
 const ROOT = join(SERVER_DIR, "..");
@@ -5369,7 +5370,7 @@ describe("harness HTTP API", () => {
     }
   });
 
-  it("sends an earlier image as native pixels again when an edit rewinds the chat", async () => {
+  it("names an earlier image as a file to open, not as a picture of the latest message, when an edit rewinds the chat", async () => {
     const created = await api("POST", "/api/bots", {
       modelSelection: { instanceId: "claude", model: "claude-sonnet-5" },
       requireAvailableModel: true,
@@ -5413,13 +5414,9 @@ describe("harness HTTP API", () => {
         .toBe(202);
       const rewound = await readJsonFileWhenReady<Dump>(fakeClaudeDump);
       expect(JSON.stringify(rewound.prompt)).toContain("Describe this screenshot");
-      expect(imageBlocks(rewound)).toEqual([
-        expect.objectContaining({ source: expect.objectContaining({ data: png.toString("base64") }) }),
-      ]);
+      expect(imageBlocks(rewound)).toEqual([]); // suyuan fork: server/suyuan/replay-images.ts
       expect(JSON.stringify(rewound.prompt)).not.toContain("attached-image");
-      expect(imagePromptText(rewound.prompt)).toContain(`<attached-file path="${imagePath}" name="tiny.png" />`);
-      const parts = rewound.prompt.message.content as Array<{ type: string; text?: string }>;
-      expect(parts[parts.findIndex((part) => part.type === "image") - 1]).toMatchObject({ type: "text", text: expect.stringContaining("「Describe this screenshot」") });
+      expect(imagePromptText(rewound.prompt)).toContain(`${EARLIER_IMAGE_NOTE}\n\n<attached-file path="${imagePath}" name="tiny.png" />`);
       await releaseTurn(bot.id);
     } finally {
       await api("POST", `/api/bots/${bot.id}/interrupt`, {}).catch(() => undefined);
