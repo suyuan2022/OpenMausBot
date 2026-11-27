@@ -676,6 +676,47 @@ describe("ClaudeDriver turns (fake CLI)", () => {
     ]);
   });
 
+  it("leaves out of the reply a picture the bot only re-opened from its own prompt", async () => {
+    const data = Buffer.from([0x89, 0x50, 0x4e, 0x47, 1, 2, 3]).toString("base64");
+    const promptImage = "/private/tmp/claude-502/-Users-lizhi-Documents-suyuanos/3aa8fed1-0b5f-4013-8ab4-33f7ccd343f1/images/1.png";
+    await create(undefined, {
+      FAKE_CLAUDE_TOOL_CALLS: JSON.stringify([{ name: "Read", input: { file_path: promptImage }, output: [{ type: "image", source: { type: "base64", media_type: "image/png", data } }] }]),
+    });
+    await instance.adapter.sendTurn({ threadId: "t-reopened-image", text: "what was in my picture?" });
+    await recorder.until((e) => e.type === "turn.completed");
+    expect(recorder.events.filter((e) => e.type === "item.completed" && e.itemType === "assistant_image")).toEqual([]);
+    expect(recorder.events.some((e) => e.type === "item.completed" && e.itemType === "tool")).toBe(true);
+  });
+
+  it("puts an image's note right before that image, after none of the others", async () => {
+    await create();
+    const dump = join(scratch, "dump-noted-images.json");
+    process.env.FAKE_CLAUDE_DUMP = dump;
+    const old = Buffer.from([0x89, 0x50, 0x4e, 0x47, 9, 9]);
+    const now = Buffer.from([0x89, 0x50, 0x4e, 0x47, 8, 8]);
+    const oldPath = join(scratch, "old.png");
+    const nowPath = join(scratch, "now.png");
+    writeFileSync(oldPath, old);
+    writeFileSync(nowPath, now);
+
+    await instance.adapter.sendTurn({
+      threadId: "t-noted-images",
+      text: "and this one?",
+      images: [
+        { path: oldPath, mime: "image/png", bytes: old.length, note: "[The next image is from an earlier message.]" },
+        { path: nowPath, mime: "image/png", bytes: now.length },
+      ],
+    });
+    await recorder.until((e) => e.type === "turn.completed");
+
+    expect(JSON.parse(readFileSync(dump, "utf8")).prompt.message.content).toEqual([
+      { type: "text", text: "[The next image is from an earlier message.]" },
+      { type: "image", source: { type: "base64", media_type: "image/png", data: old.toString("base64") } },
+      { type: "image", source: { type: "base64", media_type: "image/png", data: now.toString("base64") } },
+      { type: "text", text: "and this one?" },
+    ]);
+  });
+
   it("names the CLI process while a long tool runs, and no process once the turn is over", async () => {
     const release = join(scratch, "release");
     await create(undefined, {

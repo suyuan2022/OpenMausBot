@@ -5418,6 +5418,8 @@ describe("harness HTTP API", () => {
       ]);
       expect(JSON.stringify(rewound.prompt)).not.toContain("attached-image");
       expect(imagePromptText(rewound.prompt)).toContain(`<attached-file path="${imagePath}" name="tiny.png" />`);
+      const parts = rewound.prompt.message.content as Array<{ type: string; text?: string }>;
+      expect(parts[parts.findIndex((part) => part.type === "image") - 1]).toMatchObject({ type: "text", text: expect.stringContaining("「Describe this screenshot」") });
       await releaseTurn(bot.id);
     } finally {
       await api("POST", `/api/bots/${bot.id}/interrupt`, {}).catch(() => undefined);

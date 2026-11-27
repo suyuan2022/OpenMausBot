@@ -61,7 +61,7 @@ import type { KeepWarmContract } from "./claude-keepwarm.ts"; import { claudeFor
 import { BACKGROUND_CALL_TIMEOUT_MS, backgroundCallArgs, spawnBackgroundCall } from "./claude-background.ts"; import { withEndpointFolder } from "./claude-endpoint-folder.ts";
 import { permissionLaunchCwd, shellRequest } from "./permission-command.ts"; import { readToolPaths } from "../own-file-reads.ts";
 import { SPAWNED_PROXIES } from "../proxy-paths.ts"; import { OWN_APPS_SERVER } from "../../shared/own-apps.ts";
-import { extractMcpImages } from "../mcp-tool-images.ts"; import { claudeToolDraft } from "./tool-progress.ts"; import { redactSecretsInText } from "../../shared/redact.ts";
+import { extractMcpImages } from "../mcp-tool-images.ts"; import { claudeToolDraft } from "./tool-progress.ts"; import { redactSecretsInText } from "../../shared/redact.ts"; import { rememberToolUse, shownToolImages } from "../suyuan/replay-images.ts";
 import {
   ASK_USER_QUESTION_TOOL,
   ASK_USER_TOOL,
@@ -655,14 +655,14 @@ function claudeUserMessage(
   images: readonly ClaudeImage[] | undefined,
 ): ClaudeUserMessage {
   if (!images?.length) return { type: "user", message: { role: "user", content: text } };
-  const content: ClaudeUserContent[] = images.map((image) => ({
-    type: "image",
+  const content: ClaudeUserContent[] = images.flatMap((image) => [...(image.note ? [{ type: "text" as const, text: image.note }] : []), {
+    type: "image" as const,
     source: {
-      type: "base64",
+      type: "base64" as const,
       media_type: image.mime,
       data: readFileSync(image.path).toString("base64"),
     },
-  }));
+  }]);
   if (text) content.push({ type: "text", text });
   return { type: "user", message: { role: "user", content } };
 }
@@ -1493,7 +1493,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
             }
             for (const b of Array.isArray(msg.content) ? msg.content : []) {
               if (b.type === "tool_use") {
-                emit({ ...base(threadId, currentTurnId()), type: "item.started", itemType: "tool", itemId: b.id, title: b.name, summary: commandSummary(b.input), input: toolDetailPreview(b.input) });
+                emit({ ...base(threadId, currentTurnId()), type: "item.started", itemType: "tool", itemId: b.id, title: b.name, summary: commandSummary(b.input), input: toolDetailPreview(b.input) }); rememberToolUse(b.id, b.name, b.input);
               }
             }
             if (msg.usage) {
@@ -1520,7 +1520,7 @@ export const ClaudeDriver: ProviderDriver<ClaudeConfig> = {
             for (const b of Array.isArray(o.message?.content) ? o.message.content : []) {
               if (b.type === "tool_result") {
                 emit({ ...base(threadId, currentTurnId()), type: "item.completed", itemType: "tool", itemId: b.tool_use_id, ok: !b.is_error, output: toolDetailPreview(b.content) });
-                for (const img of extractMcpImages(b.content)) {
+                for (const img of shownToolImages(b.tool_use_id, extractMcpImages(b.content))) {
                   emit({ ...base(threadId, currentTurnId()), type: "item.completed", itemType: "assistant_image", data: img.data, fromTool: true });
                 }
               }
